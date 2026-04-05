@@ -127,13 +127,13 @@ func CalculateWithSlippageSell(amount uint64, basisPoints uint64) (uint64, error
 
 // ===== PumpFun Calculations =====
 
-// PumpFun Constants
+// PumpFun Constants from Rust: src/instruction/utils/pumpfun.rs global_constants
 const (
-	PumpFunFeeBasisPoints     uint64 = 100  // 1%
-	PumpFunCreatorFee         uint64 = 50   // 0.5%
+	PumpFunFeeBasisPoints     uint64 = 95   // Protocol fee (NOT 100!)
+	PumpFunCreatorFee         uint64 = 30   // Creator fee (NOT 50!)
 	PumpFunInitialVirtualToken        = 1073000000000000
 	PumpFunInitialVirtualSol          = 30000000000
-	PumpFunInitialRealToken           = 793000000000000
+	PumpFunInitialRealToken           = 793100000000000 // Fixed: was 793000000000000
 	PumpFunTokenTotalSupply           = 1000000000000000
 )
 
@@ -209,11 +209,11 @@ func GetSellSolAmountFromTokenAmount(
 
 // ===== PumpSwap Calculations =====
 
-// PumpSwap Constants
+// PumpSwap Constants from Rust: src/instruction/utils/pumpswap.rs accounts
 const (
-	PumpSwapLPFeeBasisPoints         uint64 = 20   // 0.2%
-	PumpSwapProtocolFeeBasisPoints   uint64 = 20   // 0.2%
-	PumpSwapCoinCreatorFeeBasisPoints uint64 = 10  // 0.1%
+	PumpSwapLPFeeBasisPoints         uint64 = 25   // 0.25% (was 20)
+	PumpSwapProtocolFeeBasisPoints   uint64 = 5    // 0.05% (was 20)
+	PumpSwapCoinCreatorFeeBasisPoints uint64 = 5   // 0.05% (was 10)
 )
 
 // BuyBaseInputResult contains results for buying base tokens with base amount input
