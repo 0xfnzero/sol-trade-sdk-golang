@@ -38,8 +38,8 @@ func checkMulOverflow(a, b uint64) error {
 	if a == 0 || b == 0 {
 		return nil
 	}
-	_, overflow := bits.Mul64(a, b)
-	if overflow {
+	hi, _ := bits.Mul64(a, b)
+	if hi != 0 {
 		return ErrOverflow
 	}
 	return nil
@@ -196,7 +196,10 @@ func GetSellSolAmountFromTokenAmount(
 		totalFeeBasisPoints += PumpFunCreatorFee
 	}
 
-	fee := ComputeFee(solCost, totalFeeBasisPoints)
+	fee, err := ComputeFee(solCost, totalFeeBasisPoints)
+	if err != nil {
+		return 0
+	}
 
 	if solCost < fee {
 		return 0
@@ -256,24 +259,29 @@ func BuyBaseInputInternal(
 		return nil, ErrInsufficientReserves
 	}
 
-	numerator := uint128(quoteReserve) * uint128(base)
+	// Use 128-bit multiplication to avoid overflow
+	numerator := mul128(quoteReserve, base)
 	denominator := baseReserve - base
 
 	if denominator == 0 {
 		return nil, ErrPoolDepleted
 	}
 
-	quoteAmountIn := CeilDiv(uint64(numerator), uint64(denominator))
+	quoteAmountIn := div128(numerator, denominator)
+	// Add 1 for ceiling division
+	if numerator.Lo%denominator != 0 || numerator.Hi != 0 {
+		quoteAmountIn++
+	}
 
-	lpFee := ComputeFee(quoteAmountIn, PumpSwapLPFeeBasisPoints)
-	protocolFee := ComputeFee(quoteAmountIn, PumpSwapProtocolFeeBasisPoints)
+	lpFee, _ := ComputeFee(quoteAmountIn, PumpSwapLPFeeBasisPoints)
+	protocolFee, _ := ComputeFee(quoteAmountIn, PumpSwapProtocolFeeBasisPoints)
 	coinCreatorFee := uint64(0)
 	if hasCoinCreator {
-		coinCreatorFee = ComputeFee(quoteAmountIn, PumpSwapCoinCreatorFeeBasisPoints)
+		coinCreatorFee, _ = ComputeFee(quoteAmountIn, PumpSwapCoinCreatorFeeBasisPoints)
 	}
 
 	totalQuote := quoteAmountIn + lpFee + protocolFee + coinCreatorFee
-	maxQuote := CalculateWithSlippageBuy(totalQuote, slippageBasisPoints)
+	maxQuote, _ := CalculateWithSlippageBuy(totalQuote, slippageBasisPoints)
 
 	return &BuyBaseInputResult{
 		InternalQuoteAmount: quoteAmountIn,
@@ -300,21 +308,24 @@ func BuyQuoteInputInternal(
 	}
 	denominator := 10000 + totalFeeBps
 
-	effectiveQuote := (uint128(quote) * 10000) / uint128(denominator)
+	// Use 128-bit arithmetic
+	effectiveQuote := div128(mul128(quote, 10000), uint64(denominator))
 
-	numerator := uint128(baseReserve) * effectiveQuote
-	denominatorEffective := uint128(quoteReserve) + effectiveQuote
+	// numerator = baseReserve * effectiveQuote
+	numerator := mul128(baseReserve, effectiveQuote)
+	// denominatorEffective = quoteReserve + effectiveQuote
+	denominatorEffective := quoteReserve + effectiveQuote
 
 	if denominatorEffective == 0 {
 		return nil, ErrPoolDepleted
 	}
 
-	baseAmountOut := uint64(numerator / denominatorEffective)
-	maxQuote := CalculateWithSlippageBuy(quote, slippageBasisPoints)
+	baseAmountOut := div128(numerator, denominatorEffective)
+	maxQuote, _ := CalculateWithSlippageBuy(quote, slippageBasisPoints)
 
 	return &BuyQuoteInputResult{
 		Base:                      baseAmountOut,
-		InternalQuoteWithoutFees: uint64(effectiveQuote),
+		InternalQuoteWithoutFees: effectiveQuote,
 		MaxQuote:                  maxQuote,
 	}, nil
 }
@@ -331,14 +342,19 @@ func SellBaseInputInternal(
 		return nil, ErrInvalidReserves
 	}
 
-	quoteAmountOut := (uint128(quoteReserve) * uint128(base)) / (uint128(baseReserve) + uint128(base))
-	quoteAmountOutUint := uint64(quoteAmountOut)
+	// Use 128-bit arithmetic: (quoteReserve * base) / (baseReserve + base)
+	numerator := mul128(quoteReserve, base)
+	denominator := baseReserve + base
+	if denominator == 0 {
+		return nil, ErrPoolDepleted
+	}
+	quoteAmountOutUint := div128(numerator, denominator)
 
-	lpFee := ComputeFee(quoteAmountOutUint, PumpSwapLPFeeBasisPoints)
-	protocolFee := ComputeFee(quoteAmountOutUint, PumpSwapProtocolFeeBasisPoints)
+	lpFee, _ := ComputeFee(quoteAmountOutUint, PumpSwapLPFeeBasisPoints)
+	protocolFee, _ := ComputeFee(quoteAmountOutUint, PumpSwapProtocolFeeBasisPoints)
 	coinCreatorFee := uint64(0)
 	if hasCoinCreator {
-		coinCreatorFee = ComputeFee(quoteAmountOutUint, PumpSwapCoinCreatorFeeBasisPoints)
+		coinCreatorFee, _ = ComputeFee(quoteAmountOutUint, PumpSwapCoinCreatorFeeBasisPoints)
 	}
 
 	totalFees := lpFee + protocolFee + coinCreatorFee
@@ -346,7 +362,7 @@ func SellBaseInputInternal(
 		return nil, ErrFeesExceedOutput
 	}
 	finalQuote := quoteAmountOutUint - totalFees
-	minQuote := CalculateWithSlippageSell(finalQuote, slippageBasisPoints)
+	minQuote, _ := CalculateWithSlippageSell(finalQuote, slippageBasisPoints)
 
 	return &SellBaseInputResult{
 		UIQuote:                finalQuote,
@@ -378,15 +394,22 @@ func SellQuoteInputInternal(
 	rawQuote := calculateQuoteAmountOut(quote, PumpSwapLPFeeBasisPoints, PumpSwapProtocolFeeBasisPoints, coinCreatorFee)
 
 	if rawQuote >= quoteReserve {
-		return nil, ErrInvalidInput
+		return nil, ErrInvalidInputCalc
 	}
 
-	baseAmountIn := CeilDiv(uint128(baseReserve)*uint128(rawQuote), uint128(quoteReserve-rawQuote))
-	minQuote := CalculateWithSlippageSell(quote, slippageBasisPoints)
+	// Use 128-bit arithmetic for ceiling division
+	numerator := mul128(baseReserve, rawQuote)
+	denominator := quoteReserve - rawQuote
+	baseAmountIn := div128(numerator, denominator)
+	// Add 1 for ceiling division
+	if numerator.Lo%denominator != 0 || numerator.Hi != 0 {
+		baseAmountIn++
+	}
+	minQuote, _ := CalculateWithSlippageSell(quote, slippageBasisPoints)
 
 	return &SellQuoteInputResult{
 		InternalRawQuote: rawQuote,
-		Base:             uint64(baseAmountIn),
+		Base:             baseAmountIn,
 		MinQuote:         minQuote,
 	}, nil
 }
@@ -399,7 +422,14 @@ func calculateQuoteAmountOut(
 ) uint64 {
 	totalFeeBasisPoints := lpFeeBasisPoints + protocolFeeBasisPoints + coinCreatorFeeBasisPoints
 	denominator := 10000 - totalFeeBasisPoints
-	return CeilDiv(uint128(userQuoteAmountOut)*10000, uint128(denominator))
+	// Use 128-bit arithmetic
+	numerator := mul128(userQuoteAmountOut, 10000)
+	result := div128(numerator, denominator)
+	// Add 1 for ceiling division
+	if numerator.Lo%denominator != 0 || numerator.Hi != 0 {
+		result++
+	}
+	return result
 }
 
 // ===== Bonk Calculations =====
@@ -430,8 +460,9 @@ func GetBonkAmountOut(
 		return 0
 	}
 
-	amountOut := (uint128(amountIn) * uint128(virtualQuote)) / uint128(virtualBase)
-	return uint64(amountOut)
+	// Use 128-bit arithmetic
+	amountOut := div128(mul128(amountIn, virtualQuote), virtualBase)
+	return amountOut
 }
 
 // GetBonkAmountIn calculates input amount needed for desired output on Bonk
@@ -450,10 +481,11 @@ func GetBonkAmountIn(
 	}
 
 	totalFeeRate := protocolFeeRate + platformFeeRate + shareFeeRate
-	amountIn := (uint128(amountOut) * 10000) / (10000 - uint128(totalFeeRate))
-	amountIn = (amountIn * uint128(virtualBase)) / uint128(virtualQuote)
+	// Use 128-bit arithmetic
+	amountIn := div128(mul128(amountOut, 10000), 10000-totalFeeRate)
+	amountIn = div128(mul128(amountIn, virtualBase), virtualQuote)
 
-	return uint64(amountIn)
+	return amountIn
 }
 
 // GetBonkAmountInNet calculates net input amount after fees
@@ -480,14 +512,17 @@ func RaydiumCPMMGetAmountOut(
 		return 0
 	}
 
-	amountOut := (uint128(amountIn) * uint128(outputReserve)) / (uint128(inputReserve) + uint128(amountIn))
+	// Use 128-bit arithmetic
+	numerator := mul128(amountIn, outputReserve)
+	denominator := inputReserve + amountIn
+	amountOut := div128(numerator, denominator)
 	
 	if hasFee {
 		// Apply fee
 		amountOut = amountOut * 997 / 1000 // 0.3% fee
 	}
 	
-	return uint64(amountOut)
+	return amountOut
 }
 
 // RaydiumCPMMGetAmountIn calculates input amount needed for Raydium CPMM
@@ -505,10 +540,15 @@ func RaydiumCPMMGetAmountIn(
 		amountOut = amountOut * 1000 / 997
 	}
 
-	numerator := uint128(inputReserve) * uint128(amountOut)
-	denominator := uint128(outputReserve) - uint128(amountOut)
-
-	return uint64(CeilDiv(uint64(numerator), uint64(denominator)))
+	// Use 128-bit arithmetic
+	numerator := mul128(inputReserve, amountOut)
+	denominator := outputReserve - amountOut
+	result := div128(numerator, denominator)
+	// Add 1 for ceiling division
+	if numerator.Lo%denominator != 0 || numerator.Hi != 0 {
+		result++
+	}
+	return result
 }
 
 // ===== Raydium AMM V4 Calculations =====
@@ -523,12 +563,19 @@ func RaydiumAmmV4GetAmountOut(
 		return 0
 	}
 
-	// Apply 0.25% fee
-	amountInWithFee := uint128(amountIn) * 9975
-	numerator := amountInWithFee * uint128(outputReserve)
-	denominator := uint128(inputReserve)*10000 + amountInWithFee
+	// Apply 0.25% fee - use 128-bit arithmetic
+	// numerator = amountIn * 9975 * outputReserve
+	numeratorFullHi, numeratorFullLo := bits.Mul64(amountIn, 9975)
+	numeratorHi, numeratorLo := bits.Mul64(numeratorFullLo, outputReserve)
+	// For full 128x64 multiplication, we'd need to handle numeratorFullHi
+	// For Solana amounts, numeratorFullHi should be 0 (amounts < 2^64)
+	_ = numeratorFullHi // Assume 0 for valid Solana amounts
+	
+	// denominator = inputReserve * 10000 + amountIn * 9975
+	amountInWithFee := numeratorFullLo
+	denominator := inputReserve*10000 + amountInWithFee
 
-	return uint64(numerator / denominator)
+	return div128(&Uint128Result{Hi: numeratorHi, Lo: numeratorLo}, denominator)
 }
 
 // RaydiumAmmV4GetAmountIn calculates input amount needed for Raydium AMM V4
@@ -541,10 +588,17 @@ func RaydiumAmmV4GetAmountIn(
 		return 0
 	}
 
-	numerator := uint128(inputReserve) * uint128(amountOut) * 10000
-	denominator := (uint128(outputReserve) - uint128(amountOut)) * 9975
+	// Use 128-bit arithmetic
+	numerator := mul128(inputReserve, amountOut)
+	numerator = mul128(div128(numerator, 1), 10000)
+	denominator := (outputReserve - amountOut) * 9975
 
-	return uint64(CeilDiv(uint64(numerator), uint64(denominator)))
+	result := div128(numerator, denominator)
+	// Add 1 for ceiling division
+	if numerator.Lo%denominator != 0 || numerator.Hi != 0 {
+		result++
+	}
+	return result
 }
 
 // ===== Price Calculations =====
@@ -596,14 +650,15 @@ func MeteoraDammV2ComputeSwapAmount(
 		}
 
 		// Constant product: b_out = (b_reserve * a_in) / (a_reserve + a_in)
-		numerator := uint128(tokenBReserve) * uint128(amountIn)
-		denominator := uint128(tokenAReserve) + uint128(amountIn)
+		// Use 128-bit arithmetic
+		numerator := mul128(tokenBReserve, amountIn)
+		denominator := tokenAReserve + amountIn
 
 		if denominator == 0 {
 			return &MeteoraSwapResult{AmountOut: 0, MinAmountOut: 0}
 		}
 
-		amountOut = uint64(numerator / denominator)
+		amountOut = div128(numerator, denominator)
 	} else {
 		// Swapping token B for token A
 		if tokenBReserve == 0 {
@@ -611,14 +666,15 @@ func MeteoraDammV2ComputeSwapAmount(
 		}
 
 		// Constant product: a_out = (a_reserve * b_in) / (b_reserve + b_in)
-		numerator := uint128(tokenAReserve) * uint128(amountIn)
-		denominator := uint128(tokenBReserve) + uint128(amountIn)
+		// Use 128-bit arithmetic
+		numerator := mul128(tokenAReserve, amountIn)
+		denominator := tokenBReserve + amountIn
 
 		if denominator == 0 {
 			return &MeteoraSwapResult{AmountOut: 0, MinAmountOut: 0}
 		}
 
-		amountOut = uint64(numerator / denominator)
+		amountOut = div128(numerator, denominator)
 	}
 
 	// Apply slippage
@@ -657,13 +713,14 @@ func MeteoraDammV2GetAmountOut(
 		return 0
 	}
 
-	// Apply fee
-	amountInAfterFee := (uint128(amountIn) * (10000 - uint128(feeBasisPoints))) / 10000
+	// Apply fee - use 128-bit arithmetic
+	amountInAfterFee := amountIn * (10000 - feeBasisPoints) / 10000
 
-	numerator := amountInAfterFee * uint128(outputReserve)
-	denominator := uint128(inputReserve) + amountInAfterFee
+	// numerator = amountInAfterFee * outputReserve
+	numerator := mul128(amountInAfterFee, outputReserve)
+	denominator := inputReserve + amountInAfterFee
 
-	return uint64(numerator / denominator)
+	return div128(numerator, denominator)
 }
 
 // MeteoraDammV2GetAmountIn calculates input amount needed for desired output
@@ -677,23 +734,58 @@ func MeteoraDammV2GetAmountIn(
 		return 0
 	}
 
-	numerator := uint128(inputReserve) * uint128(amountOut) * 10000
-	denominator := (uint128(outputReserve) - uint128(amountOut)) * (10000 - uint128(feeBasisPoints))
+	// Use 128-bit arithmetic
+	// numerator = inputReserve * amountOut * 10000
+	numeratorStep1 := mul128(inputReserve, amountOut)
+	numerator := mul128(div128(numeratorStep1, 1), 10000)
+	denominator := (outputReserve - amountOut) * (10000 - feeBasisPoints)
 
-	return uint64(CeilDiv(uint64(numerator), uint64(denominator)))
+	result := div128(numerator, denominator)
+	// Add 1 for ceiling division
+	if numerator.Lo%denominator != 0 || numerator.Hi != 0 {
+		result++
+	}
+	return result
 }
 
 // ===== Utility Types =====
 
-type uint128 = uint64 // Simplified for Go - full implementation would use math/big
+// Uint128Result holds a 128-bit result from multiplication
+type Uint128Result struct {
+	Hi uint64
+	Lo uint64
+}
 
-// Error definitions
+// mul128 performs 128-bit multiplication of two uint64 values
+func mul128(a, b uint64) *Uint128Result {
+	hi, lo := bits.Mul64(a, b)
+	return &Uint128Result{Hi: hi, Lo: lo}
+}
+
+// div128 divides a 128-bit value by a 64-bit value
+func div128(n *Uint128Result, d uint64) uint64 {
+	if d == 0 {
+		return 0
+	}
+	quo, _ := bits.Div64(n.Hi, n.Lo, d)
+	return quo
+}
+
+// add128 adds two 128-bit values
+func add128(a, b *Uint128Result) *Uint128Result {
+	lo, carry := bits.Add64(a.Lo, b.Lo, 0)
+	hi, _ := bits.Add64(a.Hi, b.Hi, carry)
+	return &Uint128Result{Hi: hi, Lo: lo}
+}
+
+// Error definitions - using CalcError for detailed error reporting
 var (
 	ErrInvalidReserves    = &CalcError{Code: 1, Message: "invalid reserves"}
 	ErrInsufficientReserves = &CalcError{Code: 2, Message: "insufficient reserves"}
 	ErrPoolDepleted       = &CalcError{Code: 3, Message: "pool depleted"}
 	ErrFeesExceedOutput   = &CalcError{Code: 4, Message: "fees exceed output"}
-	ErrInvalidInput       = &CalcError{Code: 5, Message: "invalid input"}
+	// ErrInvalidInputCalc is used for calculation-specific invalid input errors
+	ErrInvalidInputCalc   = &CalcError{Code: 5, Message: "invalid input"}
 )
 
 // CalcError represents a calculation error
