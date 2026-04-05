@@ -28,6 +28,18 @@
 
 ---
 
+## 📦 SDK Versions
+
+This SDK is available in multiple languages:
+
+| Language | Repository | Description |
+|----------|------------|-------------|
+| **Node.js** | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | TypeScript/JavaScript for Node.js |
+| **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | Async/await native support |
+| **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | Concurrent-safe with goroutine support |
+
+---
+
 A comprehensive, high-performance Go SDK for Solana DEX trading with support for multiple protocols and MEV providers.
 
 ## Features

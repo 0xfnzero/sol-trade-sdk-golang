@@ -28,6 +28,18 @@
 
 ---
 
+## 📦 SDK 版本
+
+本 SDK 提供多种语言版本：
+
+| 语言 | 仓库 | 描述 |
+|------|------|------|
+| **Node.js** | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | TypeScript/JavaScript，Node.js 支持 |
+| **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | 原生 async/await 支持 |
+| **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | 并发安全，goroutine 支持 |
+
+---
+
 一个全面的高性能 Go SDK，用于 Solana DEX 交易，支持多种协议和 MEV 提供商。
 
 ## 特性
