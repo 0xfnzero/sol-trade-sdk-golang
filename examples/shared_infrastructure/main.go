@@ -11,8 +11,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
+	"github.com/your-org/sol-trade-sdk-go/pkg/common"
+	"github.com/your-org/sol-trade-sdk-go/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -28,8 +28,8 @@ func main() {
 	// Configure SWQoS services
 	swqosConfigs := []common.SwqosConfig{
 		{Type: common.SwqosTypeDefault, URL: rpcURL},
-		{Type: common.SwqosTypeJito, UUID: "your_uuid", Region: common.SwqosRegionFrankfurt},
-		{Type: common.SwqosTypeBloxroute, APIToken: "your_api_token", Region: common.SwqosRegionFrankfurt},
+		{Type: common.SwqosTypeJito, APIKey: "your_uuid", Region: common.SwqosRegionFrankfurt},
+		{Type: common.SwqosTypeBloxroute, APIKey: "your_api_token", Region: common.SwqosRegionFrankfurt},
 	}
 
 	// Create infrastructure once (expensive operation)

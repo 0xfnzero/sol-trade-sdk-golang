@@ -10,8 +10,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
+	"github.com/your-org/sol-trade-sdk-go/pkg/calc"
+	"github.com/your-org/sol-trade-sdk-go/pkg/constants"
 )
 
 // ===== Raydium AMM V4 Program Constants from Rust: src/instruction/utils/raydium_amm_v4.rs =====

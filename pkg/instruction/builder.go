@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
-	soltradesdk "github.com/your-org/sol-trade-sdk-go"
+	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
 	"github.com/your-org/sol-trade-sdk-go/pkg/constants"
 	"github.com/your-org/sol-trade-sdk-go/pkg/params"
 )

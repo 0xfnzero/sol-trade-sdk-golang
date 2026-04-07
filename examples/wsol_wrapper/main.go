@@ -14,8 +14,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
+	"github.com/your-org/sol-trade-sdk-go/pkg/common"
+	"github.com/your-org/sol-trade-sdk-go/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )

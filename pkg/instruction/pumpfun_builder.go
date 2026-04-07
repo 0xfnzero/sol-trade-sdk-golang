@@ -14,9 +14,9 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
+	"github.com/your-org/sol-trade-sdk-go/pkg/calc"
+	"github.com/your-org/sol-trade-sdk-go/pkg/common"
+	"github.com/your-org/sol-trade-sdk-go/pkg/constants"
 )
 
 // ===== PumpFun Program Constants from Rust: src/instruction/utils/pumpfun.rs =====

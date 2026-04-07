@@ -3,7 +3,7 @@ package trading_test
 import (
 	"testing"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go"
+	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
 	"github.com/your-org/sol-trade-sdk-go/pkg/common"
 	"github.com/your-org/sol-trade-sdk-go/pkg/trading"
 )

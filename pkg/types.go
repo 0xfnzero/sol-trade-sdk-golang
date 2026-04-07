@@ -51,28 +51,35 @@ const (
 type SwqosRegion int
 
 const (
-	SwqosRegionFrankfurt SwqosRegion = iota
-	SwqosRegionNewYork
+	SwqosRegionNewYork SwqosRegion = iota
+	SwqosRegionFrankfurt
 	SwqosRegionAmsterdam
+	SwqosRegionSLC
 	SwqosRegionTokyo
-	SwqosRegionSingapore
+	SwqosRegionLondon
+	SwqosRegionLosAngeles
+	SwqosRegionDefault
 )
 
 // SwqosType represents the type of SWQOS service
 type SwqosType int
 
 const (
-	SwqosTypeDefault SwqosType = iota
-	SwqosTypeJito
-	SwqosTypeBloxroute
+	SwqosTypeJito SwqosType = iota
+	SwqosTypeNextBlock
 	SwqosTypeZeroSlot
 	SwqosTypeTemporal
+	SwqosTypeBloxroute
+	SwqosTypeNode1
 	SwqosTypeFlashBlock
 	SwqosTypeBlockRazor
-	SwqosTypeNode1
 	SwqosTypeAstralane
-	SwqosTypeNextBlock
+	SwqosTypeStellium
+	SwqosTypeLightspeed
+	SwqosTypeSoyas
+	SwqosTypeSpeedlanding
 	SwqosTypeHelius
+	SwqosTypeDefault
 )
 
 // SwqosConfig represents SWQOS service configuration
@@ -207,7 +214,7 @@ type TradeBuyParams struct {
 	SlippageBasisPoints       uint64
 	RecentBlockhash           *solana.Hash
 	ExtensionParams           interface{}
-	AddressLookupTableAccount *solana.AddressLookupTableAccount
+	AddressLookupTableAccount *solana.PublicKey
 	WaitTxConfirmed           bool
 	CreateInputTokenATA       bool
 	CloseInputTokenATA        bool
@@ -230,7 +237,7 @@ type TradeSellParams struct {
 	RecentBlockhash           *solana.Hash
 	WithTip                   bool
 	ExtensionParams           interface{}
-	AddressLookupTableAccount *solana.AddressLookupTableAccount
+	AddressLookupTableAccount *solana.PublicKey
 	WaitTxConfirmed           bool
 	CreateOutputTokenATA      bool
 	CloseOutputTokenATA       bool
@@ -258,11 +265,10 @@ type SwqosTiming struct {
 
 // TradingClient is the main client for Solana trading operations
 type TradingClient struct {
-	payer         *solana.PrivateKey
-	rpcClient     *rpc.Client
-	tradeConfig   *TradeConfig
-	middleware    MiddlewareManager
-	logEnabled    bool
+	payer       *solana.PrivateKey
+	rpcClient   *rpc.Client
+	tradeConfig *TradeConfig
+	logEnabled  bool
 }
 
 // NewTradingClient creates a new TradingClient

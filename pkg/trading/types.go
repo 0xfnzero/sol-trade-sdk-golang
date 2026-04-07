@@ -1,7 +1,7 @@
 package trading
 
 import (
-	soltradesdk "github.com/your-org/sol-trade-sdk-go"
+	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
 )
 
 // Re-exports from the main package for convenience
@@ -31,15 +31,28 @@ const (
 	TradeTypeBuy  = soltradesdk.TradeTypeBuy
 	TradeTypeSell = soltradesdk.TradeTypeSell
 
-	SwqosTypeDefault   = soltradesdk.SwqosTypeDefault
-	SwqosTypeJito      = soltradesdk.SwqosTypeJito
-	SwqosTypeBloxroute = soltradesdk.SwqosTypeBloxroute
-	SwqosTypeZeroSlot  = soltradesdk.SwqosTypeZeroSlot
-	SwqosTypeTemporal  = soltradesdk.SwqosTypeTemporal
-	SwqosTypeFlashBlock = soltradesdk.SwqosTypeFlashBlock
-	SwqosTypeBlockRazor = soltradesdk.SwqosTypeBlockRazor
-	SwqosTypeNode1      = soltradesdk.SwqosTypeNode1
-	SwqosTypeAstralane  = soltradesdk.SwqosTypeAstralane
-	SwqosTypeNextBlock  = soltradesdk.SwqosTypeNextBlock
-	SwqosTypeHelius     = soltradesdk.SwqosTypeHelius
+	SwqosTypeJito         = soltradesdk.SwqosTypeJito
+	SwqosTypeNextBlock    = soltradesdk.SwqosTypeNextBlock
+	SwqosTypeZeroSlot     = soltradesdk.SwqosTypeZeroSlot
+	SwqosTypeTemporal     = soltradesdk.SwqosTypeTemporal
+	SwqosTypeBloxroute    = soltradesdk.SwqosTypeBloxroute
+	SwqosTypeNode1        = soltradesdk.SwqosTypeNode1
+	SwqosTypeFlashBlock   = soltradesdk.SwqosTypeFlashBlock
+	SwqosTypeBlockRazor   = soltradesdk.SwqosTypeBlockRazor
+	SwqosTypeAstralane    = soltradesdk.SwqosTypeAstralane
+	SwqosTypeStellium     = soltradesdk.SwqosTypeStellium
+	SwqosTypeLightspeed   = soltradesdk.SwqosTypeLightspeed
+	SwqosTypeSoyas        = soltradesdk.SwqosTypeSoyas
+	SwqosTypeSpeedlanding = soltradesdk.SwqosTypeSpeedlanding
+	SwqosTypeHelius       = soltradesdk.SwqosTypeHelius
+	SwqosTypeDefault      = soltradesdk.SwqosTypeDefault
+
+	SwqosRegionNewYork    = soltradesdk.SwqosRegionNewYork
+	SwqosRegionFrankfurt  = soltradesdk.SwqosRegionFrankfurt
+	SwqosRegionAmsterdam  = soltradesdk.SwqosRegionAmsterdam
+	SwqosRegionSLC        = soltradesdk.SwqosRegionSLC
+	SwqosRegionTokyo      = soltradesdk.SwqosRegionTokyo
+	SwqosRegionLondon     = soltradesdk.SwqosRegionLondon
+	SwqosRegionLosAngeles = soltradesdk.SwqosRegionLosAngeles
+	SwqosRegionDefault    = soltradesdk.SwqosRegionDefault
 )

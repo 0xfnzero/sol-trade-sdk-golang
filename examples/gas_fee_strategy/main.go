@@ -8,7 +8,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
+	"github.com/your-org/sol-trade-sdk-go/pkg/common"
 )
 
 func main() {

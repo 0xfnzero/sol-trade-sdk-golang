@@ -136,26 +136,26 @@ func (p *SwqosProviderBase) RateLimitCheck() {
 
 // ===== Additional Provider Implementations =====
 
-// NextBlockClient NextBlock SWQOS client
-type NextBlockClient struct {
+// NextBlockExtClient NextBlock extended SWQOS client (stats-tracking)
+type NextBlockExtClient struct {
 	SwqosProviderBase
 	apiURL string
 }
 
-// NewNextBlockClient creates new NextBlock client
-func NewNextBlockClient(config *SwqosConfigExtended) *NextBlockClient {
+// NewNextBlockExtClient creates new NextBlock extended client
+func NewNextBlockExtClient(config *SwqosConfigExtended) *NextBlockExtClient {
 	url := config.URL
 	if url == "" {
 		url = "https://api.nextblock.io"
 	}
-	return &NextBlockClient{
+	return &NextBlockExtClient{
 		SwqosProviderBase: SwqosProviderBase{config: config},
 		apiURL:            url,
 	}
 }
 
 // SubmitTransaction submits transaction via NextBlock
-func (c *NextBlockClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
+func (c *NextBlockExtClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
 	c.RateLimitCheck()
 	start := time.Now()
 
@@ -195,26 +195,26 @@ func (c *NextBlockClient) SubmitTransaction(ctx context.Context, tx []byte, tip 
 	return &TransactionResult{Signature: sig, Success: true, Provider: "NextBlock", LatencyMs: latency}, nil
 }
 
-// Node1Client Node1 SWQOS client
-type Node1Client struct {
+// Node1ExtClient Node1 extended SWQOS client (stats-tracking)
+type Node1ExtClient struct {
 	SwqosProviderBase
 	apiURL string
 }
 
-// NewNode1Client creates new Node1 client
-func NewNode1Client(config *SwqosConfigExtended) *Node1Client {
+// NewNode1ExtClient creates new Node1 extended client
+func NewNode1ExtClient(config *SwqosConfigExtended) *Node1ExtClient {
 	url := config.URL
 	if url == "" {
 		url = "https://api.node1.io"
 	}
-	return &Node1Client{
+	return &Node1ExtClient{
 		SwqosProviderBase: SwqosProviderBase{config: config},
 		apiURL:            url,
 	}
 }
 
 // SubmitTransaction submits transaction via Node1
-func (c *Node1Client) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
+func (c *Node1ExtClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
 	c.RateLimitCheck()
 	start := time.Now()
 
@@ -254,26 +254,26 @@ func (c *Node1Client) SubmitTransaction(ctx context.Context, tx []byte, tip uint
 	return &TransactionResult{Signature: sig, Success: true, Provider: "Node1", LatencyMs: latency}, nil
 }
 
-// BlockRazorClient BlockRazor SWQOS client
-type BlockRazorClient struct {
+// BlockRazorExtClient BlockRazor extended SWQOS client (stats-tracking)
+type BlockRazorExtClient struct {
 	SwqosProviderBase
 	apiURL string
 }
 
-// NewBlockRazorClient creates new BlockRazor client
-func NewBlockRazorClient(config *SwqosConfigExtended) *BlockRazorClient {
+// NewBlockRazorExtClient creates new BlockRazor extended client
+func NewBlockRazorExtClient(config *SwqosConfigExtended) *BlockRazorExtClient {
 	url := config.URL
 	if url == "" {
 		url = "https://api.blockrazor.io"
 	}
-	return &BlockRazorClient{
+	return &BlockRazorExtClient{
 		SwqosProviderBase: SwqosProviderBase{config: config},
 		apiURL:            url,
 	}
 }
 
 // SubmitTransaction submits transaction via BlockRazor
-func (c *BlockRazorClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
+func (c *BlockRazorExtClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
 	c.RateLimitCheck()
 	start := time.Now()
 
@@ -310,26 +310,26 @@ func (c *BlockRazorClient) SubmitTransaction(ctx context.Context, tx []byte, tip
 	return &TransactionResult{Signature: sig, Success: true, Provider: "BlockRazor", LatencyMs: latency}, nil
 }
 
-// AstralaneClient Astralane SWQOS client
-type AstralaneClient struct {
+// AstralaneExtClient Astralane extended SWQOS client (stats-tracking)
+type AstralaneExtClient struct {
 	SwqosProviderBase
 	apiURL string
 }
 
-// NewAstralaneClient creates new Astralane client
-func NewAstralaneClient(config *SwqosConfigExtended) *AstralaneClient {
+// NewAstralaneExtClient creates new Astralane extended client
+func NewAstralaneExtClient(config *SwqosConfigExtended) *AstralaneExtClient {
 	url := config.URL
 	if url == "" {
 		url = "https://api.astralane.io"
 	}
-	return &AstralaneClient{
+	return &AstralaneExtClient{
 		SwqosProviderBase: SwqosProviderBase{config: config},
 		apiURL:            url,
 	}
 }
 
 // SubmitTransaction submits transaction via Astralane
-func (c *AstralaneClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
+func (c *AstralaneExtClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
 	c.RateLimitCheck()
 	start := time.Now()
 
@@ -366,26 +366,26 @@ func (c *AstralaneClient) SubmitTransaction(ctx context.Context, tx []byte, tip 
 	return &TransactionResult{Signature: sig, Success: true, Provider: "Astralane", LatencyMs: latency}, nil
 }
 
-// StelliumClient Stellium SWQOS client
-type StelliumClient struct {
+// StelliumExtClient Stellium extended SWQOS client (stats-tracking)
+type StelliumExtClient struct {
 	SwqosProviderBase
 	apiURL string
 }
 
-// NewStelliumClient creates new Stellium client
-func NewStelliumClient(config *SwqosConfigExtended) *StelliumClient {
+// NewStelliumExtClient creates new Stellium extended client
+func NewStelliumExtClient(config *SwqosConfigExtended) *StelliumExtClient {
 	url := config.URL
 	if url == "" {
 		url = "https://api.stellium.io"
 	}
-	return &StelliumClient{
+	return &StelliumExtClient{
 		SwqosProviderBase: SwqosProviderBase{config: config},
 		apiURL:            url,
 	}
 }
 
 // SubmitTransaction submits transaction via Stellium
-func (c *StelliumClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
+func (c *StelliumExtClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
 	c.RateLimitCheck()
 	start := time.Now()
 
@@ -422,26 +422,26 @@ func (c *StelliumClient) SubmitTransaction(ctx context.Context, tx []byte, tip u
 	return &TransactionResult{Signature: sig, Success: true, Provider: "Stellium", LatencyMs: latency}, nil
 }
 
-// LightspeedClient Lightspeed SWQOS client
-type LightspeedClient struct {
+// LightspeedExtClient Lightspeed extended SWQOS client (stats-tracking)
+type LightspeedExtClient struct {
 	SwqosProviderBase
 	apiURL string
 }
 
-// NewLightspeedClient creates new Lightspeed client
-func NewLightspeedClient(config *SwqosConfigExtended) *LightspeedClient {
+// NewLightspeedExtClient creates new Lightspeed extended client
+func NewLightspeedExtClient(config *SwqosConfigExtended) *LightspeedExtClient {
 	url := config.URL
 	if url == "" {
 		url = "https://api.lightspeed.trade"
 	}
-	return &LightspeedClient{
+	return &LightspeedExtClient{
 		SwqosProviderBase: SwqosProviderBase{config: config},
 		apiURL:            url,
 	}
 }
 
 // SubmitTransaction submits transaction via Lightspeed
-func (c *LightspeedClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
+func (c *LightspeedExtClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
 	c.RateLimitCheck()
 	start := time.Now()
 
@@ -478,26 +478,26 @@ func (c *LightspeedClient) SubmitTransaction(ctx context.Context, tx []byte, tip
 	return &TransactionResult{Signature: sig, Success: true, Provider: "Lightspeed", LatencyMs: latency}, nil
 }
 
-// SoyasClient Soyas SWQOS client
-type SoyasClient struct {
+// SoyasExtClient Soyas extended SWQOS client (stats-tracking)
+type SoyasExtClient struct {
 	SwqosProviderBase
 	apiURL string
 }
 
-// NewSoyasClient creates new Soyas client
-func NewSoyasClient(config *SwqosConfigExtended) *SoyasClient {
+// NewSoyasExtClient creates new Soyas extended client
+func NewSoyasExtClient(config *SwqosConfigExtended) *SoyasExtClient {
 	url := config.URL
 	if url == "" {
 		url = "https://api.soyas.io"
 	}
-	return &SoyasClient{
+	return &SoyasExtClient{
 		SwqosProviderBase: SwqosProviderBase{config: config},
 		apiURL:            url,
 	}
 }
 
 // SubmitTransaction submits transaction via Soyas
-func (c *SoyasClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
+func (c *SoyasExtClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
 	c.RateLimitCheck()
 	start := time.Now()
 
@@ -534,26 +534,26 @@ func (c *SoyasClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint
 	return &TransactionResult{Signature: sig, Success: true, Provider: "Soyas", LatencyMs: latency}, nil
 }
 
-// SpeedlandingClient Speedlanding SWQOS client
-type SpeedlandingClient struct {
+// SpeedlandingExtClient Speedlanding extended SWQOS client (stats-tracking)
+type SpeedlandingExtClient struct {
 	SwqosProviderBase
 	apiURL string
 }
 
-// NewSpeedlandingClient creates new Speedlanding client
-func NewSpeedlandingClient(config *SwqosConfigExtended) *SpeedlandingClient {
+// NewSpeedlandingExtClient creates new Speedlanding extended client
+func NewSpeedlandingExtClient(config *SwqosConfigExtended) *SpeedlandingExtClient {
 	url := config.URL
 	if url == "" {
 		url = "https://api.speedlanding.io"
 	}
-	return &SpeedlandingClient{
+	return &SpeedlandingExtClient{
 		SwqosProviderBase: SwqosProviderBase{config: config},
 		apiURL:            url,
 	}
 }
 
 // SubmitTransaction submits transaction via Speedlanding
-func (c *SpeedlandingClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
+func (c *SpeedlandingExtClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
 	c.RateLimitCheck()
 	start := time.Now()
 
@@ -877,33 +877,57 @@ type SwqosProviderFactory struct{}
 func (f *SwqosProviderFactory) CreateProvider(config *SwqosConfigExtended) (interface{}, error) {
 	switch config.Type {
 	case SwqosTypeJito:
-		return NewJitoClient("", config.URL, config.APIKey), nil
+		url := config.URL
+		if url == "" {
+			url = jitoEndpoints[SwqosRegionDefault]
+		}
+		return NewJitoClient(url, config.APIKey), nil
 	case SwqosTypeBloxroute:
-		return NewBloxrouteClient("", config.URL, config.APIKey), nil
+		url := config.URL
+		if url == "" {
+			url = bloxrouteEndpoints[SwqosRegionDefault]
+		}
+		return NewBloxrouteClient(url, config.APIKey), nil
 	case SwqosTypeZeroSlot:
-		return NewZeroSlotClient("", config.URL, config.APIKey), nil
+		url := config.URL
+		if url == "" {
+			url = zeroSlotEndpoints[SwqosRegionDefault]
+		}
+		return NewZeroSlotClient(url, config.APIKey), nil
 	case SwqosTypeNextBlock:
-		return NewNextBlockClient(config), nil
+		return NewNextBlockExtClient(config), nil
 	case SwqosTypeTemporal:
-		return NewTemporalClient("", config.URL, config.APIKey), nil
+		url := config.URL
+		if url == "" {
+			url = temporalEndpoints[SwqosRegionDefault]
+		}
+		return NewTemporalClient(url, config.APIKey), nil
 	case SwqosTypeNode1:
-		return NewNode1Client(config), nil
+		return NewNode1ExtClient(config), nil
 	case SwqosTypeFlashBlock:
-		return NewFlashBlockClient("", config.URL, config.APIKey), nil
+		url := config.URL
+		if url == "" {
+			url = flashBlockEndpoints[SwqosRegionDefault]
+		}
+		return NewFlashBlockClient(url, config.APIKey), nil
 	case SwqosTypeBlockRazor:
-		return NewBlockRazorClient(config), nil
+		return NewBlockRazorExtClient(config), nil
 	case SwqosTypeAstralane:
-		return NewAstralaneClient(config), nil
+		return NewAstralaneExtClient(config), nil
 	case SwqosTypeStellium:
-		return NewStelliumClient(config), nil
+		return NewStelliumExtClient(config), nil
 	case SwqosTypeLightspeed:
-		return NewLightspeedClient(config), nil
+		return NewLightspeedExtClient(config), nil
 	case SwqosTypeSoyas:
-		return NewSoyasClient(config), nil
+		return NewSoyasExtClient(config), nil
 	case SwqosTypeSpeedlanding:
-		return NewSpeedlandingClient(config), nil
+		return NewSpeedlandingExtClient(config), nil
 	case SwqosTypeHelius:
-		return NewHeliusClient("", config.URL, &config.APIKey, false), nil
+		url := config.URL
+		if url == "" {
+			url = heliusEndpoints[SwqosRegionDefault]
+		}
+		return NewHeliusClient(url, config.APIKey, false), nil
 	case SwqosTypeDefault:
 		return NewDefaultClient(""), nil
 	default:

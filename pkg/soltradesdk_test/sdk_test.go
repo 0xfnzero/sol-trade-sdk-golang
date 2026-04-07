@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go"
+	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
 	"github.com/your-org/sol-trade-sdk-go/pkg/cache"
 	"github.com/your-org/sol-trade-sdk-go/pkg/common"
 	"github.com/your-org/sol-trade-sdk-go/pkg/pool"
