@@ -77,10 +77,11 @@ const (
 
 // SwqosConfig represents SWQOS service configuration
 type SwqosConfig struct {
-	Type      SwqosType
-	Region    SwqosRegion
-	APIKey    string
-	CustomURL string
+	Type          SwqosType
+	Region        SwqosRegion
+	APIKey        string
+	CustomURL     string
+	MEVProtection bool
 }
 
 // GasFeeStrategy represents gas fee configuration
@@ -117,9 +118,10 @@ func (g *GasFeeStrategy) SetGlobalFeeStrategy(buyPriority, sellPriority, buyCU, 
 
 // TradeConfig represents trading configuration
 type TradeConfig struct {
-	RPCUrl       string
-	SwqosConfigs []SwqosConfig
-	LogEnabled   bool
+	RPCUrl        string
+	SwqosConfigs  []SwqosConfig
+	LogEnabled    bool
+	MEVProtection bool
 }
 
 // NewTradeConfig creates a new TradeConfig
@@ -128,6 +130,63 @@ func NewTradeConfig(rpcUrl string, swqosConfigs []SwqosConfig) *TradeConfig {
 		RPCUrl:       rpcUrl,
 		SwqosConfigs: swqosConfigs,
 		LogEnabled:   true,
+	}
+}
+
+// TradeConfigBuilder provides a fluent API for building TradeConfig.
+// All optional fields are discoverable via IDE autocomplete.
+//
+// Example:
+//
+//	config := NewTradeConfigBuilder(rpcURL).
+//	    SwqosConfigs(swqosConfigs).
+//	    // MEVProtection(true). // Enable MEV protection (BlockRazor: sandwichMitigation, Astralane: port 9000)
+//	    Build()
+type TradeConfigBuilder struct {
+	rpcUrl        string
+	swqosConfigs  []SwqosConfig
+	logEnabled    bool
+	mevProtection bool
+}
+
+// NewTradeConfigBuilder creates a new TradeConfigBuilder
+func NewTradeConfigBuilder(rpcUrl string) *TradeConfigBuilder {
+	return &TradeConfigBuilder{
+		rpcUrl:        rpcUrl,
+		swqosConfigs:  []SwqosConfig{},
+		logEnabled:    true,
+		mevProtection: false,
+	}
+}
+
+// SwqosConfigs sets the SWQOS configurations
+func (b *TradeConfigBuilder) SwqosConfigs(configs []SwqosConfig) *TradeConfigBuilder {
+	b.swqosConfigs = configs
+	return b
+}
+
+// LogEnabled sets whether logging is enabled
+func (b *TradeConfigBuilder) LogEnabled(enabled bool) *TradeConfigBuilder {
+	b.logEnabled = enabled
+	return b
+}
+
+// MEVProtection enables MEV protection.
+// When enabled:
+//   - BlockRazor uses mode=sandwichMitigation
+//   - Astralane uses port 9000 MEV-protected QUIC endpoint
+func (b *TradeConfigBuilder) MEVProtection(enabled bool) *TradeConfigBuilder {
+	b.mevProtection = enabled
+	return b
+}
+
+// Build creates the TradeConfig
+func (b *TradeConfigBuilder) Build() *TradeConfig {
+	return &TradeConfig{
+		RPCUrl:        b.rpcUrl,
+		SwqosConfigs:  b.swqosConfigs,
+		LogEnabled:    b.logEnabled,
+		MEVProtection: b.mevProtection,
 	}
 }
 

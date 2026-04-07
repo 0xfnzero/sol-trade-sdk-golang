@@ -38,15 +38,14 @@ func createClient(ctx context.Context) (*trading.TradeClient, error) {
 		rpcURL = "https://api.mainnet-beta.solana.com"
 	}
 
-	swqosConfigs := []common.SwqosConfig{
-		{Type: common.SwqosTypeDefault, URL: rpcURL},
+	swqosConfigs := []soltradesdk.SwqosConfig{
+		{Type: soltradesdk.SwqosTypeDefault, URL: rpcURL},
 	}
 
-	tradeConfig := &common.TradeConfig{
-		RPCUrl:      rpcURL,
-		SwqosConfigs: swqosConfigs,
-		Commitment:  rpc.CommitmentConfirmed,
-	}
+	tradeConfig := soltradesdk.NewTradeConfigBuilder(rpcURL).
+		SwqosConfigs(swqosConfigs).
+		// MEVProtection(true). // Enable MEV protection (BlockRazor: sandwichMitigation, Astralane: port 9000)
+		Build()
 
 	return trading.NewTradeClient(ctx, payer, tradeConfig)
 }

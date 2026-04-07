@@ -775,6 +775,197 @@ func (c *HeliusClient) MinTipSol() float64 {
 	return 0.0002
 }
 
+// ===== BlockRazor Client =====
+
+// BlockRazorClient represents a BlockRazor SWQOS client
+type BlockRazorClient struct {
+	rpcURL        string
+	endpoint      string
+	authToken     string
+	mevProtection bool
+	tipAccount    string
+}
+
+// NewBlockRazorClient creates a new BlockRazor client
+func NewBlockRazorClient(rpcURL, endpoint, authToken string, mevProtection bool) *BlockRazorClient {
+	return &BlockRazorClient{
+		rpcURL:        rpcURL,
+		endpoint:      endpoint,
+		authToken:     authToken,
+		mevProtection: mevProtection,
+		tipAccount:    "blockrazorH4gNdW3DyUr3QYjE3QiPYq78mi4jh7U3YyHY",
+	}
+}
+
+// SendTransaction sends a transaction via BlockRazor
+func (c *BlockRazorClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	encoded := base64.StdEncoding.EncodeToString(transaction)
+
+	payload := map[string]interface{}{
+		"transaction": encoded,
+	}
+
+	jsonData, _ := json.Marshal(payload)
+
+	mode := "fast"
+	if c.mevProtection {
+		mode = "sandwichMitigation"
+	}
+	url := fmt.Sprintf("https://%s/api/v1/submit?mode=%s", c.endpoint, mode)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(jsonData)))
+	if err != nil {
+		return solana.Signature{}, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if c.authToken != "" {
+		req.Header.Set("X-API-Key", c.authToken)
+	}
+
+	resp, err := getHTTPClient().Do(req)
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	var result struct {
+		Signature string `json:"signature"`
+		Error     string `json:"error"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return solana.Signature{}, err
+	}
+
+	if result.Error != "" {
+		return solana.Signature{}, &TradeError{Code: 500, Message: result.Error}
+	}
+
+	sig, err := solana.SignatureFromBase58(result.Signature)
+	if err != nil {
+		return solana.Signature{}, err
+	}
+
+	return sig, nil
+}
+
+// SendTransactions sends multiple transactions via BlockRazor
+func (c *BlockRazorClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	sigs := make([]solana.Signature, len(transactions))
+	for i, tx := range transactions {
+		sig, err := c.SendTransaction(ctx, tradeType, tx, waitConfirmation)
+		if err != nil {
+			return sigs, err
+		}
+		sigs[i] = sig
+	}
+	return sigs, nil
+}
+
+// GetTipAccount returns the BlockRazor tip account
+func (c *BlockRazorClient) GetTipAccount() string { return c.tipAccount }
+
+// GetSwqosType returns BlockRazor type
+func (c *BlockRazorClient) GetSwqosType() SwqosType { return SwqosTypeBlockRazor }
+
+// MinTipSol returns minimum tip for BlockRazor
+func (c *BlockRazorClient) MinTipSol() float64 { return MinTipBlockRazor }
+
+// ===== Astralane Client =====
+
+// AstralaneClient represents an Astralane SWQOS client
+type AstralaneClient struct {
+	rpcURL     string
+	endpoint   string
+	authToken  string
+	tipAccount string
+}
+
+// NewAstralaneClient creates a new Astralane client
+func NewAstralaneClient(rpcURL, endpoint, authToken string) *AstralaneClient {
+	return &AstralaneClient{
+		rpcURL:     rpcURL,
+		endpoint:   endpoint,
+		authToken:  authToken,
+		tipAccount: "astralaneH4gNdW3DyUr3QYjE3QiPYq78mi4jh7U3YyHY",
+	}
+}
+
+// SendTransaction sends a transaction via Astralane
+func (c *AstralaneClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	encoded := base64.StdEncoding.EncodeToString(transaction)
+
+	payload := map[string]interface{}{
+		"transaction": encoded,
+	}
+
+	jsonData, _ := json.Marshal(payload)
+	url := fmt.Sprintf("https://%s/api/v1/submit", c.endpoint)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(jsonData)))
+	if err != nil {
+		return solana.Signature{}, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if c.authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.authToken)
+	}
+
+	resp, err := getHTTPClient().Do(req)
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	var result struct {
+		Signature string `json:"signature"`
+		Error     string `json:"error"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return solana.Signature{}, err
+	}
+
+	if result.Error != "" {
+		return solana.Signature{}, &TradeError{Code: 500, Message: result.Error}
+	}
+
+	sig, err := solana.SignatureFromBase58(result.Signature)
+	if err != nil {
+		return solana.Signature{}, err
+	}
+
+	return sig, nil
+}
+
+// SendTransactions sends multiple transactions via Astralane
+func (c *AstralaneClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	sigs := make([]solana.Signature, len(transactions))
+	for i, tx := range transactions {
+		sig, err := c.SendTransaction(ctx, tradeType, tx, waitConfirmation)
+		if err != nil {
+			return sigs, err
+		}
+		sigs[i] = sig
+	}
+	return sigs, nil
+}
+
+// GetTipAccount returns the Astralane tip account
+func (c *AstralaneClient) GetTipAccount() string { return c.tipAccount }
+
+// GetSwqosType returns Astralane type
+func (c *AstralaneClient) GetSwqosType() SwqosType { return SwqosTypeAstralane }
+
+// MinTipSol returns minimum tip for Astralane
+func (c *AstralaneClient) MinTipSol() float64 { return MinTipAstralane }
+
 // ===== Default RPC Client =====
 
 // DefaultClient represents a default RPC client
@@ -897,6 +1088,22 @@ func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL stri
 
 	case SwqosTypeFlashBlock:
 		return NewFlashBlockClient(rpcURL, config.CustomURL, config.APIKey), nil
+
+	case SwqosTypeBlockRazor:
+		endpoint := "api.blockrazor.com"
+		if config.CustomURL != "" {
+			endpoint = config.CustomURL
+		}
+		return NewBlockRazorClient(rpcURL, endpoint, config.APIKey, config.MEVProtection), nil
+
+	case SwqosTypeAstralane:
+		endpoint := "api.astralane.com"
+		if config.CustomURL != "" {
+			endpoint = config.CustomURL
+		} else if config.MEVProtection {
+			endpoint = "api-mev.astralane.com:9000"
+		}
+		return NewAstralaneClient(rpcURL, endpoint, config.APIKey), nil
 
 	case SwqosTypeHelius:
 		return NewHeliusClient(rpcURL, config.CustomURL, &config.APIKey, false), nil

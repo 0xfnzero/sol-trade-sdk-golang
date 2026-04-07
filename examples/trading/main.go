@@ -29,7 +29,10 @@ func main() {
 
 	// 3. Create trade configuration
 	rpcURL := "https://mainnet.helius-rpc.com/?api-key=your_api_key"
-	tradeConfig := soltradesdk.NewTradeConfig(rpcURL, swqosConfigs)
+	tradeConfig := soltradesdk.NewTradeConfigBuilder(rpcURL).
+		SwqosConfigs(swqosConfigs).
+		// MEVProtection(true). // Enable MEV protection (BlockRazor: sandwichMitigation, Astralane: port 9000)
+		Build()
 
 	// 4. Create trading client
 	client, err := soltradesdk.NewTradingClient(ctx, &payer, tradeConfig)

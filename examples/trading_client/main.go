@@ -53,21 +53,18 @@ func createTradingClientSimple(ctx context.Context) (*trading.TradeClient, error
 		rpcURL = "https://api.mainnet-beta.solana.com"
 	}
 
-	commitment := rpc.CommitmentConfirmed
-
-	swqosConfigs := []common.SwqosConfig{
-		{Type: common.SwqosTypeDefault, URL: rpcURL},
-		{Type: common.SwqosTypeJito, UUID: "your_uuid", Region: common.SwqosRegionFrankfurt},
-		{Type: common.SwqosTypeBloxroute, APIToken: "your_api_token", Region: common.SwqosRegionFrankfurt},
-		{Type: common.SwqosTypeZeroSlot, APIToken: "your_api_token", Region: common.SwqosRegionFrankfurt},
-		{Type: common.SwqosTypeTemporal, APIToken: "your_api_token", Region: common.SwqosRegionFrankfurt},
+	swqosConfigs := []soltradesdk.SwqosConfig{
+		{Type: soltradesdk.SwqosTypeDefault, URL: rpcURL},
+		{Type: soltradesdk.SwqosTypeJito, UUID: "your_uuid", Region: soltradesdk.SwqosRegionFrankfurt},
+		{Type: soltradesdk.SwqosTypeBloxroute, APIToken: "your_api_token", Region: soltradesdk.SwqosRegionFrankfurt},
+		{Type: soltradesdk.SwqosTypeZeroSlot, APIToken: "your_api_token", Region: soltradesdk.SwqosRegionFrankfurt},
+		{Type: soltradesdk.SwqosTypeTemporal, APIToken: "your_api_token", Region: soltradesdk.SwqosRegionFrankfurt},
 	}
 
-	tradeConfig := &common.TradeConfig{
-		RPCURL:      rpcURL,
-		SwqosConfigs: swqosConfigs,
-		Commitment:  commitment,
-	}
+	tradeConfig := soltradesdk.NewTradeConfigBuilder(rpcURL).
+		SwqosConfigs(swqosConfigs).
+		// MEVProtection(true). // Enable MEV protection (BlockRazor: sandwichMitigation, Astralane: port 9000)
+		Build()
 
 	// Creates new infrastructure internally
 	client, err := trading.NewTradeClient(ctx, payer, tradeConfig)
@@ -93,9 +90,9 @@ func createTradingClientFromInfrastructure(ctx context.Context) (*trading.TradeC
 
 	commitment := rpc.CommitmentConfirmed
 
-	swqosConfigs := []common.SwqosConfig{
-		{Type: common.SwqosTypeDefault, URL: rpcURL},
-		{Type: common.SwqosTypeJito, UUID: "your_uuid", Region: common.SwqosRegionFrankfurt},
+	swqosConfigs := []soltradesdk.SwqosConfig{
+		{Type: soltradesdk.SwqosTypeDefault, URL: rpcURL},
+		{Type: soltradesdk.SwqosTypeJito, UUID: "your_uuid", Region: soltradesdk.SwqosRegionFrankfurt},
 	}
 
 	// Create infrastructure separately (can be shared across multiple wallets)
