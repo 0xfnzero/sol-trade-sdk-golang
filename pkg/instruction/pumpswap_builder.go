@@ -30,6 +30,18 @@ var (
 	DEFAULT_COIN_CREATOR_VAULT_AUTH = solana.MustPublicKeyFromBase58("8N3GDaZ2iwN65oxVatKTLPNooAVUJTbfiVJ1ahyqwjSk")
 )
 
+// Protocol extra fee recipients (Apr 2026). After pool-v2: readonly pubkey, then quote ATA (writable).
+var PROTOCOL_EXTRA_FEE_RECIPIENTS = []solana.PublicKey{
+	solana.MustPublicKeyFromBase58("5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD"),
+	solana.MustPublicKeyFromBase58("9M4giFFMxmFGXtc3feFzRai56WbBqehoSeRE5GK7gf7"),
+	solana.MustPublicKeyFromBase58("GXPFM2caqTtQYC2cJ5yJRi9VDkpsYZXzYdwYpGnLmtDL"),
+	solana.MustPublicKeyFromBase58("3BpXnfJaUTiwXnJNe7Ej1rcbzqTTQUvLShZaWazebsVR"),
+	solana.MustPublicKeyFromBase58("5cjcW9wExnJJiqgLjq7DEG75Pm6JBgE1hNv4B2vHXUW6"),
+	solana.MustPublicKeyFromBase58("EHAAiTxcdDwQ3U4bU6YcMsQGaekdzLS3B5SmYo46kJtL"),
+	solana.MustPublicKeyFromBase58("5eHhjP8JaYkz83CWwvGU2uMUXefd3AazWGx4gpcuEEYD"),
+	solana.MustPublicKeyFromBase58("A7hAgCzFw14fejgCp387JUJRMNyz4j89JKnhtKU8piqW"),
+}
+
 // Mayhem fee recipients - from Rust: src/instruction/utils/pumpswap.rs MAYHEM_FEE_RECIPIENTS
 var MAYHEM_FEE_RECIPIENTS = []solana.PublicKey{
 	solana.MustPublicKeyFromBase58("GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS"),
@@ -74,6 +86,12 @@ const (
 func GetMayhemFeeRecipientRandom() solana.PublicKey {
 	n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(MAYHEM_FEE_RECIPIENTS))))
 	return MAYHEM_FEE_RECIPIENTS[n.Int64()]
+}
+
+// GetProtocolExtraFeeRecipientRandom returns a random protocol extra fee recipient (PumpSwap Apr 2026).
+func GetProtocolExtraFeeRecipientRandom() solana.PublicKey {
+	n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(PROTOCOL_EXTRA_FEE_RECIPIENTS))))
+	return PROTOCOL_EXTRA_FEE_RECIPIENTS[n.Int64()]
 }
 
 // GetPoolV2PDA returns the Pool v2 PDA (seeds: ["pool-v2", base_mint])
@@ -375,6 +393,13 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 	accounts = append(accounts, solana.AccountMeta{
 		PublicKey: poolV2, IsSigner: false, IsWritable: false,
 	})
+	protocolExtra := GetProtocolExtraFeeRecipientRandom()
+	accounts = append(accounts, solana.AccountMeta{
+		PublicKey: protocolExtra, IsSigner: false, IsWritable: false,
+	})
+	accounts = append(accounts, solana.AccountMeta{
+		PublicKey: GetAssociatedTokenAddress(protocolExtra, pp.QuoteMint, constants.TOKEN_PROGRAM), IsSigner: false, IsWritable: true,
+	})
 
 	// Build instruction data
 	var data []byte
@@ -539,6 +564,13 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	poolV2 := GetPoolV2PDA(pp.BaseMint)
 	accounts = append(accounts, solana.AccountMeta{
 		PublicKey: poolV2, IsSigner: false, IsWritable: false,
+	})
+	protocolExtra := GetProtocolExtraFeeRecipientRandom()
+	accounts = append(accounts, solana.AccountMeta{
+		PublicKey: protocolExtra, IsSigner: false, IsWritable: false,
+	})
+	accounts = append(accounts, solana.AccountMeta{
+		PublicKey: GetAssociatedTokenAddress(protocolExtra, pp.QuoteMint, constants.TOKEN_PROGRAM), IsSigner: false, IsWritable: true,
 	})
 
 	// Build instruction data

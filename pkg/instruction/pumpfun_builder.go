@@ -38,6 +38,19 @@ var (
 	PUMPFUN_FEE_CONFIG = solana.MustPublicKeyFromBase58("8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt")
 )
 
+// Protocol extra fee recipients (Apr 2026 breaking upgrade). Appended after bonding-curve-v2, writable.
+// https://github.com/pump-fun/pump-public-docs/blob/main/docs/BREAKING_FEE_RECIPIENT.md
+var PumpFunProtocolExtraFeeRecipients = []solana.PublicKey{
+	solana.MustPublicKeyFromBase58("5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD"),
+	solana.MustPublicKeyFromBase58("9M4giFFMxmFGXtc3feFzRai56WbBqehoSeRE5GK7gf7"),
+	solana.MustPublicKeyFromBase58("GXPFM2caqTtQYC2cJ5yJRi9VDkpsYZXzYdwYpGnLmtDL"),
+	solana.MustPublicKeyFromBase58("3BpXnfJaUTiwXnJNe7Ej1rcbzqTTQUvLShZaWazebsVR"),
+	solana.MustPublicKeyFromBase58("5cjcW9wExnJJiqgLjq7DEG75Pm6JBgE1hNv4B2vHXUW6"),
+	solana.MustPublicKeyFromBase58("EHAAiTxcdDwQ3U4bU6YcMsQGaekdzLS3B5SmYo46kJtL"),
+	solana.MustPublicKeyFromBase58("5eHhjP8JaYkz83CWwvGU2uMUXefd3AazWGx4gpcuEEYD"),
+	solana.MustPublicKeyFromBase58("A7hAgCzFw14fejgCp387JUJRMNyz4j89JKnhtKU8piqW"),
+}
+
 // PumpFun Mayhem fee recipients - from Rust: src/instruction/utils/pumpfun.rs global_constants::MAYHEM_FEE_RECIPIENTS
 var PumpFunMayhemFeeRecipients = []solana.PublicKey{
 	solana.MustPublicKeyFromBase58("GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS"),
@@ -88,6 +101,12 @@ const (
 func GetPumpFunMayhemFeeRecipientRandom() solana.PublicKey {
 	n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(PumpFunMayhemFeeRecipients))))
 	return PumpFunMayhemFeeRecipients[n.Int64()]
+}
+
+// GetPumpFunProtocolExtraFeeRecipientRandom returns a random protocol extra fee recipient (after bonding-curve-v2).
+func GetPumpFunProtocolExtraFeeRecipientRandom() solana.PublicKey {
+	n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(PumpFunProtocolExtraFeeRecipients))))
+	return PumpFunProtocolExtraFeeRecipients[n.Int64()]
 }
 
 // GetBondingCurvePDA returns the bonding curve PDA for a mint (seeds: ["bonding-curve", mint])
@@ -303,6 +322,7 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 		{PublicKey: PUMPFUN_FEE_CONFIG, IsSigner: false, IsWritable: false},
 		{PublicKey: PUMPFUN_FEE_PROGRAM, IsSigner: false, IsWritable: false},
 		{PublicKey: bondingCurveV2, IsSigner: false, IsWritable: false}, // remainingAccounts: bondingCurveV2Pda
+		{PublicKey: GetPumpFunProtocolExtraFeeRecipientRandom(), IsSigner: false, IsWritable: true},
 	}
 
 	instructions = append(instructions, solana.NewInstruction(PUMPFUN_PROGRAM, accounts, data))
@@ -407,6 +427,9 @@ func PumpFunBuildSellInstructions(params *PumpFunBuildSellParams) ([]solana.Inst
 	// Add bonding curve v2
 	accounts = append(accounts, solana.AccountMeta{
 		PublicKey: bondingCurveV2, IsSigner: false, IsWritable: false,
+	})
+	accounts = append(accounts, solana.AccountMeta{
+		PublicKey: GetPumpFunProtocolExtraFeeRecipientRandom(), IsSigner: false, IsWritable: true,
 	})
 
 	instructions = append(instructions, solana.NewInstruction(PUMPFUN_PROGRAM, accounts, data))
