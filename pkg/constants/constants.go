@@ -11,16 +11,16 @@ var (
 
 // Token programs
 var (
-	TOKEN_PROGRAM       = solana.MustPublicKeyFromBase58("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-	TOKEN_PROGRAM_2022  = solana.MustPublicKeyFromBase58("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
+	TOKEN_PROGRAM      = solana.MustPublicKeyFromBase58("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+	TOKEN_PROGRAM_2022 = solana.MustPublicKeyFromBase58("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
 )
 
 // Token mints
 var (
-	SOL_TOKEN_ACCOUNT   = solana.MustPublicKeyFromBase58("So11111111111111111111111111111111111111111")
-	WSOL_TOKEN_ACCOUNT  = solana.MustPublicKeyFromBase58("So11111111111111111111111111111111111111112")
-	USD1_TOKEN_ACCOUNT  = solana.MustPublicKeyFromBase58("USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB")
-	USDC_TOKEN_ACCOUNT  = solana.MustPublicKeyFromBase58("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
+	SOL_TOKEN_ACCOUNT  = solana.MustPublicKeyFromBase58("So11111111111111111111111111111111111111111")
+	WSOL_TOKEN_ACCOUNT = solana.MustPublicKeyFromBase58("So11111111111111111111111111111111111111112")
+	USD1_TOKEN_ACCOUNT = solana.MustPublicKeyFromBase58("USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB")
+	USDC_TOKEN_ACCOUNT = solana.MustPublicKeyFromBase58("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
 )
 
 // Associated token program
@@ -67,10 +67,12 @@ var (
 const (
 	// Default slippage in basis points (5%)
 	DEFAULT_SLIPPAGE = 500
+)
 
-	// PumpFun instruction discriminators
-	BUY_DISCRIMINATOR            = [8]byte{102, 6, 141, 196, 242, 95, 28, 167}
-	SELL_DISCRIMINATOR           = [8]byte{187, 75, 56, 100, 133, 176, 22, 141}
+// PumpFun instruction discriminators
+var (
+	BUY_DISCRIMINATOR              = [8]byte{102, 6, 141, 196, 242, 95, 28, 167}
+	SELL_DISCRIMINATOR             = [8]byte{187, 75, 56, 100, 133, 176, 22, 141}
 	BUY_EXACT_SOL_IN_DISCRIMINATOR = [8]byte{133, 104, 247, 38, 153, 106, 73, 253}
 )
 

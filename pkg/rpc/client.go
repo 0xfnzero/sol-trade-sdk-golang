@@ -15,16 +15,16 @@ import (
 
 // Client is a high-performance Solana RPC client
 type Client struct {
-	endpoint      string
-	httpClient    *http.Client
-	headers       map[string]string
-	requestID     int64
-	timeout       time.Duration
-	requests      int64
-	errors        int64
-	avgLatencyNs  int64
+	endpoint       string
+	httpClient     *http.Client
+	headers        map[string]string
+	requestID      int64
+	timeout        time.Duration
+	requests       int64
+	errors         int64
+	avgLatencyNs   int64
 	totalLatencyNs int64
-	mu            sync.RWMutex
+	mu             sync.RWMutex
 }
 
 // ClientOption is a functional option for the client
@@ -269,18 +269,18 @@ func (c *Client) GetTokenAccountsByOwner(ctx context.Context, owner string, filt
 
 // AccountInfo represents account information
 type AccountInfo struct {
-	Lamports  uint64 `json:"lamports"`
-	Data      []byte `json:"data"`
-	Owner     string `json:"owner"`
+	Lamports   uint64 `json:"lamports"`
+	Data       []byte `json:"data"`
+	Owner      string `json:"owner"`
 	Executable bool   `json:"executable"`
-	RentEpoch uint64 `json:"rentEpoch"`
+	RentEpoch  uint64 `json:"rentEpoch"`
 }
 
 // AccountInfoConfig represents account info config
 type AccountInfoConfig struct {
-	Encoding       string `json:"encoding,omitempty"`
+	Encoding       string     `json:"encoding,omitempty"`
 	DataSlice      *DataSlice `json:"dataSlice,omitempty"`
-	MinContextSlot uint64 `json:"minContextSlot,omitempty"`
+	MinContextSlot uint64     `json:"minContextSlot,omitempty"`
 }
 
 // DataSlice represents data slice options
@@ -291,16 +291,16 @@ type DataSlice struct {
 
 // BlockhashResult represents a blockhash result
 type BlockhashResult struct {
-	Blockhash          string `json:"blockhash"`
+	Blockhash            string `json:"blockhash"`
 	LastValidBlockHeight uint64 `json:"lastValidBlockHeight"`
 }
 
 // SignatureStatus represents signature status
 type SignatureStatus struct {
-	Slot              uint64          `json:"slot"`
-	Confirmations     *uint64         `json:"confirmations,omitempty"`
-	Err               json.RawMessage `json:"err,omitempty"`
-	ConfirmationStatus string         `json:"confirmationStatus"`
+	Slot               uint64          `json:"slot"`
+	Confirmations      *uint64         `json:"confirmations,omitempty"`
+	Err                json.RawMessage `json:"err,omitempty"`
+	ConfirmationStatus string          `json:"confirmationStatus"`
 }
 
 // SendOptions represents send transaction options
@@ -313,15 +313,15 @@ type SendOptions struct {
 
 // SimulateOptions represents simulate transaction options
 type SimulateOptions struct {
-	SigVerify          bool     `json:"sigVerify,omitempty"`
-	ReplaceRecentBlockhash bool `json:"replaceRecentBlockhash,omitempty"`
-	Commitment         string   `json:"commitment,omitempty"`
-	Accounts           *SimulateAccounts `json:"accounts,omitempty"`
+	SigVerify              bool              `json:"sigVerify,omitempty"`
+	ReplaceRecentBlockhash bool              `json:"replaceRecentBlockhash,omitempty"`
+	Commitment             string            `json:"commitment,omitempty"`
+	Accounts               *SimulateAccounts `json:"accounts,omitempty"`
 }
 
 // SimulateAccounts represents accounts for simulation
 type SimulateAccounts struct {
-	Encoding string `json:"encoding"`
+	Encoding  string   `json:"encoding"`
 	Addresses []string `json:"addresses"`
 }
 
@@ -335,7 +335,7 @@ type SimulateResult struct {
 
 // ReturnData represents return data from simulation
 type ReturnData struct {
-	Data []byte `json:"data"`
+	Data      []byte `json:"data"`
 	ProgramID string `json:"programId"`
 }
 
@@ -347,7 +347,7 @@ type TokenAccount struct {
 
 // TokenAccountFilter represents token account filter
 type TokenAccountFilter struct {
-	Mint   string `json:"mint,omitempty"`
+	Mint    string `json:"mint,omitempty"`
 	Program string `json:"programId,omitempty"`
 }
 

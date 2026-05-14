@@ -2,6 +2,7 @@ package soltradesdk
 
 import (
 	"context"
+	"runtime"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -54,11 +55,31 @@ const (
 	SwqosRegionNewYork SwqosRegion = iota
 	SwqosRegionFrankfurt
 	SwqosRegionAmsterdam
+	SwqosRegionDublin
 	SwqosRegionSLC
 	SwqosRegionTokyo
+	SwqosRegionSingapore
 	SwqosRegionLondon
 	SwqosRegionLosAngeles
 	SwqosRegionDefault
+)
+
+// SwqosTransport represents provider transport modes.
+type SwqosTransport int
+
+const (
+	SwqosTransportHTTP SwqosTransport = iota
+	SwqosTransportGRPC
+	SwqosTransportQUIC
+)
+
+// AstralaneTransport represents Astralane-specific transport modes.
+type AstralaneTransport int
+
+const (
+	AstralaneTransportBinary AstralaneTransport = iota
+	AstralaneTransportPlain
+	AstralaneTransportQUIC
 )
 
 // SwqosType represents the type of SWQOS service
@@ -89,16 +110,37 @@ type SwqosConfig struct {
 	APIKey        string
 	CustomURL     string
 	MEVProtection bool
+	Transport     *SwqosTransport
+	AstralaneMode *AstralaneTransport
+	SwqosOnly     *bool
 }
+
+// SwqosClient is the shared SWQOS sender contract used by trading executors.
+type SwqosClient interface {
+	SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error)
+	SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error)
+	GetTipAccount() string
+	GetSwqosType() SwqosType
+	MinTipSol() float64
+}
+
+// GasFeeStrategyType represents the strategy row used by Rust GasFeeStrategy.
+type GasFeeStrategyType int
+
+const (
+	GasFeeStrategyTypeNormal GasFeeStrategyType = iota
+	GasFeeStrategyTypeLowTipHighCuPrice
+	GasFeeStrategyTypeHighTipLowCuPrice
+)
 
 // GasFeeStrategy represents gas fee configuration
 type GasFeeStrategy struct {
-	BuyPriorityFee    uint64
-	SellPriorityFee   uint64
-	BuyComputeUnits   uint64
-	SellComputeUnits  uint64
-	BuyTipLamports    uint64
-	SellTipLamports   uint64
+	BuyPriorityFee   uint64
+	SellPriorityFee  uint64
+	BuyComputeUnits  uint64
+	SellComputeUnits uint64
+	BuyTipLamports   uint64
+	SellTipLamports  uint64
 }
 
 // NewGasFeeStrategy creates a new GasFeeStrategy with default values
@@ -125,18 +167,26 @@ func (g *GasFeeStrategy) SetGlobalFeeStrategy(buyPriority, sellPriority, buyCU, 
 
 // TradeConfig represents trading configuration
 type TradeConfig struct {
-	RPCUrl        string
-	SwqosConfigs  []SwqosConfig
-	LogEnabled    bool
-	MEVProtection bool
+	RPCUrl                    string
+	SwqosConfigs              []SwqosConfig
+	LogEnabled                bool
+	MEVProtection             bool
+	CheckMinTip               bool
+	UseSeedOptimize           bool
+	CreateWsolAtaOnStartup    bool
+	UsePumpFunV2              bool
+	SwqosCoresFromEnd         bool
+	MaxSwqosSubmitConcurrency int
 }
 
 // NewTradeConfig creates a new TradeConfig
 func NewTradeConfig(rpcUrl string, swqosConfigs []SwqosConfig) *TradeConfig {
 	return &TradeConfig{
-		RPCUrl:       rpcUrl,
-		SwqosConfigs: swqosConfigs,
-		LogEnabled:   true,
+		RPCUrl:            rpcUrl,
+		SwqosConfigs:      swqosConfigs,
+		LogEnabled:        true,
+		UseSeedOptimize:   true,
+		SwqosCoresFromEnd: true,
 	}
 }
 
@@ -150,19 +200,27 @@ func NewTradeConfig(rpcUrl string, swqosConfigs []SwqosConfig) *TradeConfig {
 //	    // MEVProtection(true). // Enable MEV protection (BlockRazor: sandwichMitigation, Astralane: port 9000)
 //	    Build()
 type TradeConfigBuilder struct {
-	rpcUrl        string
-	swqosConfigs  []SwqosConfig
-	logEnabled    bool
-	mevProtection bool
+	rpcUrl                    string
+	swqosConfigs              []SwqosConfig
+	logEnabled                bool
+	mevProtection             bool
+	checkMinTip               bool
+	useSeedOptimize           bool
+	createWsolAtaOnStartup    bool
+	usePumpFunV2              bool
+	swqosCoresFromEnd         bool
+	maxSwqosSubmitConcurrency int
 }
 
 // NewTradeConfigBuilder creates a new TradeConfigBuilder
 func NewTradeConfigBuilder(rpcUrl string) *TradeConfigBuilder {
 	return &TradeConfigBuilder{
-		rpcUrl:        rpcUrl,
-		swqosConfigs:  []SwqosConfig{},
-		logEnabled:    true,
-		mevProtection: false,
+		rpcUrl:            rpcUrl,
+		swqosConfigs:      []SwqosConfig{},
+		logEnabled:        true,
+		mevProtection:     false,
+		useSeedOptimize:   true,
+		swqosCoresFromEnd: true,
 	}
 }
 
@@ -187,22 +245,78 @@ func (b *TradeConfigBuilder) MEVProtection(enabled bool) *TradeConfigBuilder {
 	return b
 }
 
+func (b *TradeConfigBuilder) CheckMinTip(enabled bool) *TradeConfigBuilder {
+	b.checkMinTip = enabled
+	return b
+}
+
+func (b *TradeConfigBuilder) UseSeedOptimize(enabled bool) *TradeConfigBuilder {
+	b.useSeedOptimize = enabled
+	return b
+}
+
+func (b *TradeConfigBuilder) CreateWsolAtaOnStartup(enabled bool) *TradeConfigBuilder {
+	b.createWsolAtaOnStartup = enabled
+	return b
+}
+
+func (b *TradeConfigBuilder) UsePumpFunV2(enabled bool) *TradeConfigBuilder {
+	b.usePumpFunV2 = enabled
+	return b
+}
+
+func (b *TradeConfigBuilder) SwqosCoresFromEnd(enabled bool) *TradeConfigBuilder {
+	b.swqosCoresFromEnd = enabled
+	return b
+}
+
+func (b *TradeConfigBuilder) MaxSwqosSubmitConcurrency(limit int) *TradeConfigBuilder {
+	b.maxSwqosSubmitConcurrency = limit
+	return b
+}
+
 // Build creates the TradeConfig
 func (b *TradeConfigBuilder) Build() *TradeConfig {
 	return &TradeConfig{
-		RPCUrl:        b.rpcUrl,
-		SwqosConfigs:  b.swqosConfigs,
-		LogEnabled:    b.logEnabled,
-		MEVProtection: b.mevProtection,
+		RPCUrl:                    b.rpcUrl,
+		SwqosConfigs:              b.swqosConfigs,
+		LogEnabled:                b.logEnabled,
+		MEVProtection:             b.mevProtection,
+		CheckMinTip:               b.checkMinTip,
+		UseSeedOptimize:           b.useSeedOptimize,
+		CreateWsolAtaOnStartup:    b.createWsolAtaOnStartup,
+		UsePumpFunV2:              b.usePumpFunV2,
+		SwqosCoresFromEnd:         b.swqosCoresFromEnd,
+		MaxSwqosSubmitConcurrency: b.maxSwqosSubmitConcurrency,
 	}
+}
+
+// RecommendedSenderThreadCoreIndices returns Rust-parity SWQOS sender core indices.
+func RecommendedSenderThreadCoreIndices(swqosCount int, availableCores ...int) []int {
+	cores := runtime.NumCPU()
+	if len(availableCores) > 0 {
+		cores = availableCores[0]
+	}
+	if swqosCount <= 0 || cores <= 0 {
+		return nil
+	}
+	count := swqosCount
+	if count > cores {
+		count = cores
+	}
+	out := make([]int, 0, count)
+	for i := cores - count; i < cores; i++ {
+		out = append(out, i)
+	}
+	return out
 }
 
 // DurableNonceInfo represents durable nonce information
 type DurableNonceInfo struct {
-	NonceAccount      solana.PublicKey
-	Authority         solana.PublicKey
-	NonceHash         solana.Hash
-	RecentBlockhash   solana.Hash
+	NonceAccount    solana.PublicKey
+	Authority       solana.PublicKey
+	NonceHash       solana.Hash
+	RecentBlockhash solana.Hash
 }
 
 // TradeBuyParams represents parameters for buy operation
@@ -273,6 +387,12 @@ type TradingClient struct {
 
 // NewTradingClient creates a new TradingClient
 func NewTradingClient(ctx context.Context, payer *solana.PrivateKey, config *TradeConfig) (*TradingClient, error) {
+	if payer == nil {
+		return nil, ErrInvalidPrivateKey
+	}
+	if config == nil {
+		return nil, NewTradeError(1001, "trade config is required", nil)
+	}
 	rpcClient := rpc.New(config.RPCUrl)
 
 	return &TradingClient{
@@ -290,6 +410,9 @@ func (c *TradingClient) GetRPC() *rpc.Client {
 
 // GetPayer returns the payer public key
 func (c *TradingClient) GetPayer() solana.PublicKey {
+	if c == nil || c.payer == nil {
+		return solana.PublicKey{}
+	}
 	return c.payer.PublicKey()
 }
 
@@ -314,12 +437,18 @@ func (c *TradingClient) SellByPercent(ctx context.Context, params TradeSellParam
 
 // executeTrade is the internal implementation for trading
 func (c *TradingClient) executeTrade(ctx context.Context, tradeType TradeType, params TradeBuyParams) (*TradeResult, error) {
-	// Implementation will be added in executor module
-	return nil, nil
+	return nil, NewTradeError(
+		2001,
+		"root TradingClient does not build or submit trades; use the pkg/trading executors or pkg/trading/core executor",
+		ErrTradingExecutionUnavailable,
+	)
 }
 
 // executeSell is the internal implementation for sell
 func (c *TradingClient) executeSell(ctx context.Context, params TradeSellParams) (*TradeResult, error) {
-	// Implementation will be added in executor module
-	return nil, nil
+	return nil, NewTradeError(
+		2001,
+		"root TradingClient does not build or submit trades; use the pkg/trading executors or pkg/trading/core executor",
+		ErrTradingExecutionUnavailable,
+	)
 }

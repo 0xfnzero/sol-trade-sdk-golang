@@ -1,3 +1,6 @@
+//go:build live_examples
+// +build live_examples
+
 // Nonce Cache Example
 //
 // This example demonstrates how to use durable nonce for transaction submission.
@@ -12,9 +15,9 @@ import (
 	"log"
 	"os"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go"
-	"github.com/your-org/sol-trade-sdk-go/pkg/common"
-	"github.com/your-org/sol-trade-sdk-go/pkg/trading"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -80,18 +83,18 @@ func tradeWithNonce(
 	buySOLAmount := uint64(100_000)
 
 	buyParams := &trading.TradeBuyParams{
-		DexType:              soltradesdk.DexTypePumpFun,
-		InputTokenType:       soltradesdk.TradeTokenTypeSOL,
-		Mint:                 mint,
-		InputTokenAmount:     buySOLAmount,
-		SlippageBasisPoints:  ptrUint64(100),
-		RecentBlockhash:      nil, // Not used when durable_nonce is provided
-		WaitConfirmed:        true,
-		CreateInputTokenATA:  false,
-		CloseInputTokenATA:   false,
-		CreateMintATA:        true,
-		DurableNonce:         durableNonce,
-		GasFeeStrategy:       gasFeeStrategy,
+		DexType:             soltradesdk.DexTypePumpFun,
+		InputTokenType:      soltradesdk.TradeTokenTypeSOL,
+		Mint:                mint,
+		InputTokenAmount:    buySOLAmount,
+		SlippageBasisPoints: ptrUint64(100),
+		RecentBlockhash:     nil, // Not used when durable_nonce is provided
+		WaitConfirmed:       true,
+		CreateInputTokenATA: false,
+		CloseInputTokenATA:  false,
+		CreateMintATA:       true,
+		DurableNonce:        durableNonce,
+		GasFeeStrategy:      gasFeeStrategy,
 		// ExtensionParams: pumpFunParams,
 	}
 

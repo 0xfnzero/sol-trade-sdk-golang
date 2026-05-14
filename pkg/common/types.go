@@ -1,9 +1,56 @@
 package common
 
 import (
+	"encoding/binary"
 	"sync"
 	"sync/atomic"
+
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 )
+
+type SwqosType = soltradesdk.SwqosType
+type TradeType = soltradesdk.TradeType
+
+const (
+	SwqosTypeJito         = soltradesdk.SwqosTypeJito
+	SwqosTypeNextBlock    = soltradesdk.SwqosTypeNextBlock
+	SwqosTypeZeroSlot     = soltradesdk.SwqosTypeZeroSlot
+	SwqosTypeTemporal     = soltradesdk.SwqosTypeTemporal
+	SwqosTypeBloxroute    = soltradesdk.SwqosTypeBloxroute
+	SwqosTypeNode1        = soltradesdk.SwqosTypeNode1
+	SwqosTypeFlashBlock   = soltradesdk.SwqosTypeFlashBlock
+	SwqosTypeBlockRazor   = soltradesdk.SwqosTypeBlockRazor
+	SwqosTypeAstralane    = soltradesdk.SwqosTypeAstralane
+	SwqosTypeStellium     = soltradesdk.SwqosTypeStellium
+	SwqosTypeLightspeed   = soltradesdk.SwqosTypeLightspeed
+	SwqosTypeSoyas        = soltradesdk.SwqosTypeSoyas
+	SwqosTypeSpeedlanding = soltradesdk.SwqosTypeSpeedlanding
+	SwqosTypeHelius       = soltradesdk.SwqosTypeHelius
+	SwqosTypeDefault      = soltradesdk.SwqosTypeDefault
+
+	TradeTypeBuy  = soltradesdk.TradeTypeBuy
+	TradeTypeSell = soltradesdk.TradeTypeSell
+)
+
+func GetAllSwqosTypes() []SwqosType {
+	return []SwqosType{
+		SwqosTypeJito,
+		SwqosTypeNextBlock,
+		SwqosTypeZeroSlot,
+		SwqosTypeTemporal,
+		SwqosTypeBloxroute,
+		SwqosTypeNode1,
+		SwqosTypeFlashBlock,
+		SwqosTypeBlockRazor,
+		SwqosTypeAstralane,
+		SwqosTypeStellium,
+		SwqosTypeLightspeed,
+		SwqosTypeSoyas,
+		SwqosTypeSpeedlanding,
+		SwqosTypeHelius,
+		SwqosTypeDefault,
+	}
+}
 
 // GasFeeStrategyType represents the type of gas fee strategy
 type GasFeeStrategyType int
@@ -139,6 +186,52 @@ func (g *GasFeeStrategy) GetStrategies(tradeType TradeType) []StrategyResult {
 	return results
 }
 
+func (g *GasFeeStrategy) defaultValue() GasFeeStrategyValue {
+	if v, ok := g.Get(SwqosTypeDefault, TradeTypeBuy, GasFeeStrategyTypeNormal); ok {
+		return v
+	}
+	if v, ok := g.Get(SwqosTypeJito, TradeTypeBuy, GasFeeStrategyTypeNormal); ok {
+		return v
+	}
+	return GasFeeStrategyValue{}
+}
+
+// GetComputeUnitPrice returns the default buy compute-unit price.
+func (g *GasFeeStrategy) GetComputeUnitPrice() uint64 {
+	return g.defaultValue().CuPrice
+}
+
+// GetComputeUnitLimit returns the default buy compute-unit limit.
+func (g *GasFeeStrategy) GetComputeUnitLimit() uint32 {
+	return g.defaultValue().CuLimit
+}
+
+// GetPriorityFee returns the default buy tip converted from SOL to lamports.
+func (g *GasFeeStrategy) GetPriorityFee() uint64 {
+	return uint64(g.defaultValue().Tip * 1_000_000_000)
+}
+
+// SetComputeUnitPrice updates compute-unit price across all configured strategies.
+func (g *GasFeeStrategy) SetComputeUnitPrice(price uint64) {
+	g.strategies.Range(func(key, value interface{}) bool {
+		v := value.(GasFeeStrategyValue)
+		v.CuPrice = price
+		g.strategies.Store(key, v)
+		return true
+	})
+}
+
+// SetPriorityFee updates tip across all configured strategies using lamports.
+func (g *GasFeeStrategy) SetPriorityFee(lamports uint64) {
+	tipSol := float64(lamports) / 1_000_000_000
+	g.strategies.Range(func(key, value interface{}) bool {
+		v := value.(GasFeeStrategyValue)
+		v.Tip = tipSol
+		g.strategies.Store(key, v)
+		return true
+	})
+}
+
 // StrategyResult represents a strategy search result
 type StrategyResult struct {
 	SwqosType    SwqosType
@@ -200,8 +293,8 @@ const (
 	InitialVirtualSolReserves   uint64 = 30000000000
 	InitialRealTokenReserves    uint64 = 793000000000000
 	TokenTotalSupply            uint64 = 1000000000000000
-	FeeBasisPoints              uint64 = 100   // 1%
-	CreatorFee                  uint64 = 50    // 0.5%
+	FeeBasisPoints              uint64 = 100 // 1%
+	CreatorFee                  uint64 = 50  // 0.5%
 )
 
 // GetBuyPrice calculates the amount of tokens received for a given SOL amount
@@ -275,7 +368,7 @@ func (b *BondingCurveAccount) getBuyOutPriceInternal(amount uint64, feeBasisPoin
 		return 0
 	}
 
-	totalSellValue := (solTokens * b.VirtualSolReserves) / (b.VirtualTokenReserves - solTokens) + 1
+	totalSellValue := (solTokens*b.VirtualSolReserves)/(b.VirtualTokenReserves-solTokens) + 1
 	fee := (totalSellValue * feeBasisPoints) / 10000
 
 	return totalSellValue + fee
@@ -404,9 +497,9 @@ func (n *NonceCache) Delete(pubkey [32]byte) {
 // ===== Rent =====
 
 var (
-	splTokenRent      atomic.Uint64
-	splToken2022Rent  atomic.Uint64
-	defaultTokenRent  uint64 = 2_039_280 // ~0.00203928 SOL
+	splTokenRent     atomic.Uint64
+	splToken2022Rent atomic.Uint64
+	defaultTokenRent uint64 = 2_039_280 // ~0.00203928 SOL
 )
 
 // GetTokenAccountRent returns the rent for a token account
@@ -430,27 +523,6 @@ func SetTokenAccountRent(isToken2022 bool, rent uint64) {
 	} else {
 		splTokenRent.Store(rent)
 	}
-}
-
-// ===== WSOL Manager =====
-
-// WSOLManager handles WSOL operations
-type WSOLManager struct{}
-
-// HandleWsol creates instructions to wrap SOL to WSOL
-func (w *WSOLManager) HandleWsol(payer [32]byte, amount uint64) []Instruction {
-	// Implementation creates ATA, transfers SOL, and syncs
-	return nil // Placeholder - full implementation needed
-}
-
-// CloseWsol creates instructions to close WSOL account
-func (w *WSOLManager) CloseWsol(payer [32]byte) []Instruction {
-	return nil // Placeholder - full implementation needed
-}
-
-// CreateWsolATA creates instructions to create WSOL ATA
-func (w *WSOLManager) CreateWsolATA(payer [32]byte) []Instruction {
-	return nil // Placeholder - full implementation needed
 }
 
 // Instruction represents a Solana instruction (placeholder)

@@ -122,10 +122,10 @@ func (m *SyscallBypassManager) processLoop() {
 
 // FastTimeProvider provides fast time access
 type FastTimeProvider struct {
-	cachedTime  int64
+	cachedTime     int64
 	updateInterval time.Duration
-	mu          sync.RWMutex
-	stopChan    chan struct{}
+	mu             sync.RWMutex
+	stopChan       chan struct{}
 }
 
 // NewFastTimeProvider creates a fast time provider

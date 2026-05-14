@@ -3,6 +3,7 @@ package perf
 import (
 	"encoding/binary"
 	"math"
+	"unsafe"
 )
 
 // SIMDCapability represents available SIMD capabilities
@@ -204,10 +205,10 @@ func (c *CryptoSIMD) BatchXOR(data [][]byte, key []byte) [][]byte {
 
 // SIMDProcessor provides high-level SIMD processing
 type SIMDProcessor struct {
-	config  *SIMDConfig
+	config   *SIMDConfig
 	detector *SIMDDetector
-	math    *VectorizedMath
-	crypto  *CryptoSIMD
+	math     *VectorizedMath
+	crypto   *CryptoSIMD
 }
 
 // NewSIMDProcessor creates SIMD processor

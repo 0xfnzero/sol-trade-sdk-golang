@@ -10,8 +10,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 
-	"github.com/your-org/sol-trade-sdk-go/pkg/calc"
-	"github.com/your-org/sol-trade-sdk-go/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
 )
 
 // ===== Raydium CPMM Program Constants from Rust: src/instruction/utils/raydium_cpmm.rs =====
@@ -235,7 +235,7 @@ func RaydiumCPMMBuildBuyInstructions(params *RaydiumCPMMBuildBuyParams) ([]solan
 		{PublicKey: observationStateAccount, IsSigner: false, IsWritable: true},  // 12: Observation State Account
 	}
 
-	instructions = append(instructions, solana.NewInstruction(RAYDIUM_CPMM_PROGRAM, accounts, data))
+	instructions = append(instructions, newInstruction(RAYDIUM_CPMM_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
 	if params.CloseInputMintAta {
@@ -342,7 +342,7 @@ func RaydiumCPMMBuildSellInstructions(params *RaydiumCPMMBuildSellParams) ([]sol
 		{PublicKey: observationStateAccount, IsSigner: false, IsWritable: true},  // 12: Observation State Account
 	}
 
-	instructions = append(instructions, solana.NewInstruction(RAYDIUM_CPMM_PROGRAM, accounts, data))
+	instructions = append(instructions, newInstruction(RAYDIUM_CPMM_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
 	if params.CloseOutputMintAta {
@@ -374,28 +374,28 @@ const RaydiumCPMMpoolStateSize = 629
 
 // RaydiumCPMMpoolState represents a decoded Raydium CPMM pool state
 type RaydiumCPMMpoolState struct {
-	AmmConfig           solana.PublicKey
-	PoolCreator         solana.PublicKey
-	Token0Vault         solana.PublicKey
-	Token1Vault         solana.PublicKey
-	LpMint              solana.PublicKey
-	Token0Mint          solana.PublicKey
-	Token1Mint          solana.PublicKey
-	Token0Program       solana.PublicKey
-	Token1Program       solana.PublicKey
-	ObservationKey      solana.PublicKey
-	AuthBump            uint8
-	Status              uint8
-	LpMintDecimals      uint8
-	Mint0Decimals       uint8
-	Mint1Decimals       uint8
-	LpSupply            uint64
-	ProtocolFeesToken0  uint64
-	ProtocolFeesToken1  uint64
-	FundFeesToken0      uint64
-	FundFeesToken1      uint64
-	OpenTime            uint64
-	RecentEpoch         uint64
+	AmmConfig          solana.PublicKey
+	PoolCreator        solana.PublicKey
+	Token0Vault        solana.PublicKey
+	Token1Vault        solana.PublicKey
+	LpMint             solana.PublicKey
+	Token0Mint         solana.PublicKey
+	Token1Mint         solana.PublicKey
+	Token0Program      solana.PublicKey
+	Token1Program      solana.PublicKey
+	ObservationKey     solana.PublicKey
+	AuthBump           uint8
+	Status             uint8
+	LpMintDecimals     uint8
+	Mint0Decimals      uint8
+	Mint1Decimals      uint8
+	LpSupply           uint64
+	ProtocolFeesToken0 uint64
+	ProtocolFeesToken1 uint64
+	FundFeesToken0     uint64
+	FundFeesToken1     uint64
+	OpenTime           uint64
+	RecentEpoch        uint64
 }
 
 // DecodeRaydiumCPMMpoolState decodes a Raydium CPMM pool state from account data

@@ -36,8 +36,8 @@ func (w *WSOLManager) HandleWSOL(payer solana.PublicKey, amount uint64) ([]solan
 
 	// 2. Transfer SOL to WSOL ATA
 	transferIx := system.NewTransferInstructionBuilder().
-		SetFromPubkey(payer).
-		SetToPubkey(wsolATA).
+		SetFundingAccount(payer).
+		SetRecipientAccount(wsolATA).
 		SetLamports(amount).
 		Build()
 	instructions = append(instructions, transferIx)
@@ -83,8 +83,8 @@ func (w *WSOLManager) WrapSOLOnly(payer solana.PublicKey, amount uint64) ([]sola
 
 	// 1. Transfer SOL to WSOL ATA
 	transferIx := system.NewTransferInstructionBuilder().
-		SetFromPubkey(payer).
-		SetToPubkey(wsolATA).
+		SetFundingAccount(payer).
+		SetRecipientAccount(wsolATA).
 		SetLamports(amount).
 		Build()
 	instructions = append(instructions, transferIx)

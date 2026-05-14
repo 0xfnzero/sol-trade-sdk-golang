@@ -1,23 +1,23 @@
 package trading
 
 import (
-	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 )
 
 // Re-exports from the main package for convenience
 type (
-	DexType              = soltradesdk.DexType
-	TradeType            = soltradesdk.TradeType
-	TradeTokenType       = soltradesdk.TradeTokenType
-	SwqosType            = soltradesdk.SwqosType
-	SwqosRegion          = soltradesdk.SwqosRegion
-	SwqosConfig          = soltradesdk.SwqosConfig
-	GasFeeStrategy       = soltradesdk.GasFeeStrategy
-	TradeConfig          = soltradesdk.TradeConfig
-	TradeBuyParams       = soltradesdk.TradeBuyParams
-	TradeSellParams      = soltradesdk.TradeSellParams
-	TradeResult          = soltradesdk.TradeResult
-	DurableNonceInfo     = soltradesdk.DurableNonceInfo
+	DexType          = soltradesdk.DexType
+	TradeType        = soltradesdk.TradeType
+	TradeTokenType   = soltradesdk.TradeTokenType
+	SwqosType        = soltradesdk.SwqosType
+	SwqosRegion      = soltradesdk.SwqosRegion
+	SwqosConfig      = soltradesdk.SwqosConfig
+	GasFeeStrategy   = soltradesdk.GasFeeStrategy
+	TradeConfig      = soltradesdk.TradeConfig
+	TradeBuyParams   = soltradesdk.TradeBuyParams
+	TradeSellParams  = soltradesdk.TradeSellParams
+	TradeResult      = soltradesdk.TradeResult
+	DurableNonceInfo = soltradesdk.DurableNonceInfo
 )
 
 const (
@@ -50,8 +50,10 @@ const (
 	SwqosRegionNewYork    = soltradesdk.SwqosRegionNewYork
 	SwqosRegionFrankfurt  = soltradesdk.SwqosRegionFrankfurt
 	SwqosRegionAmsterdam  = soltradesdk.SwqosRegionAmsterdam
+	SwqosRegionDublin     = soltradesdk.SwqosRegionDublin
 	SwqosRegionSLC        = soltradesdk.SwqosRegionSLC
 	SwqosRegionTokyo      = soltradesdk.SwqosRegionTokyo
+	SwqosRegionSingapore  = soltradesdk.SwqosRegionSingapore
 	SwqosRegionLondon     = soltradesdk.SwqosRegionLondon
 	SwqosRegionLosAngeles = soltradesdk.SwqosRegionLosAngeles
 	SwqosRegionDefault    = soltradesdk.SwqosRegionDefault

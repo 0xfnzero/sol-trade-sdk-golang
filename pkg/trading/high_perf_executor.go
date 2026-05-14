@@ -7,7 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/swqos"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -69,9 +70,9 @@ func DefaultHighPerfExecuteOptions() *HighPerfExecuteOptions {
 
 // HighPerfTradeExecutor implements parallel SWQoS submission with advanced optimization
 type HighPerfTradeExecutor struct {
-	config     *HighPerfTradeConfig
-	rpcClient  *rpc.Client
-	clients    map[soltradesdk.SwqosType]soltradesdk.SwqosClient
+	config      *HighPerfTradeConfig
+	rpcClient   *rpc.Client
+	clients     map[soltradesdk.SwqosType]soltradesdk.SwqosClient
 	gasStrategy *soltradesdk.GasFeeStrategy
 
 	// Worker pool and rate limiting
@@ -177,11 +178,11 @@ func NewHighPerfTradeExecutor(config *HighPerfTradeConfig) (*HighPerfTradeExecut
 	}
 
 	executor := &HighPerfTradeExecutor{
-		config:      config,
-		rpcClient:   rpc.New(config.RPCUrl),
-		clients:     make(map[soltradesdk.SwqosType]soltradesdk.SwqosClient),
-		workerPool:  make(chan struct{}, config.MaxWorkers),
-		rateLimiter: NewRateLimiter(int(1000 / config.RateLimitPerSecond)),
+		config:         config,
+		rpcClient:      rpc.New(config.RPCUrl),
+		clients:        make(map[soltradesdk.SwqosType]soltradesdk.SwqosClient),
+		workerPool:     make(chan struct{}, config.MaxWorkers),
+		rateLimiter:    NewRateLimiter(int(1000 / config.RateLimitPerSecond)),
 		blockhashCache: NewBlockhashCache(2 * time.Second),
 		signatureCache: NewSignatureCache(1000),
 	}
@@ -192,8 +193,9 @@ func NewHighPerfTradeExecutor(config *HighPerfTradeConfig) (*HighPerfTradeExecut
 	}
 
 	// Initialize SWQoS clients
+	clientFactory := &swqos.ClientFactory{}
 	for _, swqosConfig := range config.SWQoSConfigs {
-		client, err := soltradesdk.NewSwqosClient(swqosConfig, config.RPCUrl)
+		client, err := clientFactory.CreateClient(swqosConfig, config.RPCUrl)
 		if err != nil {
 			continue
 		}
@@ -205,7 +207,8 @@ func NewHighPerfTradeExecutor(config *HighPerfTradeConfig) (*HighPerfTradeExecut
 
 // AddClient adds a new SWQoS client
 func (e *HighPerfTradeExecutor) AddClient(config soltradesdk.SwqosConfig) error {
-	client, err := soltradesdk.NewSwqosClient(config, e.config.RPCUrl)
+	clientFactory := &swqos.ClientFactory{}
+	client, err := clientFactory.CreateClient(config, e.config.RPCUrl)
 	if err != nil {
 		return err
 	}
@@ -432,25 +435,34 @@ func (e *HighPerfTradeExecutor) GetGasConfig(
 ) map[string]interface{} {
 	if e.gasStrategy == nil {
 		return map[string]interface{}{
-			"cu_limit":  uint64(200000),
-			"cu_price":  uint64(100000),
-			"tip":       0.001,
+			"cu_limit": uint64(200000),
+			"cu_price": uint64(100000),
+			"tip":      0.001,
 		}
 	}
 
-	value, ok := e.gasStrategy.Get(swqosType, tradeType, strategyType)
-	if !ok {
+	_ = swqosType
+	_ = strategyType
+
+	switch tradeType {
+	case soltradesdk.TradeTypeSell:
 		return map[string]interface{}{
-			"cu_limit":  uint64(200000),
-			"cu_price":  uint64(100000),
-			"tip":       0.001,
+			"cu_limit": e.gasStrategy.SellComputeUnits,
+			"cu_price": e.gasStrategy.SellPriorityFee,
+			"tip":      float64(e.gasStrategy.SellTipLamports) / float64(solana.LAMPORTS_PER_SOL),
 		}
-	}
-
-	return map[string]interface{}{
-		"cu_limit":  uint64(value.CuLimit),
-		"cu_price":  value.CuPrice,
-		"tip":       value.Tip,
+	case soltradesdk.TradeTypeBuy:
+		return map[string]interface{}{
+			"cu_limit": e.gasStrategy.BuyComputeUnits,
+			"cu_price": e.gasStrategy.BuyPriorityFee,
+			"tip":      float64(e.gasStrategy.BuyTipLamports) / float64(solana.LAMPORTS_PER_SOL),
+		}
+	default:
+		return map[string]interface{}{
+			"cu_limit": uint64(200000),
+			"cu_price": uint64(100000),
+			"tip":      0.001,
+		}
 	}
 }
 
@@ -489,12 +501,12 @@ func (e *HighPerfTradeExecutor) GetMetrics() map[string]interface{} {
 	e.mu.RUnlock()
 
 	return map[string]interface{}{
-		"total_trades":     total,
+		"total_trades":      total,
 		"successful_trades": successful,
-		"failed_trades":    failed,
-		"success_rate":     successRate,
-		"avg_latency_ms":   avgLatency,
-		"clients_count":    clientCount,
+		"failed_trades":     failed,
+		"success_rate":      successRate,
+		"avg_latency_ms":    avgLatency,
+		"clients_count":     clientCount,
 	}
 }
 
@@ -514,7 +526,7 @@ func CreateHighPerfTradeExecutor(
 	for i, swqosType := range swqosTypes {
 		configs[i] = soltradesdk.SwqosConfig{
 			Type:   swqosType,
-			ApiKey: apiKeys[swqosType],
+			APIKey: apiKeys[swqosType],
 		}
 	}
 

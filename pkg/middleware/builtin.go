@@ -59,15 +59,15 @@ func (t *TimerMiddleware) Clone() InstructionMiddleware {
 
 // ValidationMiddleware validates instructions before processing
 type ValidationMiddleware struct {
-	maxInstructions int
-	maxDataSize     int
+	MaxInstructions int
+	MaxDataSize     int
 }
 
 // NewValidationMiddleware creates a new validation middleware
 func NewValidationMiddleware(maxInstructions, maxDataSize int) *ValidationMiddleware {
 	return &ValidationMiddleware{
-		maxInstructions: maxInstructions,
-		maxDataSize:     maxDataSize,
+		MaxInstructions: maxInstructions,
+		MaxDataSize:     maxDataSize,
 	}
 }
 
@@ -103,20 +103,20 @@ func (v *ValidationMiddleware) ProcessFullInstructions(
 // Clone creates a copy of the middleware
 func (v *ValidationMiddleware) Clone() InstructionMiddleware {
 	return &ValidationMiddleware{
-		maxInstructions: v.maxInstructions,
-		maxDataSize:     v.maxDataSize,
+		MaxInstructions: v.MaxInstructions,
+		MaxDataSize:     v.MaxDataSize,
 	}
 }
 
 // validate checks if instructions meet validation criteria
 func (v *ValidationMiddleware) validate(instructions []Instruction) error {
-	if v.maxInstructions > 0 && len(instructions) > v.maxInstructions {
-		return fmt.Errorf("too many instructions: %d > %d", len(instructions), v.maxInstructions)
+	if v.MaxInstructions > 0 && len(instructions) > v.MaxInstructions {
+		return fmt.Errorf("too many instructions: %d > %d", len(instructions), v.MaxInstructions)
 	}
 
 	for i, instr := range instructions {
-		if v.maxDataSize > 0 && len(instr.Data) > v.maxDataSize {
-			return fmt.Errorf("instruction %d data too large: %d > %d", i, len(instr.Data), v.maxDataSize)
+		if v.MaxDataSize > 0 && len(instr.Data) > v.MaxDataSize {
+			return fmt.Errorf("instruction %d data too large: %d > %d", i, len(instr.Data), v.MaxDataSize)
 		}
 	}
 

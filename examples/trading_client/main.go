@@ -1,3 +1,6 @@
+//go:build live_examples
+// +build live_examples
+
 // TradingClient Creation Example
 //
 // This example demonstrates two ways to create a TradingClient:
@@ -14,9 +17,9 @@ import (
 	"log"
 	"os"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go"
-	"github.com/your-org/sol-trade-sdk-go/pkg/common"
-	"github.com/your-org/sol-trade-sdk-go/pkg/trading"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -97,9 +100,9 @@ func createTradingClientFromInfrastructure(ctx context.Context) (*trading.TradeC
 
 	// Create infrastructure separately (can be shared across multiple wallets)
 	infraConfig := &common.InfrastructureConfig{
-		RPCURL:      rpcURL,
+		RPCURL:       rpcURL,
 		SwqosConfigs: swqosConfigs,
-		Commitment:  commitment,
+		Commitment:   commitment,
 	}
 	infrastructure, err := trading.NewInfrastructure(ctx, infraConfig)
 	if err != nil {

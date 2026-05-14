@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -194,26 +195,26 @@ func (r *ExecutionResult) Duration() time.Duration {
 
 // AsyncTradeExecutor handles asynchronous trade execution
 type AsyncTradeExecutor struct {
-	config      *ExecutionConfig
-	rpcClient   *rpc.Client
-	semaphore   chan struct{}
-	executions  sync.Map // map[solana.Signature]*executionContext
-	callbacks   []ExecutionCallback
-	mu          sync.RWMutex
-	started     atomic.Bool
-	stopCh      chan struct{}
-	wg          sync.WaitGroup
+	config     *ExecutionConfig
+	rpcClient  *rpc.Client
+	semaphore  chan struct{}
+	executions sync.Map // map[solana.Signature]*executionContext
+	callbacks  []ExecutionCallback
+	mu         sync.RWMutex
+	started    atomic.Bool
+	stopCh     chan struct{}
+	wg         sync.WaitGroup
 }
 
 // executionContext tracks the context of an ongoing execution
 type executionContext struct {
-	result       *ExecutionResult
-	transaction  *solana.Transaction
-	config       *ExecutionConfig
-	ctx          context.Context
-	cancel       context.CancelFunc
-	retryCount   int
-	submittedTo  []string
+	result      *ExecutionResult
+	transaction *solana.Transaction
+	config      *ExecutionConfig
+	ctx         context.Context
+	cancel      context.CancelFunc
+	retryCount  int
+	submittedTo []string
 }
 
 // ExecutionCallback is called when execution status changes
@@ -229,10 +230,10 @@ func NewAsyncTradeExecutor(config *ExecutionConfig, rpcClient *rpc.Client) (*Asy
 	}
 
 	executor := &AsyncTradeExecutor{
-		config:     config,
-		rpcClient:  rpcClient,
-		stopCh:     make(chan struct{}),
-		callbacks:  make([]ExecutionCallback, 0),
+		config:    config,
+		rpcClient: rpcClient,
+		stopCh:    make(chan struct{}),
+		callbacks: make([]ExecutionCallback, 0),
 	}
 
 	if config.MaxConcurrentExecutions > 0 {
@@ -406,7 +407,7 @@ func (e *AsyncTradeExecutor) submitTransaction(
 		PreflightCommitment: config.PreflightCommitment,
 	}
 
-	sig, err := e.rpcClient.SendTransactionWithOpts(ctx, txBytes, opts)
+	sig, err := e.rpcClient.SendEncodedTransactionWithOpts(ctx, base64.StdEncoding.EncodeToString(txBytes), opts)
 	if err != nil {
 		return solana.Signature{}, err
 	}
@@ -445,17 +446,13 @@ func (e *AsyncTradeExecutor) waitForConfirmation(exec *executionContext) {
 					return
 				}
 
-				if status.ConfirmationStatus != nil {
-					switch *status.ConfirmationStatus {
+				if status.ConfirmationStatus != "" {
+					switch status.ConfirmationStatus {
 					case rpc.ConfirmationStatusConfirmed:
 						confirmedAt := time.Now()
 						exec.result.ConfirmedAt = &confirmedAt
 						exec.result.ConfirmationTimeMs = confirmedAt.Sub(exec.result.SubmittedAt).Milliseconds()
 						exec.result.Slot = uint64(status.Slot)
-						if status.BlockTime != nil {
-							blockTime := time.Unix(*status.BlockTime, 0)
-							exec.result.BlockTime = &blockTime
-						}
 						e.updateStatus(exec, ExecutionStatusConfirmed, nil)
 
 						if exec.config.CommitmentLevel == rpc.CommitmentConfirmed {

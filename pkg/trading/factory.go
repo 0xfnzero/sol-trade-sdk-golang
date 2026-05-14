@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 	"github.com/gagliardetto/solana-go"
 )
 
@@ -26,40 +26,48 @@ func NewPumpFunExecutor(base *TradeExecutor) *PumpFunExecutor {
 
 // PumpFunBuyParams represents parameters for PumpFun buy
 type PumpFunBuyParams struct {
-	Payer               solana.PublicKey
-	OutputMint          solana.PublicKey
-	InputAmount         uint64
-	SlippageBasisPoints uint16
-	BondingCurve        solana.PublicKey
-	CreatorVault        solana.PublicKey
+	Payer                  solana.PublicKey
+	OutputMint             solana.PublicKey
+	InputAmount            uint64
+	SlippageBasisPoints    uint16
+	BondingCurve           solana.PublicKey
+	CreatorVault           solana.PublicKey
 	AssociatedBondingCurve solana.PublicKey
-	TokenProgram        solana.PublicKey
-	CreateOutputATA     bool
-	UseExactSolAmount   bool
+	TokenProgram           solana.PublicKey
+	CreateOutputATA        bool
+	UseExactSolAmount      bool
 }
 
 // PumpFunSellParams represents parameters for PumpFun sell
 type PumpFunSellParams struct {
-	Payer               solana.PublicKey
-	InputMint           solana.PublicKey
-	TokenAmount         uint64
-	SlippageBasisPoints uint16
-	BondingCurve        solana.PublicKey
-	CreatorVault        solana.PublicKey
+	Payer                  solana.PublicKey
+	InputMint              solana.PublicKey
+	TokenAmount            uint64
+	SlippageBasisPoints    uint16
+	BondingCurve           solana.PublicKey
+	CreatorVault           solana.PublicKey
 	AssociatedBondingCurve solana.PublicKey
-	TokenProgram        solana.PublicKey
-	CloseTokenAccount   bool
+	TokenProgram           solana.PublicKey
+	CloseTokenAccount      bool
 }
 
 // ExecuteBuy executes a buy on PumpFun
-func (e *PumpFunExecutor) ExecuteBuy(ctx context.Context, params *PumpFunBuyParams) (*ExecuteResult, error) {
+func (e *PumpFunExecutor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
+	if _, ok := params.(*PumpFunBuyParams); !ok {
+		return nil, fmt.Errorf("invalid PumpFun buy params: %T", params)
+	}
+
 	return &ExecuteResult{
 		Success: true,
 	}, nil
 }
 
 // ExecuteSell executes a sell on PumpFun
-func (e *PumpFunExecutor) ExecuteSell(ctx context.Context, params *PumpFunSellParams) (*ExecuteResult, error) {
+func (e *PumpFunExecutor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
+	if _, ok := params.(*PumpFunSellParams); !ok {
+		return nil, fmt.Errorf("invalid PumpFun sell params: %T", params)
+	}
+
 	return &ExecuteResult{
 		Success: true,
 	}, nil
@@ -77,53 +85,61 @@ func NewPumpSwapExecutor(base *TradeExecutor) *PumpSwapExecutor {
 
 // PumpSwapBuyParams represents parameters for PumpSwap buy
 type PumpSwapBuyParams struct {
-	Payer                 solana.PublicKey
-	Pool                  solana.PublicKey
-	BaseMint              solana.PublicKey
-	QuoteMint             solana.PublicKey
-	InputAmount           uint64
-	SlippageBasisPoints   uint16
-	PoolBaseTokenAccount  solana.PublicKey
-	PoolQuoteTokenAccount solana.PublicKey
+	Payer                  solana.PublicKey
+	Pool                   solana.PublicKey
+	BaseMint               solana.PublicKey
+	QuoteMint              solana.PublicKey
+	InputAmount            uint64
+	SlippageBasisPoints    uint16
+	PoolBaseTokenAccount   solana.PublicKey
+	PoolQuoteTokenAccount  solana.PublicKey
 	PoolBaseTokenReserves  uint64
 	PoolQuoteTokenReserves uint64
-	CoinCreatorVaultATA   solana.PublicKey
-	CoinCreatorVaultAuth  solana.PublicKey
-	BaseTokenProgram      solana.PublicKey
-	QuoteTokenProgram     solana.PublicKey
-	IsMayhemMode          bool
-	IsCashbackCoin        bool
+	CoinCreatorVaultATA    solana.PublicKey
+	CoinCreatorVaultAuth   solana.PublicKey
+	BaseTokenProgram       solana.PublicKey
+	QuoteTokenProgram      solana.PublicKey
+	IsMayhemMode           bool
+	IsCashbackCoin         bool
 }
 
 // PumpSwapSellParams represents parameters for PumpSwap sell
 type PumpSwapSellParams struct {
-	Payer                 solana.PublicKey
-	Pool                  solana.PublicKey
-	BaseMint              solana.PublicKey
-	QuoteMint             solana.PublicKey
-	TokenAmount           uint64
-	SlippageBasisPoints   uint16
-	PoolBaseTokenAccount  solana.PublicKey
-	PoolQuoteTokenAccount solana.PublicKey
+	Payer                  solana.PublicKey
+	Pool                   solana.PublicKey
+	BaseMint               solana.PublicKey
+	QuoteMint              solana.PublicKey
+	TokenAmount            uint64
+	SlippageBasisPoints    uint16
+	PoolBaseTokenAccount   solana.PublicKey
+	PoolQuoteTokenAccount  solana.PublicKey
 	PoolBaseTokenReserves  uint64
 	PoolQuoteTokenReserves uint64
-	CoinCreatorVaultATA   solana.PublicKey
-	CoinCreatorVaultAuth  solana.PublicKey
-	BaseTokenProgram      solana.PublicKey
-	QuoteTokenProgram     solana.PublicKey
-	IsMayhemMode          bool
-	IsCashbackCoin        bool
+	CoinCreatorVaultATA    solana.PublicKey
+	CoinCreatorVaultAuth   solana.PublicKey
+	BaseTokenProgram       solana.PublicKey
+	QuoteTokenProgram      solana.PublicKey
+	IsMayhemMode           bool
+	IsCashbackCoin         bool
 }
 
 // ExecuteBuy executes a buy on PumpSwap
-func (e *PumpSwapExecutor) ExecuteBuy(ctx context.Context, params *PumpSwapBuyParams) (*ExecuteResult, error) {
+func (e *PumpSwapExecutor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
+	if _, ok := params.(*PumpSwapBuyParams); !ok {
+		return nil, fmt.Errorf("invalid PumpSwap buy params: %T", params)
+	}
+
 	return &ExecuteResult{
 		Success: true,
 	}, nil
 }
 
 // ExecuteSell executes a sell on PumpSwap
-func (e *PumpSwapExecutor) ExecuteSell(ctx context.Context, params *PumpSwapSellParams) (*ExecuteResult, error) {
+func (e *PumpSwapExecutor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
+	if _, ok := params.(*PumpSwapSellParams); !ok {
+		return nil, fmt.Errorf("invalid PumpSwap sell params: %T", params)
+	}
+
 	return &ExecuteResult{
 		Success: true,
 	}, nil
@@ -282,20 +298,7 @@ func (c *TradingClient) Buy(ctx context.Context, dexType soltradesdk.DexType, pa
 		return nil, err
 	}
 
-	switch e := executor.(type) {
-	case *PumpFunExecutor:
-		if p, ok := params.(*PumpFunBuyParams); ok {
-			return e.ExecuteBuy(ctx, p)
-		}
-	case *PumpSwapExecutor:
-		if p, ok := params.(*PumpSwapBuyParams); ok {
-			return e.ExecuteBuy(ctx, p)
-		}
-	default:
-		return e.ExecuteBuy(ctx, params)
-	}
-
-	return nil, fmt.Errorf("invalid params type for DEX: %s", dexType)
+	return executor.ExecuteBuy(ctx, params)
 }
 
 // Sell executes a sell trade on the specified DEX
@@ -305,18 +308,5 @@ func (c *TradingClient) Sell(ctx context.Context, dexType soltradesdk.DexType, p
 		return nil, err
 	}
 
-	switch e := executor.(type) {
-	case *PumpFunExecutor:
-		if p, ok := params.(*PumpFunSellParams); ok {
-			return e.ExecuteSell(ctx, p)
-		}
-	case *PumpSwapExecutor:
-		if p, ok := params.(*PumpSwapSellParams); ok {
-			return e.ExecuteSell(ctx, p)
-		}
-	default:
-		return e.ExecuteSell(ctx, params)
-	}
-
-	return nil, fmt.Errorf("invalid params type for DEX: %s", dexType)
+	return executor.ExecuteSell(ctx, params)
 }

@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
-	"github.com/your-org/sol-trade-sdk-go/pkg/constants"
-	"github.com/your-org/sol-trade-sdk-go/pkg/params"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/params"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 )
 
 func main() {
@@ -47,7 +49,7 @@ func main() {
 
 	pumpFunParams := &params.PumpFunParams{
 		BondingCurve: &params.BondingCurveAccount{
-			Account:        constants.GetBondingCurvePDA(mint),
+			Account:              instruction.GetBondingCurvePDA(mint),
 			VirtualTokenReserves: 1000000000,
 			VirtualSolReserves:   30000000000,
 			RealTokenReserves:    800000000,
@@ -56,8 +58,8 @@ func main() {
 			IsMayhemMode:         false,
 			IsCashbackCoin:       false,
 		},
-		CreatorVault:   constants.GetCreatorVaultPDA(constants.MustPublicKeyFromBase58("creator_address")),
-		TokenProgram:   constants.TOKEN_PROGRAM,
+		CreatorVault: instruction.GetCreatorVaultPDA(constants.MustPublicKeyFromBase58("creator_address")),
+		TokenProgram: constants.TOKEN_PROGRAM,
 	}
 
 	// 6. Get recent blockhash

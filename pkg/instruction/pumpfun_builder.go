@@ -6,17 +6,18 @@ package instruction
 import (
 	"context"
 	"crypto/rand"
-	"encoding/binary"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 
-	"github.com/your-org/sol-trade-sdk-go/pkg/calc"
-	"github.com/your-org/sol-trade-sdk-go/pkg/common"
-	"github.com/your-org/sol-trade-sdk-go/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
 )
 
 // ===== PumpFun Program Constants from Rust: src/instruction/utils/pumpfun.rs =====
@@ -51,6 +52,8 @@ var PumpFunProtocolExtraFeeRecipients = []solana.PublicKey{
 	solana.MustPublicKeyFromBase58("A7hAgCzFw14fejgCp387JUJRMNyz4j89JKnhtKU8piqW"),
 }
 
+var PumpFunBuybackFeeRecipients = PumpFunProtocolExtraFeeRecipients
+
 // PumpFun Mayhem fee recipients - from Rust: src/instruction/utils/pumpfun.rs global_constants::MAYHEM_FEE_RECIPIENTS
 var PumpFunMayhemFeeRecipients = []solana.PublicKey{
 	solana.MustPublicKeyFromBase58("GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS"),
@@ -71,6 +74,12 @@ var (
 	PumpFunBuyExactSolInDiscriminator = []byte{56, 252, 116, 8, 158, 223, 205, 95}
 	// PumpFunSellDiscriminator is the discriminator for the sell instruction
 	PumpFunSellDiscriminator = []byte{51, 230, 133, 164, 1, 127, 131, 173}
+	// PumpFunBuyV2Discriminator is the discriminator for buy_v2
+	PumpFunBuyV2Discriminator = []byte{184, 23, 238, 97, 103, 197, 211, 61}
+	// PumpFunSellV2Discriminator is the discriminator for sell_v2
+	PumpFunSellV2Discriminator = []byte{93, 246, 130, 60, 231, 233, 64, 178}
+	// PumpFunBuyExactQuoteInV2Discriminator is the discriminator for buy_exact_quote_in_v2
+	PumpFunBuyExactQuoteInV2Discriminator = []byte{194, 171, 28, 70, 104, 77, 91, 47}
 	// PumpFunClaimCashbackDiscriminator is the discriminator for the claim cashback instruction
 	PumpFunClaimCashbackDiscriminator = []byte{37, 58, 35, 126, 190, 53, 228, 197}
 )
@@ -83,7 +92,10 @@ var (
 	PumpFunUserVolumeAccumulatorSeed   = []byte("user_volume_accumulator")
 	PumpFunGlobalVolumeAccumulatorSeed = []byte("global_volume_accumulator")
 	PumpFunFeeConfigSeed               = []byte("fee_config")
+	PumpFunSharingConfigSeed           = []byte("sharing-config")
 )
+
+var pumpFunPhantomDefaultCreatorVault = solana.MustPublicKeyFromBase58("2DR3iqRPVThyRLVJnwjPW1qiGWrp8RUFfHVjMbZyhdNc")
 
 // PumpFun Constants - from Rust: src/instruction/utils/pumpfun.rs global_constants
 const (
@@ -109,31 +121,10 @@ func GetPumpFunProtocolExtraFeeRecipientRandom() solana.PublicKey {
 	return PumpFunProtocolExtraFeeRecipients[n.Int64()]
 }
 
-// GetBondingCurvePDA returns the bonding curve PDA for a mint (seeds: ["bonding-curve", mint])
-func GetBondingCurvePDA(mint solana.PublicKey) solana.PublicKey {
-	pda, _, _ := solana.FindProgramAddress(
-		[][]byte{PumpFunBondingCurveSeed, mint[:]},
-		PUMPFUN_PROGRAM,
-	)
-	return pda
-}
-
-// GetBondingCurveV2PDA returns the bonding curve v2 PDA for a mint (seeds: ["bonding-curve-v2", mint])
-func GetBondingCurveV2PDA(mint solana.PublicKey) solana.PublicKey {
-	pda, _, _ := solana.FindProgramAddress(
-		[][]byte{PumpFunBondingCurveV2Seed, mint[:]},
-		PUMPFUN_PROGRAM,
-	)
-	return pda
-}
-
-// GetCreatorVaultPDA returns the creator vault PDA (seeds: ["creator-vault", creator])
-func GetCreatorVaultPDA(creator solana.PublicKey) solana.PublicKey {
-	pda, _, _ := solana.FindProgramAddress(
-		[][]byte{PumpFunCreatorVaultSeed, creator[:]},
-		PUMPFUN_PROGRAM,
-	)
-	return pda
+// GetPumpFunBuybackFeeRecipientRandom returns a random PumpFun V2 buyback fee recipient.
+func GetPumpFunBuybackFeeRecipientRandom() solana.PublicKey {
+	n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(PumpFunBuybackFeeRecipients))))
+	return PumpFunBuybackFeeRecipients[n.Int64()]
 }
 
 // GetPumpFunUserVolumeAccumulatorPDA returns the user volume accumulator PDA
@@ -141,6 +132,15 @@ func GetPumpFunUserVolumeAccumulatorPDA(user solana.PublicKey) solana.PublicKey 
 	pda, _, _ := solana.FindProgramAddress(
 		[][]byte{PumpFunUserVolumeAccumulatorSeed, user[:]},
 		PUMPFUN_PROGRAM,
+	)
+	return pda
+}
+
+// GetPumpFunFeeSharingConfigPDA returns the fee sharing config PDA for a mint.
+func GetPumpFunFeeSharingConfigPDA(mint solana.PublicKey) solana.PublicKey {
+	pda, _, _ := solana.FindProgramAddress(
+		[][]byte{PumpFunSharingConfigSeed, mint[:]},
+		PUMPFUN_FEE_PROGRAM,
 	)
 	return pda
 }
@@ -167,6 +167,7 @@ type BondingCurve struct {
 	VirtualTokenReserves uint64
 	VirtualSolReserves   uint64
 	RealTokenReserves    uint64
+	Creator              solana.PublicKey
 	IsMayhemMode         bool
 	IsCashbackCoin       bool
 }
@@ -178,6 +179,11 @@ type PumpFunParams struct {
 	AssociatedBondingCurve    solana.PublicKey
 	TokenProgram              solana.PublicKey
 	CloseTokenAccountWhenSell *bool
+	ObservedTradeCreator      solana.PublicKey
+	FeeSharingCreatorVault    solana.PublicKey
+	FeeRecipient              solana.PublicKey
+	QuoteMint                 solana.PublicKey
+	UseV2Ix                   bool
 }
 
 // PumpFunBuildBuyParams contains parameters for building buy instructions
@@ -188,8 +194,10 @@ type PumpFunBuildBuyParams struct {
 	SlippageBasisPoints uint64
 	ProtocolParams      *PumpFunParams
 	CreateOutputMintAta bool
+	CreateInputMintAta  bool
 	UseExactSolAmount   bool
 	FixedOutputAmount   *uint64
+	UsePumpFunV2        bool
 }
 
 // PumpFunBuildSellParams contains parameters for building sell instructions
@@ -199,8 +207,78 @@ type PumpFunBuildSellParams struct {
 	InputAmount         uint64
 	SlippageBasisPoints uint64
 	ProtocolParams      *PumpFunParams
+	CreateOutputMintAta bool
 	CloseInputMintAta   bool
 	FixedOutputAmount   *uint64
+	UsePumpFunV2        bool
+}
+
+func pumpFunUsablePubkey(pk solana.PublicKey) bool {
+	return !pk.IsZero() && !pk.Equals(pumpFunPhantomDefaultCreatorVault)
+}
+
+func pumpFunEffectiveCreator(pp *PumpFunParams) solana.PublicKey {
+	if pumpFunUsablePubkey(pp.ObservedTradeCreator) {
+		return pp.ObservedTradeCreator
+	}
+	if pp.BondingCurve != nil && pumpFunUsablePubkey(pp.BondingCurve.Creator) {
+		return pp.BondingCurve.Creator
+	}
+	return solana.PublicKey{}
+}
+
+func pumpFunResolveCreatorVaultForIx(pp *PumpFunParams, mint solana.PublicKey) (solana.PublicKey, error) {
+	if pumpFunUsablePubkey(pp.CreatorVault) {
+		return pp.CreatorVault, nil
+	}
+	if pumpFunUsablePubkey(pp.FeeSharingCreatorVault) {
+		return pp.FeeSharingCreatorVault, nil
+	}
+	creator := pumpFunEffectiveCreator(pp)
+	if pumpFunUsablePubkey(creator) {
+		return GetCreatorVaultPDA(creator), nil
+	}
+	return solana.PublicKey{}, fmt.Errorf("creator_vault PDA derivation failed for mint %s", mint.String())
+}
+
+func pumpFunResolveCreatorVaultForSellV2(pp *PumpFunParams, mint solana.PublicKey) (solana.PublicKey, error) {
+	if pumpFunUsablePubkey(pp.CreatorVault) {
+		return pp.CreatorVault, nil
+	}
+	if pumpFunUsablePubkey(pp.FeeSharingCreatorVault) {
+		return pp.FeeSharingCreatorVault, nil
+	}
+	if pp.BondingCurve != nil && pumpFunUsablePubkey(pp.BondingCurve.Creator) {
+		return GetCreatorVaultPDA(pp.BondingCurve.Creator), nil
+	}
+	return solana.PublicKey{}, fmt.Errorf("creator_vault PDA derivation failed for sell_v2 mint %s", mint.String())
+}
+
+func pumpFunEffectiveMintTokenProgram(mint solana.PublicKey, pp *PumpFunParams) solana.PublicKey {
+	if strings.HasSuffix(mint.String(), "pump") {
+		return constants.TOKEN_PROGRAM_2022
+	}
+	if pumpFunUsablePubkey(pp.TokenProgram) {
+		return pp.TokenProgram
+	}
+	return constants.TOKEN_PROGRAM_2022
+}
+
+func pumpFunEffectiveQuoteMint(pp *PumpFunParams) solana.PublicKey {
+	if pumpFunUsablePubkey(pp.QuoteMint) {
+		return pp.QuoteMint
+	}
+	return constants.WSOL_TOKEN_ACCOUNT
+}
+
+func pumpFunFeeRecipient(pp *PumpFunParams) solana.PublicKey {
+	if pumpFunUsablePubkey(pp.FeeRecipient) {
+		return pp.FeeRecipient
+	}
+	if pp.BondingCurve != nil && pp.BondingCurve.IsMayhemMode {
+		return GetPumpFunMayhemFeeRecipientRandom()
+	}
+	return PUMPFUN_FEE_RECIPIENT
 }
 
 // ===== Instruction Builders - 100% from Rust =====
@@ -213,8 +291,15 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 	}
 
 	pp := params.ProtocolParams
+	if params.UsePumpFunV2 || pp.UseV2Ix || pumpFunUsablePubkey(pp.QuoteMint) {
+		return PumpFunBuildBuyV2Instructions(params)
+	}
 	bondingCurve := pp.BondingCurve
-	creator := GetCreator(pp.CreatorVault)
+	creator := pumpFunEffectiveCreator(pp)
+	creatorVaultAccount, err := pumpFunResolveCreatorVaultForIx(pp, params.OutputMint)
+	if err != nil {
+		creatorVaultAccount = pp.CreatorVault
+	}
 
 	// Calculate buy token amount
 	var buyTokenAmount uint64
@@ -225,7 +310,7 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 			bondingCurve.VirtualTokenReserves,
 			bondingCurve.VirtualSolReserves,
 			bondingCurve.RealTokenReserves,
-			!creator.IsZero(),
+			pumpFunUsablePubkey(creator),
 			params.InputAmount,
 		)
 	}
@@ -240,10 +325,7 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 	}
 
 	// Get token program
-	tokenProgram := pp.TokenProgram
-	if tokenProgram.IsZero() {
-		tokenProgram = constants.TOKEN_PROGRAM
-	}
+	tokenProgram := pumpFunEffectiveMintTokenProgram(params.OutputMint, pp)
 
 	// Get associated bonding curve
 	associatedBondingCurve := pp.AssociatedBondingCurve
@@ -292,13 +374,7 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 		copy(data[24:26], trackVolume)
 	}
 
-	// Determine fee recipient
-	var feeRecipient solana.PublicKey
-	if bondingCurve.IsMayhemMode {
-		feeRecipient = GetPumpFunMayhemFeeRecipientRandom()
-	} else {
-		feeRecipient = PUMPFUN_FEE_RECIPIENT
-	}
+	feeRecipient := pumpFunFeeRecipient(pp)
 
 	// Get bonding curve v2
 	bondingCurveV2 := GetBondingCurveV2PDA(params.OutputMint)
@@ -314,7 +390,7 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 		{PublicKey: params.Payer, IsSigner: true, IsWritable: true},
 		{PublicKey: constants.SYSTEM_PROGRAM, IsSigner: false, IsWritable: false},
 		{PublicKey: tokenProgram, IsSigner: false, IsWritable: false},
-		{PublicKey: pp.CreatorVault, IsSigner: false, IsWritable: true},
+		{PublicKey: creatorVaultAccount, IsSigner: false, IsWritable: true},
 		{PublicKey: PUMPFUN_EVENT_AUTHORITY, IsSigner: false, IsWritable: false},
 		{PublicKey: PUMPFUN_PROGRAM, IsSigner: false, IsWritable: false},
 		{PublicKey: PUMPFUN_GLOBAL_VOLUME_ACCUMULATOR, IsSigner: false, IsWritable: true},
@@ -325,7 +401,7 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 		{PublicKey: GetPumpFunProtocolExtraFeeRecipientRandom(), IsSigner: false, IsWritable: true},
 	}
 
-	instructions = append(instructions, solana.NewInstruction(PUMPFUN_PROGRAM, accounts, data))
+	instructions = append(instructions, newInstruction(PUMPFUN_PROGRAM, accounts, data))
 
 	return instructions, nil
 }
@@ -338,14 +414,21 @@ func PumpFunBuildSellInstructions(params *PumpFunBuildSellParams) ([]solana.Inst
 	}
 
 	pp := params.ProtocolParams
+	if params.UsePumpFunV2 || pp.UseV2Ix || pumpFunUsablePubkey(pp.QuoteMint) {
+		return PumpFunBuildSellV2Instructions(params)
+	}
 	bondingCurve := pp.BondingCurve
-	creator := GetCreator(pp.CreatorVault)
+	creator := pumpFunEffectiveCreator(pp)
+	creatorVaultAccount, err := pumpFunResolveCreatorVaultForIx(pp, params.InputMint)
+	if err != nil {
+		creatorVaultAccount = pp.CreatorVault
+	}
 
 	// Calculate SOL amount from token amount
 	solAmount := calc.GetSellSolAmountFromTokenAmount(
 		bondingCurve.VirtualTokenReserves,
 		bondingCurve.VirtualSolReserves,
-		!creator.IsZero(),
+		pumpFunUsablePubkey(creator),
 		params.InputAmount,
 	)
 
@@ -364,10 +447,7 @@ func PumpFunBuildSellInstructions(params *PumpFunBuildSellParams) ([]solana.Inst
 	}
 
 	// Get token program
-	tokenProgram := pp.TokenProgram
-	if tokenProgram.IsZero() {
-		tokenProgram = constants.TOKEN_PROGRAM
-	}
+	tokenProgram := pumpFunEffectiveMintTokenProgram(params.InputMint, pp)
 
 	// Get associated bonding curve
 	associatedBondingCurve := pp.AssociatedBondingCurve
@@ -387,13 +467,7 @@ func PumpFunBuildSellInstructions(params *PumpFunBuildSellParams) ([]solana.Inst
 	binary.LittleEndian.PutUint64(data[8:16], params.InputAmount)
 	binary.LittleEndian.PutUint64(data[16:24], minSolOutput)
 
-	// Determine fee recipient
-	var feeRecipient solana.PublicKey
-	if bondingCurve.IsMayhemMode {
-		feeRecipient = GetPumpFunMayhemFeeRecipientRandom()
-	} else {
-		feeRecipient = PUMPFUN_FEE_RECIPIENT
-	}
+	feeRecipient := pumpFunFeeRecipient(pp)
 
 	// Get bonding curve v2
 	bondingCurveV2 := GetBondingCurveV2PDA(params.InputMint)
@@ -408,7 +482,7 @@ func PumpFunBuildSellInstructions(params *PumpFunBuildSellParams) ([]solana.Inst
 		{PublicKey: userTokenAccount, IsSigner: false, IsWritable: true},
 		{PublicKey: params.Payer, IsSigner: true, IsWritable: true},
 		{PublicKey: constants.SYSTEM_PROGRAM, IsSigner: false, IsWritable: false},
-		{PublicKey: pp.CreatorVault, IsSigner: false, IsWritable: true},
+		{PublicKey: creatorVaultAccount, IsSigner: false, IsWritable: true},
 		{PublicKey: tokenProgram, IsSigner: false, IsWritable: false},
 		{PublicKey: PUMPFUN_EVENT_AUTHORITY, IsSigner: false, IsWritable: false},
 		{PublicKey: PUMPFUN_PROGRAM, IsSigner: false, IsWritable: false},
@@ -432,13 +506,226 @@ func PumpFunBuildSellInstructions(params *PumpFunBuildSellParams) ([]solana.Inst
 		PublicKey: GetPumpFunProtocolExtraFeeRecipientRandom(), IsSigner: false, IsWritable: true,
 	})
 
-	instructions = append(instructions, solana.NewInstruction(PUMPFUN_PROGRAM, accounts, data))
+	instructions = append(instructions, newInstruction(PUMPFUN_PROGRAM, accounts, data))
 
 	// Close token account if requested
 	closeWhenSell := pp.CloseTokenAccountWhenSell != nil && *pp.CloseTokenAccountWhenSell
 	if closeWhenSell || params.CloseInputMintAta {
 		closeIx := token.NewCloseAccountInstruction(
 			userTokenAccount,
+			params.Payer,
+			params.Payer,
+			[]solana.PublicKey{},
+		).Build()
+		instructions = append(instructions, closeIx)
+	}
+
+	return instructions, nil
+}
+
+// PumpFunBuildBuyV2Instructions builds buy_v2 / buy_exact_quote_in_v2 instructions.
+func PumpFunBuildBuyV2Instructions(params *PumpFunBuildBuyParams) ([]solana.Instruction, error) {
+	if params.InputAmount == 0 {
+		return nil, ErrInvalidAmount
+	}
+
+	pp := params.ProtocolParams
+	bondingCurve := pp.BondingCurve
+	creator := pumpFunEffectiveCreator(pp)
+	creatorVaultAccount, err := pumpFunResolveCreatorVaultForIx(pp, params.OutputMint)
+	if err != nil {
+		return nil, err
+	}
+
+	bondingCurveAddr := bondingCurve.Account
+	if bondingCurveAddr.IsZero() {
+		bondingCurveAddr = GetBondingCurvePDA(params.OutputMint)
+	}
+	baseTokenProgram := pumpFunEffectiveMintTokenProgram(params.OutputMint, pp)
+	quoteMint := pumpFunEffectiveQuoteMint(pp)
+	quoteTokenProgram := constants.TOKEN_PROGRAM
+
+	associatedBaseBondingCurve := GetAssociatedTokenAddress(bondingCurveAddr, params.OutputMint, baseTokenProgram)
+	associatedBaseUser := GetAssociatedTokenAddress(params.Payer, params.OutputMint, baseTokenProgram)
+	feeRecipient := pumpFunFeeRecipient(pp)
+	buybackFeeRecipient := GetPumpFunBuybackFeeRecipientRandom()
+	associatedQuoteFeeRecipient := GetAssociatedTokenAddress(feeRecipient, quoteMint, quoteTokenProgram)
+	associatedQuoteBuybackFeeRecipient := GetAssociatedTokenAddress(buybackFeeRecipient, quoteMint, quoteTokenProgram)
+	associatedQuoteBondingCurve := GetAssociatedTokenAddress(bondingCurveAddr, quoteMint, quoteTokenProgram)
+	associatedQuoteUser := GetAssociatedTokenAddress(params.Payer, quoteMint, quoteTokenProgram)
+	associatedCreatorVault := GetAssociatedTokenAddress(creatorVaultAccount, quoteMint, quoteTokenProgram)
+	sharingConfig := GetPumpFunFeeSharingConfigPDA(params.OutputMint)
+	userVolumeAccumulator := GetPumpFunUserVolumeAccumulatorPDA(params.Payer)
+	associatedUserVolumeAccumulator := GetAssociatedTokenAddress(userVolumeAccumulator, quoteMint, quoteTokenProgram)
+
+	instructions := make([]solana.Instruction, 0, 4)
+	if params.CreateOutputMintAta {
+		instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
+			params.Payer, params.Payer, params.OutputMint, baseTokenProgram,
+		))
+	}
+	if params.CreateInputMintAta {
+		instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
+			params.Payer, params.Payer, quoteMint, quoteTokenProgram,
+		))
+	}
+
+	var buyTokenAmount uint64
+	if params.FixedOutputAmount != nil {
+		buyTokenAmount = *params.FixedOutputAmount
+	} else {
+		buyTokenAmount = calc.GetBuyTokenAmountFromSolAmount(
+			bondingCurve.VirtualTokenReserves,
+			bondingCurve.VirtualSolReserves,
+			bondingCurve.RealTokenReserves,
+			pumpFunUsablePubkey(creator),
+			params.InputAmount,
+		)
+	}
+	maxSolCost, _ := calc.CalculateWithSlippageBuy(params.InputAmount, params.SlippageBasisPoints)
+
+	data := make([]byte, 24)
+	if params.UseExactSolAmount {
+		minTokensOut := buyTokenAmount
+		if params.FixedOutputAmount == nil {
+			minTokensOut, _ = calc.CalculateWithSlippageSell(buyTokenAmount, params.SlippageBasisPoints)
+		}
+		copy(data[0:8], PumpFunBuyExactQuoteInV2Discriminator)
+		binary.LittleEndian.PutUint64(data[8:16], params.InputAmount)
+		binary.LittleEndian.PutUint64(data[16:24], minTokensOut)
+	} else {
+		copy(data[0:8], PumpFunBuyV2Discriminator)
+		binary.LittleEndian.PutUint64(data[8:16], buyTokenAmount)
+		binary.LittleEndian.PutUint64(data[16:24], maxSolCost)
+	}
+
+	accounts := []solana.AccountMeta{
+		{PublicKey: PUMPFUN_GLOBAL_ACCOUNT, IsSigner: false, IsWritable: false},
+		{PublicKey: params.OutputMint, IsSigner: false, IsWritable: false},
+		{PublicKey: quoteMint, IsSigner: false, IsWritable: false},
+		{PublicKey: baseTokenProgram, IsSigner: false, IsWritable: false},
+		{PublicKey: quoteTokenProgram, IsSigner: false, IsWritable: false},
+		{PublicKey: constants.ASSOCIATED_TOKEN_PROGRAM_ID, IsSigner: false, IsWritable: false},
+		{PublicKey: feeRecipient, IsSigner: false, IsWritable: true},
+		{PublicKey: associatedQuoteFeeRecipient, IsSigner: false, IsWritable: true},
+		{PublicKey: buybackFeeRecipient, IsSigner: false, IsWritable: false},
+		{PublicKey: associatedQuoteBuybackFeeRecipient, IsSigner: false, IsWritable: true},
+		{PublicKey: bondingCurveAddr, IsSigner: false, IsWritable: true},
+		{PublicKey: associatedBaseBondingCurve, IsSigner: false, IsWritable: true},
+		{PublicKey: associatedQuoteBondingCurve, IsSigner: false, IsWritable: true},
+		{PublicKey: params.Payer, IsSigner: true, IsWritable: true},
+		{PublicKey: associatedBaseUser, IsSigner: false, IsWritable: true},
+		{PublicKey: associatedQuoteUser, IsSigner: false, IsWritable: true},
+		{PublicKey: creatorVaultAccount, IsSigner: false, IsWritable: true},
+		{PublicKey: associatedCreatorVault, IsSigner: false, IsWritable: true},
+		{PublicKey: sharingConfig, IsSigner: false, IsWritable: false},
+		{PublicKey: PUMPFUN_GLOBAL_VOLUME_ACCUMULATOR, IsSigner: false, IsWritable: true},
+		{PublicKey: userVolumeAccumulator, IsSigner: false, IsWritable: true},
+		{PublicKey: associatedUserVolumeAccumulator, IsSigner: false, IsWritable: true},
+		{PublicKey: PUMPFUN_FEE_CONFIG, IsSigner: false, IsWritable: false},
+		{PublicKey: PUMPFUN_FEE_PROGRAM, IsSigner: false, IsWritable: false},
+		{PublicKey: constants.SYSTEM_PROGRAM, IsSigner: false, IsWritable: false},
+		{PublicKey: PUMPFUN_EVENT_AUTHORITY, IsSigner: false, IsWritable: false},
+		{PublicKey: PUMPFUN_PROGRAM, IsSigner: false, IsWritable: false},
+	}
+	instructions = append(instructions, newInstruction(PUMPFUN_PROGRAM, accounts, data))
+	return instructions, nil
+}
+
+// PumpFunBuildSellV2Instructions builds sell_v2 instructions.
+func PumpFunBuildSellV2Instructions(params *PumpFunBuildSellParams) ([]solana.Instruction, error) {
+	if params.InputAmount == 0 {
+		return nil, ErrInvalidAmount
+	}
+
+	pp := params.ProtocolParams
+	bondingCurve := pp.BondingCurve
+	creator := pumpFunEffectiveCreator(pp)
+	creatorVaultAccount, err := pumpFunResolveCreatorVaultForSellV2(pp, params.InputMint)
+	if err != nil {
+		return nil, err
+	}
+
+	bondingCurveAddr := bondingCurve.Account
+	if bondingCurveAddr.IsZero() {
+		bondingCurveAddr = GetBondingCurvePDA(params.InputMint)
+	}
+	baseTokenProgram := pumpFunEffectiveMintTokenProgram(params.InputMint, pp)
+	quoteMint := pumpFunEffectiveQuoteMint(pp)
+	quoteTokenProgram := constants.TOKEN_PROGRAM
+
+	associatedBaseBondingCurve := GetAssociatedTokenAddress(bondingCurveAddr, params.InputMint, baseTokenProgram)
+	associatedBaseUser := GetAssociatedTokenAddress(params.Payer, params.InputMint, baseTokenProgram)
+	feeRecipient := pumpFunFeeRecipient(pp)
+	buybackFeeRecipient := GetPumpFunBuybackFeeRecipientRandom()
+	associatedQuoteFeeRecipient := GetAssociatedTokenAddress(feeRecipient, quoteMint, quoteTokenProgram)
+	associatedQuoteBuybackFeeRecipient := GetAssociatedTokenAddress(buybackFeeRecipient, quoteMint, quoteTokenProgram)
+	associatedQuoteBondingCurve := GetAssociatedTokenAddress(bondingCurveAddr, quoteMint, quoteTokenProgram)
+	associatedQuoteUser := GetAssociatedTokenAddress(params.Payer, quoteMint, quoteTokenProgram)
+	associatedCreatorVault := GetAssociatedTokenAddress(creatorVaultAccount, quoteMint, quoteTokenProgram)
+	sharingConfig := GetPumpFunFeeSharingConfigPDA(params.InputMint)
+	userVolumeAccumulator := GetPumpFunUserVolumeAccumulatorPDA(params.Payer)
+	associatedUserVolumeAccumulator := GetAssociatedTokenAddress(userVolumeAccumulator, quoteMint, quoteTokenProgram)
+
+	instructions := make([]solana.Instruction, 0, 3)
+	if params.CreateOutputMintAta {
+		instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
+			params.Payer, params.Payer, quoteMint, quoteTokenProgram,
+		))
+	}
+
+	solAmount := calc.GetSellSolAmountFromTokenAmount(
+		bondingCurve.VirtualTokenReserves,
+		bondingCurve.VirtualSolReserves,
+		pumpFunUsablePubkey(creator),
+		params.InputAmount,
+	)
+	minSolOutput := solAmount
+	if params.FixedOutputAmount != nil {
+		minSolOutput = *params.FixedOutputAmount
+	} else {
+		minSolOutput, _ = calc.CalculateWithSlippageSell(solAmount, params.SlippageBasisPoints)
+	}
+
+	data := make([]byte, 24)
+	copy(data[0:8], PumpFunSellV2Discriminator)
+	binary.LittleEndian.PutUint64(data[8:16], params.InputAmount)
+	binary.LittleEndian.PutUint64(data[16:24], minSolOutput)
+
+	accounts := []solana.AccountMeta{
+		{PublicKey: PUMPFUN_GLOBAL_ACCOUNT, IsSigner: false, IsWritable: false},
+		{PublicKey: params.InputMint, IsSigner: false, IsWritable: false},
+		{PublicKey: quoteMint, IsSigner: false, IsWritable: false},
+		{PublicKey: baseTokenProgram, IsSigner: false, IsWritable: false},
+		{PublicKey: quoteTokenProgram, IsSigner: false, IsWritable: false},
+		{PublicKey: constants.ASSOCIATED_TOKEN_PROGRAM_ID, IsSigner: false, IsWritable: false},
+		{PublicKey: feeRecipient, IsSigner: false, IsWritable: true},
+		{PublicKey: associatedQuoteFeeRecipient, IsSigner: false, IsWritable: true},
+		{PublicKey: buybackFeeRecipient, IsSigner: false, IsWritable: false},
+		{PublicKey: associatedQuoteBuybackFeeRecipient, IsSigner: false, IsWritable: true},
+		{PublicKey: bondingCurveAddr, IsSigner: false, IsWritable: true},
+		{PublicKey: associatedBaseBondingCurve, IsSigner: false, IsWritable: true},
+		{PublicKey: associatedQuoteBondingCurve, IsSigner: false, IsWritable: true},
+		{PublicKey: params.Payer, IsSigner: true, IsWritable: true},
+		{PublicKey: associatedBaseUser, IsSigner: false, IsWritable: true},
+		{PublicKey: associatedQuoteUser, IsSigner: false, IsWritable: true},
+		{PublicKey: creatorVaultAccount, IsSigner: false, IsWritable: true},
+		{PublicKey: associatedCreatorVault, IsSigner: false, IsWritable: true},
+		{PublicKey: sharingConfig, IsSigner: false, IsWritable: false},
+		{PublicKey: userVolumeAccumulator, IsSigner: false, IsWritable: true},
+		{PublicKey: associatedUserVolumeAccumulator, IsSigner: false, IsWritable: true},
+		{PublicKey: PUMPFUN_FEE_CONFIG, IsSigner: false, IsWritable: false},
+		{PublicKey: PUMPFUN_FEE_PROGRAM, IsSigner: false, IsWritable: false},
+		{PublicKey: constants.SYSTEM_PROGRAM, IsSigner: false, IsWritable: false},
+		{PublicKey: PUMPFUN_EVENT_AUTHORITY, IsSigner: false, IsWritable: false},
+		{PublicKey: PUMPFUN_PROGRAM, IsSigner: false, IsWritable: false},
+	}
+	instructions = append(instructions, newInstruction(PUMPFUN_PROGRAM, accounts, data))
+
+	closeWhenSell := pp.CloseTokenAccountWhenSell != nil && *pp.CloseTokenAccountWhenSell
+	if closeWhenSell || params.CloseInputMintAta {
+		closeIx := token.NewCloseAccountInstruction(
+			associatedBaseUser,
 			params.Payer,
 			params.Payer,
 			[]solana.PublicKey{},
@@ -461,7 +748,7 @@ func PumpFunBuildClaimCashbackInstruction(payer solana.PublicKey) solana.Instruc
 		{PublicKey: PUMPFUN_PROGRAM, IsSigner: false, IsWritable: false},
 	}
 
-	return solana.NewInstruction(PUMPFUN_PROGRAM, accounts, PumpFunClaimCashbackDiscriminator)
+	return newInstruction(PUMPFUN_PROGRAM, accounts, PumpFunClaimCashbackDiscriminator)
 }
 
 // Error definitions

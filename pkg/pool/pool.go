@@ -249,6 +249,39 @@ func (p *ConnectionPool) Stats() (created, waiting, available int) {
 
 var ErrConnectionTimeout = &PoolError{Code: 2, Message: "connection timeout"}
 
+// ===== Rate Limiter =====
+
+// RateLimiter enforces a minimum delay between calls.
+type RateLimiter struct {
+	lastSubmit atomic.Int64
+	minDelay   int64
+}
+
+// NewRateLimiter creates a minimum-delay limiter. minDelayMs is milliseconds.
+func NewRateLimiter(minDelayMs int) *RateLimiter {
+	return &RateLimiter{
+		minDelay: int64(minDelayMs) * int64(time.Millisecond),
+	}
+}
+
+// Wait blocks until the minimum delay has passed since the last call.
+func (r *RateLimiter) Wait() {
+	for {
+		last := r.lastSubmit.Load()
+		now := time.Now().UnixNano()
+		elapsed := now - last
+
+		if elapsed >= r.minDelay {
+			if r.lastSubmit.CompareAndSwap(last, now) {
+				return
+			}
+			continue
+		}
+
+		time.Sleep(time.Duration(r.minDelay - elapsed))
+	}
+}
+
 // ===== Rate Limiter Pool =====
 
 // RateLimiterPool manages rate limiters for different keys

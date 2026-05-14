@@ -163,11 +163,11 @@ type SubscriptionManager struct {
 	mu           sync.RWMutex
 
 	// Configuration
-	dialer           *websocket.Dialer
-	reconnectDelay   time.Duration
-	pingInterval     time.Duration
-	writeTimeout     time.Duration
-	headers          http.Header
+	dialer         *websocket.Dialer
+	reconnectDelay time.Duration
+	pingInterval   time.Duration
+	writeTimeout   time.Duration
+	headers        http.Header
 
 	// Callbacks
 	onConnect    func()
@@ -691,8 +691,8 @@ func (m *SubscriptionManager) SubscribeSlot(
 // ===== Errors =====
 
 var (
-	ErrNotConnected      = errors.New("not connected to WebSocket")
-	ErrAlreadyConnecting = errors.New("already connecting")
-	ErrInvalidParams     = errors.New("invalid subscription parameters")
+	ErrNotConnected       = errors.New("not connected to WebSocket")
+	ErrAlreadyConnecting  = errors.New("already connecting")
+	ErrInvalidParams      = errors.New("invalid subscription parameters")
 	ErrSubscriptionFailed = errors.New("subscription failed")
 )

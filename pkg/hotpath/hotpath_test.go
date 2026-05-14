@@ -11,6 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func newTestHash() solana.Hash {
+	return solana.HashFromBytes(solana.NewWallet().PublicKey().Bytes())
+}
+
 // ===== HotPathConfig Tests =====
 
 func TestDefaultHotPathConfig(t *testing.T) {
@@ -25,8 +29,9 @@ func TestDefaultHotPathConfig(t *testing.T) {
 
 func TestPrefetchedDataIsFresh(t *testing.T) {
 	// Fresh data
+	hash := newTestHash()
 	data := &PrefetchedData{
-		Blockhash:       solana.NewHash(),
+		Blockhash:       &hash,
 		LastValidHeight: 100,
 		FetchedAt:       time.Now(),
 	}
@@ -49,7 +54,7 @@ func TestHotPathStateGetBlockhash(t *testing.T) {
 	assert.False(t, ok)
 
 	// Set data manually
-	hash := solana.NewHash()
+	hash := newTestHash()
 	data := &PrefetchedData{
 		Blockhash:       &hash,
 		LastValidHeight: 100,
@@ -71,7 +76,7 @@ func TestHotPathStateIsDataFresh(t *testing.T) {
 	assert.False(t, state.IsDataFresh())
 
 	// Fresh data
-	hash := solana.NewHash()
+	hash := newTestHash()
 	data := &PrefetchedData{
 		Blockhash:       &hash,
 		LastValidHeight: 100,
@@ -157,9 +162,9 @@ func TestPoolStateCache(t *testing.T) {
 
 	poolAddr := solana.NewWallet().PublicKey()
 	state := &PoolState{
-		PoolAddress:  poolAddr,
-		ReserveA:     1000,
-		ReserveB:     2000,
+		PoolAddress: poolAddr,
+		ReserveA:    1000,
+		ReserveB:    2000,
 	}
 
 	cache.Update(poolAddr, state)
@@ -188,7 +193,7 @@ func TestTradingContext(t *testing.T) {
 	state := NewHotPathState(nil, DefaultHotPathConfig())
 
 	// Set blockhash
-	hash := solana.NewHash()
+	hash := newTestHash()
 	data := &PrefetchedData{
 		Blockhash:       &hash,
 		LastValidHeight: 100,
@@ -216,7 +221,7 @@ func TestTradingContextStaleBlockhash(t *testing.T) {
 func TestTradingContextAge(t *testing.T) {
 	state := NewHotPathState(nil, DefaultHotPathConfig())
 
-	hash := solana.NewHash()
+	hash := newTestHash()
 	data := &PrefetchedData{
 		Blockhash:       &hash,
 		LastValidHeight: 100,
@@ -268,9 +273,9 @@ func TestHotPathStateConcurrentAccess(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
-		go func() {
+		go func(i int) {
 			defer wg.Done()
-			hash := solana.NewHash()
+			hash := newTestHash()
 			data := &PrefetchedData{
 				Blockhash:       &hash,
 				LastValidHeight: uint64(i),
@@ -279,7 +284,7 @@ func TestHotPathStateConcurrentAccess(t *testing.T) {
 			state.currentData.Store(data)
 			state.GetBlockhash()
 			state.IsDataFresh()
-		}()
+		}(i)
 	}
 	wg.Wait()
 }
@@ -306,15 +311,15 @@ func TestAccountStateCacheConcurrentAccess(t *testing.T) {
 // ===== Mock SWQoS Client for Testing =====
 
 type MockSwqosClient struct {
-	swqosType    string
-	sendTxFunc   func(ctx context.Context, tradeType string, txBytes []byte) (solana.Signature, error)
+	swqosType  string
+	sendTxFunc func(ctx context.Context, tradeType string, txBytes []byte) (solana.Signature, error)
 }
 
 func (m *MockSwqosClient) SendTransaction(ctx context.Context, tradeType interface{}, txBytes []byte, skipPreflight bool) (solana.Signature, error) {
 	if m.sendTxFunc != nil {
 		return m.sendTxFunc(ctx, tradeType.(string), txBytes)
 	}
-	return solana.NewSignature(), nil
+	return solana.Signature{}, nil
 }
 
 func (m *MockSwqosClient) GetSwqosType() interface{} {

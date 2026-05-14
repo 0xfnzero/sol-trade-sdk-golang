@@ -160,29 +160,6 @@ func (m *ThreadPriorityManager) GetPriority() (ThreadPriority, error) {
 	}
 }
 
-// SpinLock provides a simple spin lock
-type SpinLock struct {
-	state int32
-}
-
-// Lock acquires the spin lock
-func (s *SpinLock) Lock() {
-	for !s.TryLock() {
-		// Spin
-		runtime.Gosched()
-	}
-}
-
-// TryLock tries to acquire the spin lock
-func (s *SpinLock) TryLock() bool {
-	return atomic.CompareAndSwapInt32(&s.state, 0, 1)
-}
-
-// Unlock releases the spin lock
-func (s *SpinLock) Unlock() {
-	atomic.StoreInt32(&s.state, 0)
-}
-
 // BusyWait spins for a duration
 func BusyWait(duration time.Duration) {
 	start := time.Now()

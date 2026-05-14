@@ -1,3 +1,6 @@
+//go:build live_examples
+// +build live_examples
+
 // Shared Infrastructure Example
 //
 // This example demonstrates how to share infrastructure across multiple wallets.
@@ -11,8 +14,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/your-org/sol-trade-sdk-go/pkg/common"
-	"github.com/your-org/sol-trade-sdk-go/pkg/trading"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -34,9 +37,9 @@ func main() {
 
 	// Create infrastructure once (expensive operation)
 	infraConfig := &common.InfrastructureConfig{
-		RPCURL:      rpcURL,
+		RPCURL:       rpcURL,
 		SwqosConfigs: swqosConfigs,
-		Commitment:  rpc.CommitmentConfirmed,
+		Commitment:   rpc.CommitmentConfirmed,
 	}
 	infrastructure, err := trading.NewInfrastructure(ctx, infraConfig)
 	if err != nil {

@@ -10,8 +10,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 
-	"github.com/your-org/sol-trade-sdk-go/pkg/calc"
-	"github.com/your-org/sol-trade-sdk-go/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
 )
 
 // ===== Bonk Program Constants from Rust: src/instruction/utils/bonk.rs =====
@@ -184,7 +184,7 @@ func BonkBuildBuyInstructions(params *BonkBuildBuyParams) ([]solana.Instruction,
 			pp.VirtualQuote,
 			pp.RealBase,
 			pp.RealQuote,
-			params.SlippageBasisPoints,
+			int(params.SlippageBasisPoints),
 		)
 	}
 
@@ -246,7 +246,7 @@ func BonkBuildBuyInstructions(params *BonkBuildBuyParams) ([]solana.Instruction,
 		{PublicKey: pp.CreatorAssociatedAccount, IsSigner: false, IsWritable: true},  // 17: Creator Associated Account
 	}
 
-	instructions = append(instructions, solana.NewInstruction(BONK_PROGRAM, accounts, data))
+	instructions = append(instructions, newInstruction(BONK_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
 	if params.CloseInputMintAta && !usd1Pool {
@@ -305,7 +305,7 @@ func BonkBuildSellInstructions(params *BonkBuildSellParams) ([]solana.Instructio
 			pp.VirtualQuote,
 			pp.RealBase,
 			pp.RealQuote,
-			params.SlippageBasisPoints,
+			int(params.SlippageBasisPoints),
 		)
 	}
 
@@ -362,7 +362,7 @@ func BonkBuildSellInstructions(params *BonkBuildSellParams) ([]solana.Instructio
 		{PublicKey: pp.CreatorAssociatedAccount, IsSigner: false, IsWritable: true},  // 17: Creator Associated Account
 	}
 
-	instructions = append(instructions, solana.NewInstruction(BONK_PROGRAM, accounts, data))
+	instructions = append(instructions, newInstruction(BONK_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
 	if params.CloseOutputMintAta && !usd1Pool {

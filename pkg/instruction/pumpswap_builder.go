@@ -12,8 +12,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 
-	"github.com/your-org/sol-trade-sdk-go/pkg/calc"
-	"github.com/your-org/sol-trade-sdk-go/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
 )
 
 // ===== PumpSwap Program Constants from Rust: src/instruction/utils/pumpswap.rs =====
@@ -64,12 +64,12 @@ var (
 
 // Seeds - from Rust: src/instruction/utils/pumpswap.rs
 var (
-	POOL_V2_SEED                 = []byte("pool-v2")
-	POOL_SEED                    = []byte("pool")
-	POOL_AUTHORITY_SEED          = []byte("pool-authority")
-	USER_VOLUME_ACCUMULATOR_SEED = []byte("user_volume_accumulator")
-	CREATOR_VAULT_SEED           = []byte("creator_vault")
-	FEE_CONFIG_SEED              = []byte("fee_config")
+	POOL_V2_SEED                   = []byte("pool-v2")
+	POOL_SEED                      = []byte("pool")
+	POOL_AUTHORITY_SEED            = []byte("pool-authority")
+	USER_VOLUME_ACCUMULATOR_SEED   = []byte("user_volume_accumulator")
+	CREATOR_VAULT_SEED             = []byte("creator_vault")
+	FEE_CONFIG_SEED                = []byte("fee_config")
 	GLOBAL_VOLUME_ACCUMULATOR_SEED = []byte("global_volume_accumulator")
 )
 
@@ -133,8 +133,8 @@ func GetCoinCreatorVaultAuthority(coinCreator solana.PublicKey) solana.PublicKey
 	return pda
 }
 
-// GetUserVolumeAccumulatorPDA returns the user volume accumulator PDA for PumpSwap
-func GetUserVolumeAccumulatorPDA(user solana.PublicKey) solana.PublicKey {
+// GetPumpSwapUserVolumeAccumulatorPDA returns the user volume accumulator PDA for PumpSwap.
+func GetPumpSwapUserVolumeAccumulatorPDA(user solana.PublicKey) solana.PublicKey {
 	pda, _, _ := solana.FindProgramAddress(
 		[][]byte{USER_VOLUME_ACCUMULATOR_SEED, user[:]},
 		PUMPSWAP_PROGRAM,
@@ -144,13 +144,13 @@ func GetUserVolumeAccumulatorPDA(user solana.PublicKey) solana.PublicKey {
 
 // GetUserVolumeAccumulatorWsolAta returns the WSOL ATA of UserVolumeAccumulator
 func GetUserVolumeAccumulatorWsolAta(user solana.PublicKey) solana.PublicKey {
-	accumulator := GetUserVolumeAccumulatorPDA(user)
+	accumulator := GetPumpSwapUserVolumeAccumulatorPDA(user)
 	return GetAssociatedTokenAddress(accumulator, constants.WSOL_TOKEN_ACCOUNT, constants.TOKEN_PROGRAM)
 }
 
 // GetUserVolumeAccumulatorQuoteAta returns the quote-mint ATA of UserVolumeAccumulator
 func GetUserVolumeAccumulatorQuoteAta(user, quoteMint, quoteTokenProgram solana.PublicKey) solana.PublicKey {
-	accumulator := GetUserVolumeAccumulatorPDA(user)
+	accumulator := GetPumpSwapUserVolumeAccumulatorPDA(user)
 	return GetAssociatedTokenAddress(accumulator, quoteMint, quoteTokenProgram)
 }
 
@@ -254,7 +254,7 @@ func CreateAssociatedTokenAccountIdempotent(payer, owner, mint, tokenProgram sol
 	// Idempotent discriminator = 1
 	data := []byte{1}
 
-	return solana.NewInstruction(constants.ASSOCIATED_TOKEN_PROGRAM_ID, accounts, data)
+	return newInstruction(constants.ASSOCIATED_TOKEN_PROGRAM_ID, accounts, data)
 }
 
 // ===== Instruction Builders - 100% from Rust =====
@@ -278,7 +278,7 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 	quoteIsWsolOrUsdc := pp.QuoteMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.QuoteMint.Equals(constants.USDC_TOKEN_ACCOUNT)
 
 	// Determine if has coin creator
-	hasCoinCreator := !pp.CoinCreatorVaultAuthority.Equals(DEFAULT_COIN_CREATOR_VAULT_AUTHORITY)
+	hasCoinCreator := !pp.CoinCreatorVaultAuthority.Equals(DEFAULT_COIN_CREATOR_VAULT_AUTH)
 
 	// Calculate trade amounts
 	var tokenAmount uint64
@@ -368,7 +368,7 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 		accounts = append(accounts, solana.AccountMeta{
 			PublicKey: GLOBAL_VOLUME_ACCUMULATOR, IsSigner: false, IsWritable: true,
 		})
-		userVolumeAccumulator := GetUserVolumeAccumulatorPDA(params.Payer)
+		userVolumeAccumulator := GetPumpSwapUserVolumeAccumulatorPDA(params.Payer)
 		accounts = append(accounts, solana.AccountMeta{
 			PublicKey: userVolumeAccumulator, IsSigner: false, IsWritable: true,
 		})
@@ -433,7 +433,7 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 		}
 	}
 
-	instructions = append(instructions, solana.NewInstruction(PUMPSWAP_PROGRAM, accounts, data))
+	instructions = append(instructions, newInstruction(PUMPSWAP_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
 	if params.CloseInputMintAta {
@@ -462,7 +462,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	quoteIsWsolOrUsdc := pp.QuoteMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.QuoteMint.Equals(constants.USDC_TOKEN_ACCOUNT)
 
 	// Determine if has coin creator
-	hasCoinCreator := !pp.CoinCreatorVaultAuthority.Equals(DEFAULT_COIN_CREATOR_VAULT_AUTHORITY)
+	hasCoinCreator := !pp.CoinCreatorVaultAuthority.Equals(DEFAULT_COIN_CREATOR_VAULT_AUTH)
 
 	// Calculate trade amounts
 	tokenAmount := params.InputAmount
@@ -538,7 +538,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 		accounts = append(accounts, solana.AccountMeta{
 			PublicKey: GLOBAL_VOLUME_ACCUMULATOR, IsSigner: false, IsWritable: true,
 		})
-		userVolumeAccumulator := GetUserVolumeAccumulatorPDA(params.Payer)
+		userVolumeAccumulator := GetPumpSwapUserVolumeAccumulatorPDA(params.Payer)
 		accounts = append(accounts, solana.AccountMeta{
 			PublicKey: userVolumeAccumulator, IsSigner: false, IsWritable: true,
 		})
@@ -553,7 +553,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	// Add cashback accounts if needed
 	if pp.IsCashbackCoin {
 		quoteAta := GetUserVolumeAccumulatorQuoteAta(params.Payer, pp.QuoteMint, pp.QuoteTokenProgram)
-		userVolumeAccumulator := GetUserVolumeAccumulatorPDA(params.Payer)
+		userVolumeAccumulator := GetPumpSwapUserVolumeAccumulatorPDA(params.Payer)
 		accounts = append(accounts,
 			solana.AccountMeta{PublicKey: quoteAta, IsSigner: false, IsWritable: true},
 			solana.AccountMeta{PublicKey: userVolumeAccumulator, IsSigner: false, IsWritable: true},
@@ -585,7 +585,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 		binary.LittleEndian.PutUint64(data[16:24], tokenAmount)
 	}
 
-	instructions = append(instructions, solana.NewInstruction(PUMPSWAP_PROGRAM, accounts, data))
+	instructions = append(instructions, newInstruction(PUMPSWAP_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
 	if params.CloseOutputMintAta && quoteIsWsolOrUsdc {
@@ -608,7 +608,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 
 // BuildClaimCashbackInstruction builds claim cashback instruction for PumpSwap
 func BuildClaimCashbackInstruction(payer, quoteMint, quoteTokenProgram solana.PublicKey) solana.Instruction {
-	userVolumeAccumulator := GetUserVolumeAccumulatorPDA(payer)
+	userVolumeAccumulator := GetPumpSwapUserVolumeAccumulatorPDA(payer)
 	userVolumeAccumulatorWsolAta := GetUserVolumeAccumulatorWsolAta(payer)
 	userWsolAta := GetAssociatedTokenAddress(payer, quoteMint, quoteTokenProgram)
 
@@ -624,15 +624,8 @@ func BuildClaimCashbackInstruction(payer, quoteMint, quoteTokenProgram solana.Pu
 		{PublicKey: PUMPSWAP_PROGRAM, IsSigner: false, IsWritable: false},
 	}
 
-	return solana.NewInstruction(PUMPSWAP_PROGRAM, accounts, PUMPSWAP_CLAIM_CASHBACK_DISCRIMINATOR)
+	return newInstruction(PUMPSWAP_PROGRAM, accounts, PUMPSWAP_CLAIM_CASHBACK_DISCRIMINATOR)
 }
-
-// Error definitions
-var (
-	ErrInvalidAmount        = fmt.Errorf("amount cannot be zero")
-	ErrInvalidPool          = fmt.Errorf("pool must contain WSOL or USDC")
-	ErrInvalidConfiguration = fmt.Errorf("invalid configuration for operation")
-)
 
 // ===== Pool Types and Decoding - from Rust: src/instruction/utils/pumpswap_types.rs =====
 

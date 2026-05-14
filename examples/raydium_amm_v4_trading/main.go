@@ -1,3 +1,6 @@
+//go:build live_examples
+// +build live_examples
+
 // Raydium AMM V4 Trading Example
 //
 // This example demonstrates how to trade on Raydium AMM V4.
@@ -11,9 +14,9 @@ import (
 	"log"
 	"os"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go"
-	"github.com/your-org/sol-trade-sdk-go/pkg/common"
-	"github.com/your-org/sol-trade-sdk-go/pkg/trading"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -103,18 +106,18 @@ func raydiumAmmV4Trade(
 	inputTokenAmount := uint64(100_000) // 0.0001 SOL or USDC
 
 	buyParams := &trading.TradeBuyParams{
-		DexType:              soltradesdk.DexTypeRaydiumAmmV4,
-		InputTokenType:       inputTokenType,
-		Mint:                 mintPubkey,
-		InputTokenAmount:     inputTokenAmount,
-		SlippageBasisPoints:  &slippageBasisPoints,
-		RecentBlockhash:      &recentBlockhash,
-		WaitConfirmed:        true,
-		CreateInputTokenATA:  isWSOL,
-		CloseInputTokenATA:   isWSOL,
-		CreateMintATA:        true,
-		GasFeeStrategy:       gasFeeStrategy,
-		ExtensionParams:      params,
+		DexType:             soltradesdk.DexTypeRaydiumAmmV4,
+		InputTokenType:      inputTokenType,
+		Mint:                mintPubkey,
+		InputTokenAmount:    inputTokenAmount,
+		SlippageBasisPoints: &slippageBasisPoints,
+		RecentBlockhash:     &recentBlockhash,
+		WaitConfirmed:       true,
+		CreateInputTokenATA: isWSOL,
+		CloseInputTokenATA:  isWSOL,
+		CreateMintATA:       true,
+		GasFeeStrategy:      gasFeeStrategy,
+		ExtensionParams:     params,
 	}
 
 	// Execute buy

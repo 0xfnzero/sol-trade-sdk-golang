@@ -8,7 +8,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/your-org/sol-trade-sdk-go/pkg/middleware"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/middleware"
 )
 
 func main() {

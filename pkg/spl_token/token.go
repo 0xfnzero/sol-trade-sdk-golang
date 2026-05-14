@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/gagliardetto/solana-go"
 )
@@ -13,27 +14,27 @@ import (
 
 const (
 	// Instruction discriminators
-	InitializeMint           = 0
-	InitializeAccount        = 1
-	InitializeMultisig       = 2
-	Transfer                 = 3
-	Approve                  = 4
-	Revoke                   = 5
-	SetAuthority            = 6
-	MintTo                   = 7
-	Burn                     = 8
-	CloseAccount            = 9
-	FreezeAccount           = 10
-	ThawAccount             = 11
-	TransferChecked         = 12
-	ApproveChecked          = 13
-	MintToChecked           = 14
-	BurnChecked             = 15
-	InitializeAccount2      = 16
-	SyncNative              = 17
-	InitializeAccount3      = 20
-	InitializeMultisig2     = 21
-	InitializeMint2         = 22
+	InitializeMint      = 0
+	InitializeAccount   = 1
+	InitializeMultisig  = 2
+	Transfer            = 3
+	Approve             = 4
+	Revoke              = 5
+	SetAuthority        = 6
+	MintTo              = 7
+	Burn                = 8
+	CloseAccount        = 9
+	FreezeAccount       = 10
+	ThawAccount         = 11
+	TransferChecked     = 12
+	ApproveChecked      = 13
+	MintToChecked       = 14
+	BurnChecked         = 15
+	InitializeAccount2  = 16
+	SyncNative          = 17
+	InitializeAccount3  = 20
+	InitializeMultisig2 = 21
+	InitializeMint2     = 22
 
 	// Account states
 	AccountUninitialized = 0
@@ -41,11 +42,13 @@ const (
 	AccountFrozen        = 2
 
 	// Authority types
-	AuthorityMintTokens  = 0
+	AuthorityMintTokens    = 0
 	AuthorityFreezeAccount = 1
-	AuthorityAccountOwner = 2
-	AuthorityCloseAccount = 3
+	AuthorityAccountOwner  = 2
+	AuthorityCloseAccount  = 3
 )
+
+var tokenProgramID = solana.MustPublicKeyFromBase58("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
 
 // ===== Token Account Layout =====
 
@@ -62,23 +65,23 @@ const (
 
 // TokenAccount represents a token account
 type TokenAccount struct {
-	Mint         solana.PublicKey
-	Owner        solana.PublicKey
-	Amount       uint64
-	Delegate     *solana.PublicKey
-	State        uint8
-	IsNative     *uint64
+	Mint            solana.PublicKey
+	Owner           solana.PublicKey
+	Amount          uint64
+	Delegate        *solana.PublicKey
+	State           uint8
+	IsNative        *uint64
 	DelegatedAmount uint64
-	CloseAuthority *solana.PublicKey
+	CloseAuthority  *solana.PublicKey
 }
 
 // Mint represents a token mint
 type Mint struct {
-	MintAuthority         *solana.PublicKey
-	Supply               uint64
-	Decimals             uint8
-	IsInitialized        bool
-	FreezeAuthority      *solana.PublicKey
+	MintAuthority   *solana.PublicKey
+	Supply          uint64
+	Decimals        uint8
+	IsInitialized   bool
+	FreezeAuthority *solana.PublicKey
 }
 
 // DecodeTokenAccount decodes a token account from bytes
@@ -109,7 +112,8 @@ func DecodeTokenAccount(data []byte) (*TokenAccount, error) {
 	if hasDelegate == 1 {
 		var delegate [32]byte
 		binary.Read(buf, binary.LittleEndian, &delegate)
-		acc.Delegate = &delegate
+		delegateKey := solana.PublicKey(delegate)
+		acc.Delegate = &delegateKey
 	}
 
 	// State (1 byte)
@@ -133,7 +137,8 @@ func DecodeTokenAccount(data []byte) (*TokenAccount, error) {
 	if hasCloseAuthority == 1 {
 		var closeAuthority [32]byte
 		binary.Read(buf, binary.LittleEndian, &closeAuthority)
-		acc.CloseAuthority = &closeAuthority
+		closeAuthorityKey := solana.PublicKey(closeAuthority)
+		acc.CloseAuthority = &closeAuthorityKey
 	}
 
 	return acc, nil
@@ -154,7 +159,8 @@ func DecodeMint(data []byte) (*Mint, error) {
 	if hasAuthority == 1 {
 		var authority [32]byte
 		binary.Read(buf, binary.LittleEndian, &authority)
-		mint.MintAuthority = &authority
+		authorityKey := solana.PublicKey(authority)
+		mint.MintAuthority = &authorityKey
 	}
 
 	// Supply (8 bytes)
@@ -172,7 +178,8 @@ func DecodeMint(data []byte) (*Mint, error) {
 	if hasFreezeAuthority == 1 {
 		var freezeAuthority [32]byte
 		binary.Read(buf, binary.LittleEndian, &freezeAuthority)
-		mint.FreezeAuthority = &freezeAuthority
+		freezeAuthorityKey := solana.PublicKey(freezeAuthority)
+		mint.FreezeAuthority = &freezeAuthorityKey
 	}
 
 	return mint, nil
@@ -188,7 +195,7 @@ func TransferInstruction(
 	checked bool,
 ) *solana.GenericInstruction {
 	if checked {
-		return TransferCheckedInstruction(source, destination, owner, amount, decimals)
+		return TransferUncheckedInstruction(source, destination, owner, amount)
 	}
 	return TransferUncheckedInstruction(source, destination, owner, amount)
 }
@@ -202,13 +209,13 @@ func TransferUncheckedInstruction(
 	data[0] = Transfer
 	binary.LittleEndian.PutUint64(data[1:9], amount)
 
-	return solana.NewGenericInstruction(
-		solana.MustPublicKeyFromBase58("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
-		solana.NewAccountMetaSlice(
+	return solana.NewInstruction(
+		tokenProgramID,
+		solana.AccountMetaSlice{
 			solana.NewAccountMeta(source, false, true),
 			solana.NewAccountMeta(destination, false, true),
 			solana.NewAccountMeta(owner, true, false),
-		),
+		},
 		data,
 	)
 }
@@ -224,14 +231,14 @@ func TransferCheckedInstruction(
 	binary.LittleEndian.PutUint64(data[1:9], amount)
 	data[9] = decimals
 
-	return solana.NewGenericInstruction(
-		solana.MustPublicKeyFromBase58("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
-		solana.NewAccountMetaSlice(
+	return solana.NewInstruction(
+		tokenProgramID,
+		solana.AccountMetaSlice{
 			solana.NewAccountMeta(source, false, true),
 			solana.NewAccountMeta(mint, false, false),
 			solana.NewAccountMeta(destination, false, true),
 			solana.NewAccountMeta(owner, true, false),
-		),
+		},
 		data,
 	)
 }
@@ -242,13 +249,13 @@ func CloseAccountInstruction(
 ) *solana.GenericInstruction {
 	data := []byte{CloseAccount}
 
-	return solana.NewGenericInstruction(
-		solana.MustPublicKeyFromBase58("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
-		solana.NewAccountMetaSlice(
+	return solana.NewInstruction(
+		tokenProgramID,
+		solana.AccountMetaSlice{
 			solana.NewAccountMeta(account, false, true),
 			solana.NewAccountMeta(destination, false, true),
 			solana.NewAccountMeta(owner, true, false),
-		),
+		},
 		data,
 	)
 }
@@ -257,11 +264,11 @@ func CloseAccountInstruction(
 func SyncNativeInstruction(account solana.PublicKey) *solana.GenericInstruction {
 	data := []byte{SyncNative}
 
-	return solana.NewGenericInstruction(
-		solana.MustPublicKeyFromBase58("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
-		solana.NewAccountMetaSlice(
+	return solana.NewInstruction(
+		tokenProgramID,
+		solana.AccountMetaSlice{
 			solana.NewAccountMeta(account, false, true),
-		),
+		},
 		data,
 	)
 }
@@ -272,14 +279,14 @@ func InitializeAccountInstruction(
 ) *solana.GenericInstruction {
 	data := []byte{InitializeAccount}
 
-	return solana.NewGenericInstruction(
-		solana.MustPublicKeyFromBase58("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
-		solana.NewAccountMetaSlice(
+	return solana.NewInstruction(
+		tokenProgramID,
+		solana.AccountMetaSlice{
 			solana.NewAccountMeta(account, false, true),
 			solana.NewAccountMeta(mint, false, false),
 			solana.NewAccountMeta(owner, true, false),
 			solana.NewAccountMeta(solana.MustPublicKeyFromBase58("SysvarRent111111111111111111111111111111111"), false, false),
-		),
+		},
 		data,
 	)
 }
@@ -300,24 +307,24 @@ func ApproveInstruction(
 		binary.LittleEndian.PutUint64(data[1:9], amount)
 		data[9] = decimals
 		// Need mint for checked
-		accounts = solana.NewAccountMetaSlice(
+		accounts = solana.AccountMetaSlice{
 			solana.NewAccountMeta(source, false, true),
 			solana.NewAccountMeta(delegate, false, false),
 			solana.NewAccountMeta(owner, true, false),
-		)
+		}
 	} else {
 		data = make([]byte, 9)
 		data[0] = Approve
 		binary.LittleEndian.PutUint64(data[1:9], amount)
-		accounts = solana.NewAccountMetaSlice(
+		accounts = solana.AccountMetaSlice{
 			solana.NewAccountMeta(source, false, true),
 			solana.NewAccountMeta(delegate, false, false),
 			solana.NewAccountMeta(owner, true, false),
-		)
+		}
 	}
 
-	return solana.NewGenericInstruction(
-		solana.MustPublicKeyFromBase58("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+	return solana.NewInstruction(
+		tokenProgramID,
 		accounts,
 		data,
 	)
@@ -337,22 +344,22 @@ func SolToLamports(sol float64) uint64 {
 
 // TokensToUIAmount converts raw token amount to UI amount
 func TokensToUIAmount(amount uint64, decimals uint8) float64 {
-	return float64(amount) / float64(uint64(10)<<decimals)
+	return float64(amount) / math.Pow10(int(decimals))
 }
 
 // UIAmountToTokens converts UI amount to raw token amount
 func UIAmountToTokens(uiAmount float64, decimals uint8) uint64 {
-	return uint64(uiAmount * float64(uint64(10)<<decimals))
+	return uint64(uiAmount * math.Pow10(int(decimals)))
 }
 
 // ===== Error Definitions =====
 
 var (
-	ErrInvalidAccountData   = errors.New("invalid account data")
-	ErrInvalidMintData      = errors.New("invalid mint data")
+	ErrInvalidAccountData    = errors.New("invalid account data")
+	ErrInvalidMintData       = errors.New("invalid mint data")
 	ErrAccountNotInitialized = errors.New("account not initialized")
-	ErrAccountFrozen        = errors.New("account frozen")
-	ErrInsufficientFunds    = errors.New("insufficient funds")
+	ErrAccountFrozen         = errors.New("account frozen")
+	ErrInsufficientFunds     = errors.New("insufficient funds")
 )
 
 // TokenError represents a token program error
@@ -367,8 +374,8 @@ func (e *TokenError) Error() string {
 
 // Standard Token Program errors
 var (
-	ErrTokenInvalidInstruction = &TokenError{Code: 0, Message: "invalid instruction"}
+	ErrTokenInvalidInstruction  = &TokenError{Code: 0, Message: "invalid instruction"}
 	ErrTokenInvalidAccountIndex = &TokenError{Code: 1, Message: "invalid account index"}
-	ErrTokenInvalidAmount = &TokenError{Code: 2, Message: "invalid amount"}
-	ErrTokenInvalidDecimals = &TokenError{Code: 3, Message: "invalid decimals"}
+	ErrTokenInvalidAmount       = &TokenError{Code: 2, Message: "invalid amount"}
+	ErrTokenInvalidDecimals     = &TokenError{Code: 3, Message: "invalid decimals"}
 )
