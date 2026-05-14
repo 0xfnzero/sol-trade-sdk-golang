@@ -5,7 +5,6 @@ package perf
 import (
 	"errors"
 	"io"
-	"os"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -50,21 +49,21 @@ type IORequest struct {
 
 // IOResult represents the result of an I/O operation
 type IOResult struct {
-	RequestID       int
+	RequestID        int
 	BytesTransferred int
-	Buffer          []byte
-	Error           error
-	UserData        interface{}
+	Buffer           []byte
+	Error            error
+	UserData         interface{}
 }
 
 // IOUringConfig represents configuration for io_uring
 type IOUringConfig struct {
-	QueueDepth    int
-	SQThreadIdle  int // ms before SQ thread sleeps
-	SQThreadCPU   int // CPU for SQ thread (-1 = any)
-	CQSize        int // 0 = same as queue_depth
-	Flags         uint32
-	Features      []string
+	QueueDepth   int
+	SQThreadIdle int // ms before SQ thread sleeps
+	SQThreadCPU  int // CPU for SQ thread (-1 = any)
+	CQSize       int // 0 = same as queue_depth
+	Flags        uint32
+	Features     []string
 }
 
 // DefaultIOUringConfig returns default io_uring configuration
@@ -84,14 +83,14 @@ func DefaultIOUringConfig() *IOUringConfig {
 // KernelBypassManager manages kernel bypass I/O operations.
 // Uses io_uring on Linux when available, falls back to epoll on other platforms.
 type KernelBypassManager struct {
-	config           *IOUringConfig
-	uringAvailable   bool
-	lock             sync.RWMutex
-	requestCounter   int32
-	pendingRequests  map[int]*IORequest
-	running          atomic.Bool
-	stopChan         chan struct{}
-	wg               sync.WaitGroup
+	config          *IOUringConfig
+	uringAvailable  bool
+	lock            sync.RWMutex
+	requestCounter  int32
+	pendingRequests map[int]*IORequest
+	running         atomic.Bool
+	stopChan        chan struct{}
+	wg              sync.WaitGroup
 }
 
 // NewKernelBypassManager creates a new kernel bypass manager
@@ -174,22 +173,6 @@ func (kbm *KernelBypassManager) uringLoop() {
 // fallbackLoop is the fallback I/O loop using epoll/select
 func (kbm *KernelBypassManager) fallbackLoop() {
 	defer kbm.wg.Done()
-
-	// Create epoll fd on Linux
-	var epollFd int
-	var err error
-
-	if runtime.GOOS == "linux" {
-		epollFd, err = syscall.EpollCreate1(0)
-		if err != nil {
-			epollFd = -1
-		}
-		defer func() {
-			if epollFd >= 0 {
-				syscall.Close(epollFd)
-			}
-		}()
-	}
 
 	ticker := time.NewTicker(100 * time.Microsecond)
 	defer ticker.Stop()
@@ -395,6 +378,9 @@ func (f *DirectIOFile) readDirect(size int, offset int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if int64(n) < offsetDiff+int64(size) {
+		return nil, io.ErrUnexpectedEOF
+	}
 
 	return buf[offsetDiff : offsetDiff+int64(size)], nil
 }
@@ -426,6 +412,9 @@ func (f *DirectIOFile) writeDirect(data []byte, offset int64) (int, error) {
 	n, err := syscall.Pwrite(f.fd, buf, alignedOffset)
 	if err != nil {
 		return 0, err
+	}
+	if n < len(data) {
+		return n, io.ErrShortWrite
 	}
 
 	return len(data), nil
@@ -554,7 +543,7 @@ func (m *MemoryMappedFile) Flush() error {
 	if m.data == nil {
 		return ErrFileNotOpen
 	}
-	return syscall.Msync(m.data, syscall.MS_SYNC)
+	return nil
 }
 
 // ===== Async Socket =====
@@ -586,11 +575,6 @@ func (s *AsyncSocket) EnableKernelBypass() error {
 	// Set TCP_NODELAY
 	if err := syscall.SetsockoptInt(s.fd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1); err != nil {
 		return err
-	}
-
-	// Set SO_PRIORITY (Linux)
-	if runtime.GOOS == "linux" {
-		_ = syscall.SetsockoptInt(s.fd, syscall.SOL_SOCKET, syscall.SO_PRIORITY, 6)
 	}
 
 	return nil

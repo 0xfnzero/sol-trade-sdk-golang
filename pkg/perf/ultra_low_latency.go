@@ -5,17 +5,18 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
 // UltraLowLatencyConfig configuration for ULL optimizations
 type UltraLowLatencyConfig struct {
-	EnableMemoryPool    bool
-	PoolSize            int
-	EnableLockFree      bool
-	CacheLineSize       int
-	EnableCPUPinning    bool
-	EnablePrefetch      bool
-	PrefetchDistance    int
+	EnableMemoryPool bool
+	PoolSize         int
+	EnableLockFree   bool
+	CacheLineSize    int
+	EnableCPUPinning bool
+	EnablePrefetch   bool
+	PrefetchDistance int
 }
 
 // DefaultUltraLowLatencyConfig returns default ULL config
@@ -278,11 +279,6 @@ func (o *LatencyOptimizer) GetMetrics() *LatencyMetrics {
 		MinTimeNs:   atomic.LoadInt64(&o.metrics.MinTimeNs),
 		MaxTimeNs:   atomic.LoadInt64(&o.metrics.MaxTimeNs),
 	}
-}
-
-// CacheLinePad provides cache line padding
-type CacheLinePad struct {
-	_ [64]byte // Cache line size on most modern CPUs
 }
 
 // PaddedInt64 is an int64 padded to cache line size

@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 )
 
@@ -213,19 +214,19 @@ func (pq *priorityQueue) Pop() interface{} {
 
 // TransactionPool manages a pool of pending transactions
 type TransactionPool struct {
-	config      *PoolConfig
-	queue       priorityQueue
-	queueMu     sync.Mutex
+	config       *PoolConfig
+	queue        priorityQueue
+	queueMu      sync.Mutex
 	transactions sync.Map // map[solana.Signature]*PendingTransaction
-	pending     int32 // atomic counter for pending submissions
-	submitted   int64 // atomic counter for total submitted
-	confirmed   int64 // atomic counter for total confirmed
-	failed      int64 // atomic counter for total failed
-	dropped     int64 // atomic counter for total dropped
-	stopCh      chan struct{}
-	wg          sync.WaitGroup
-	started     atomic.Bool
-	submitFunc  func(ctx context.Context, tx []byte) (solana.Signature, error)
+	pending      int32    // atomic counter for pending submissions
+	submitted    int64    // atomic counter for total submitted
+	confirmed    int64    // atomic counter for total confirmed
+	failed       int64    // atomic counter for total failed
+	dropped      int64    // atomic counter for total dropped
+	stopCh       chan struct{}
+	wg           sync.WaitGroup
+	started      atomic.Bool
+	submitFunc   func(ctx context.Context, tx []byte) (solana.Signature, error)
 }
 
 // NewTransactionPool creates a new transaction pool
@@ -309,7 +310,7 @@ func (p *TransactionPool) Submit(
 	}
 
 	// Create pending transaction
-	sig, err := solana.TransactionFromData(serializedTx)
+	sig, err := solana.TransactionFromDecoder(bin.NewBinDecoder(serializedTx))
 	if err != nil {
 		return nil, fmt.Errorf("invalid transaction: %w", err)
 	}
@@ -384,13 +385,13 @@ func (p *TransactionPool) GetPendingCount() int {
 // GetStats returns pool statistics
 func (p *TransactionPool) GetStats() PoolStats {
 	return PoolStats{
-		Size:        p.GetSize(),
-		QueueSize:   p.GetQueueSize(),
-		Pending:     p.GetPendingCount(),
-		Submitted:   atomic.LoadInt64(&p.submitted),
-		Confirmed:   atomic.LoadInt64(&p.confirmed),
-		Failed:      atomic.LoadInt64(&p.failed),
-		Dropped:     atomic.LoadInt64(&p.dropped),
+		Size:      p.GetSize(),
+		QueueSize: p.GetQueueSize(),
+		Pending:   p.GetPendingCount(),
+		Submitted: atomic.LoadInt64(&p.submitted),
+		Confirmed: atomic.LoadInt64(&p.confirmed),
+		Failed:    atomic.LoadInt64(&p.failed),
+		Dropped:   atomic.LoadInt64(&p.dropped),
 	}
 }
 

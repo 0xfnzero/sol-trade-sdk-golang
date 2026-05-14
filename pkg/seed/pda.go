@@ -205,8 +205,8 @@ func Hash256Concat(parts ...[]byte) [32]byte {
 // ===== Error Definitions =====
 
 var (
-	ErrInvalidSeed       = errors.New("invalid seed")
-	ErrInvalidBump       = errors.New("invalid bump")
-	ErrPDANotFound       = errors.New("PDA not found")
-	ErrInvalidProgramID  = errors.New("invalid program ID")
+	ErrInvalidSeed      = errors.New("invalid seed")
+	ErrInvalidBump      = errors.New("invalid bump")
+	ErrPDANotFound      = errors.New("PDA not found")
+	ErrInvalidProgramID = errors.New("invalid program ID")
 )

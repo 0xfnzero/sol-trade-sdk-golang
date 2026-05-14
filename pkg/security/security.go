@@ -21,14 +21,14 @@ import (
 // ===== Errors =====
 
 var (
-	ErrKeyNotAvailable    = errors.New("key not available")
-	ErrPasswordRequired   = errors.New("password required to unlock")
-	ErrInvalidKey         = errors.New("invalid key")
-	ErrValidationFailed   = errors.New("validation failed")
-	ErrInvalidURL         = errors.New("invalid URL")
-	ErrInvalidPubkey      = errors.New("invalid public key")
-	ErrInvalidAmount      = errors.New("invalid amount")
-	ErrInvalidSlippage    = errors.New("invalid slippage")
+	ErrKeyNotAvailable     = errors.New("key not available")
+	ErrPasswordRequired    = errors.New("password required to unlock")
+	ErrInvalidKey          = errors.New("invalid key")
+	ErrValidationFailed    = errors.New("validation failed")
+	ErrInvalidURL          = errors.New("invalid URL")
+	ErrInvalidPubkey       = errors.New("invalid public key")
+	ErrInvalidAmount       = errors.New("invalid amount")
+	ErrInvalidSlippage     = errors.New("invalid slippage")
 	ErrTransactionTooLarge = errors.New("transaction too large")
 )
 

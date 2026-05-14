@@ -27,29 +27,29 @@ const (
 
 // TransactionResult represents transaction submission result
 type TransactionResult struct {
-	Signature            solana.Signature
-	Success              bool
-	Provider             string
-	LatencyMs            int64
-	Slot                 uint64
-	Error                string
-	BundleID             string
-	ConfirmationStatus   string
+	Signature          solana.Signature
+	Success            bool
+	Provider           string
+	LatencyMs          int64
+	Slot               uint64
+	Error              string
+	BundleID           string
+	ConfirmationStatus string
 }
 
 // SwqosConfigExtended extended configuration for SWQOS
 type SwqosConfigExtended struct {
-	Type                   SwqosType
-	APIKey                 string
-	Region                 SwqosRegion
-	URL                    string
-	TimeoutMs              int
-	MaxRetries             int
-	Enabled                bool
-	PriorityFeeMultiplier  float64
-	MevProtection          MevProtectionLevel
-	CustomHeaders          map[string]string
-	RateLimitRPS           int
+	Type                  SwqosType
+	APIKey                string
+	Region                SwqosRegion
+	URL                   string
+	TimeoutMs             int
+	MaxRetries            int
+	Enabled               bool
+	PriorityFeeMultiplier float64
+	MevProtection         MevProtectionLevel
+	CustomHeaders         map[string]string
+	RateLimitRPS          int
 }
 
 // DefaultSwqosConfigExtended returns default extended config
@@ -77,11 +77,11 @@ type SwqosProviderBase struct {
 
 // ProviderStats represents provider statistics
 type ProviderStats struct {
-	Requests      int64
-	Successes     int64
-	Failures      int64
-	AvgLatencyMs  int64
-	LastError     string
+	Requests     int64
+	Successes    int64
+	Failures     int64
+	AvgLatencyMs int64
+	LastError    string
 }
 
 // UpdateStats updates provider statistics

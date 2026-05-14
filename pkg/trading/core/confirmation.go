@@ -147,27 +147,27 @@ type ConfirmationCallback func(progress *ConfirmationProgress)
 
 // ConfirmationMonitor monitors transaction confirmations
 type ConfirmationMonitor struct {
-	config      *ConfirmationConfig
-	rpcClient   *rpc.Client
-	watched     sync.Map // map[solana.Signature]*watchContext
-	callbacks   []ConfirmationCallback
-	mu          sync.RWMutex
-	started     atomic.Bool
-	stopCh      chan struct{}
-	wg          sync.WaitGroup
+	config    *ConfirmationConfig
+	rpcClient *rpc.Client
+	watched   sync.Map // map[solana.Signature]*watchContext
+	callbacks []ConfirmationCallback
+	mu        sync.RWMutex
+	started   atomic.Bool
+	stopCh    chan struct{}
+	wg        sync.WaitGroup
 }
 
 // watchContext tracks the context of a watched transaction
 type watchContext struct {
-	signature   solana.Signature
-	result      *ConfirmationResult
-	config      *ConfirmationConfig
-	ctx         context.Context
-	cancel      context.CancelFunc
-	startTime   time.Time
-	pollCount   int
-	retryCount  int
-	lastStatus  ConfirmationStatus
+	signature  solana.Signature
+	result     *ConfirmationResult
+	config     *ConfirmationConfig
+	ctx        context.Context
+	cancel     context.CancelFunc
+	startTime  time.Time
+	pollCount  int
+	retryCount int
+	lastStatus ConfirmationStatus
 }
 
 // NewConfirmationMonitor creates a new confirmation monitor
@@ -347,8 +347,8 @@ func (m *ConfirmationMonitor) checkStatus(watch *watchContext) (*rpc.SignatureSt
 
 // updateStatus updates the confirmation status
 func (m *ConfirmationMonitor) updateStatus(watch *watchContext, status *rpc.SignatureStatusesResult) {
-	if status.ConfirmationStatus != nil {
-		switch *status.ConfirmationStatus {
+	if status.ConfirmationStatus != "" {
+		switch status.ConfirmationStatus {
 		case rpc.ConfirmationStatusProcessed:
 			watch.result.Status = ConfirmationStatusProcessed
 		case rpc.ConfirmationStatusConfirmed:
@@ -359,11 +359,8 @@ func (m *ConfirmationMonitor) updateStatus(watch *watchContext, status *rpc.Sign
 	}
 
 	watch.result.Slot = uint64(status.Slot)
-	watch.result.Confirmations = uint64(status.Confirmations)
-
-	if status.BlockTime != nil {
-		blockTime := time.Unix(*status.BlockTime, 0)
-		watch.result.BlockTime = &blockTime
+	if status.Confirmations != nil {
+		watch.result.Confirmations = *status.Confirmations
 	}
 }
 

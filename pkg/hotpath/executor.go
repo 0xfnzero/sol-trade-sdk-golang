@@ -3,12 +3,14 @@ package hotpath
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 	"github.com/gagliardetto/solana-go"
+	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/rpc"
 )
 
@@ -16,10 +18,10 @@ import (
 // All data must be pre-fetched before execution
 type HotPathExecutor struct {
 	// State management
-	state         *HotPathState
-	accountCache  *AccountStateCache
-	poolCache     *PoolStateCache
-	config        *HotPathConfig
+	state        *HotPathState
+	accountCache *AccountStateCache
+	poolCache    *PoolStateCache
+	config       *HotPathConfig
 
 	// SWQoS clients for transaction submission
 	swqosClients []soltradesdk.SwqosClient
@@ -255,9 +257,27 @@ func (e *HotPathExecutor) BuildTransaction(
 
 	// Add compute budget instructions if gas config provided
 	if gasConfig != nil {
+		if gasConfig.ComputeUnitLimit > math.MaxUint32 {
+			return nil, fmt.Errorf("compute unit limit exceeds uint32: %d", gasConfig.ComputeUnitLimit)
+		}
+
+		unitLimitIx, err := computebudget.NewSetComputeUnitLimitInstruction(
+			uint32(gasConfig.ComputeUnitLimit),
+		).ValidateAndBuild()
+		if err != nil {
+			return nil, fmt.Errorf("failed to build compute unit limit instruction: %w", err)
+		}
+
+		unitPriceIx, err := computebudget.NewSetComputeUnitPriceInstruction(
+			gasConfig.ComputeUnitPrice,
+		).ValidateAndBuild()
+		if err != nil {
+			return nil, fmt.Errorf("failed to build compute unit price instruction: %w", err)
+		}
+
 		txInstructions = append(txInstructions,
-			solana.NewComputeBudgetSetComputeUnitLimitInstruction(gasConfig.ComputeUnitLimit),
-			solana.NewComputeBudgetSetComputeUnitPriceInstruction(gasConfig.ComputeUnitPrice),
+			unitLimitIx,
+			unitPriceIx,
 		)
 	}
 	txInstructions = append(txInstructions, instructions...)
@@ -266,10 +286,22 @@ func (e *HotPathExecutor) BuildTransaction(
 		txInstructions,
 		*blockhash,
 		solana.TransactionPayer(payer),
-		solana.TransactionWithSigners(signers...),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build transaction: %w", err)
+	}
+
+	if len(signers) > 0 {
+		if _, err := tx.Sign(func(key solana.PublicKey) *solana.PrivateKey {
+			for _, signer := range signers {
+				if signer != nil && (*signer).PublicKey().Equals(key) {
+					return signer
+				}
+			}
+			return nil
+		}); err != nil {
+			return nil, fmt.Errorf("failed to sign transaction: %w", err)
+		}
 	}
 
 	_ = lastValidHeight // Track for validation

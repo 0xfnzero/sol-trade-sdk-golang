@@ -1,3 +1,6 @@
+//go:build live_examples
+// +build live_examples
+
 // Seed Trading Example
 //
 // This example demonstrates how to trade using seed optimization
@@ -12,9 +15,9 @@ import (
 	"os"
 	"time"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go"
-	"github.com/your-org/sol-trade-sdk-go/pkg/common"
-	"github.com/your-org/sol-trade-sdk-go/pkg/trading"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -82,17 +85,17 @@ func seedTradingExample(
 	buySOLAmount := uint64(100_000) // 0.0001 WSOL
 
 	buyParams := &trading.TradeBuyParams{
-		DexType:              soltradesdk.DexTypePumpSwap,
-		InputTokenType:       soltradesdk.TradeTokenTypeWSOL,
-		Mint:                 mint,
-		InputTokenAmount:     buySOLAmount,
-		SlippageBasisPoints:  &slippageBasisPoints,
-		RecentBlockhash:      &recentBlockhash,
-		WaitConfirmed:        true,
-		CreateInputTokenATA:  true,
-		CloseInputTokenATA:   true,
-		CreateMintATA:        true,
-		GasFeeStrategy:       gasFeeStrategy,
+		DexType:             soltradesdk.DexTypePumpSwap,
+		InputTokenType:      soltradesdk.TradeTokenTypeWSOL,
+		Mint:                mint,
+		InputTokenAmount:    buySOLAmount,
+		SlippageBasisPoints: &slippageBasisPoints,
+		RecentBlockhash:     &recentBlockhash,
+		WaitConfirmed:       true,
+		CreateInputTokenATA: true,
+		CloseInputTokenATA:  true,
+		CreateMintATA:       true,
+		GasFeeStrategy:      gasFeeStrategy,
 		// ExtensionParams: pumpSwapParams,
 	}
 

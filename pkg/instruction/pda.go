@@ -3,47 +3,59 @@ package instruction
 import (
 	"crypto/sha256"
 
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
 	"github.com/gagliardetto/solana-go"
-	"github.com/your-org/sol-trade-sdk-go/pkg/constants"
 )
+
+func accountMetaSlice(accounts []solana.AccountMeta) solana.AccountMetaSlice {
+	out := make(solana.AccountMetaSlice, len(accounts))
+	for i := range accounts {
+		out[i] = &accounts[i]
+	}
+	return out
+}
+
+func newInstruction(programID solana.PublicKey, accounts []solana.AccountMeta, data []byte) solana.Instruction {
+	return solana.NewInstruction(programID, accountMetaSlice(accounts), data)
+}
 
 // GetBondingCurvePDA derives the bonding curve PDA for a mint
 func GetBondingCurvePDA(mint solana.PublicKey) solana.PublicKey {
 	seeds := [][]byte{
-		[]byte("bonding-curve"),
+		PumpFunBondingCurveSeed,
 		mint[:],
 	}
-	pubkey, _, _ := solana.FindProgramAddress(seeds, constants.PUMPFUN_PROGRAM_ID)
+	pubkey, _, _ := solana.FindProgramAddress(seeds, PUMPFUN_PROGRAM)
 	return pubkey
 }
 
 // GetBondingCurveV2PDA derives the bonding curve v2 PDA for a mint
 func GetBondingCurveV2PDA(mint solana.PublicKey) solana.PublicKey {
 	seeds := [][]byte{
-		[]byte("bonding-curve-v2"),
+		PumpFunBondingCurveV2Seed,
 		mint[:],
 	}
-	pubkey, _, _ := solana.FindProgramAddress(seeds, constants.PUMPFUN_PROGRAM_ID)
+	pubkey, _, _ := solana.FindProgramAddress(seeds, PUMPFUN_PROGRAM)
 	return pubkey
 }
 
 // GetUserVolumeAccumulatorPDA derives the user volume accumulator PDA
 func GetUserVolumeAccumulatorPDA(user solana.PublicKey) solana.PublicKey {
 	seeds := [][]byte{
-		[]byte("user-volume-accumulator"),
+		PumpFunUserVolumeAccumulatorSeed,
 		user[:],
 	}
-	pubkey, _, _ := solana.FindProgramAddress(seeds, constants.PUMPFUN_PROGRAM_ID)
+	pubkey, _, _ := solana.FindProgramAddress(seeds, PUMPFUN_PROGRAM)
 	return pubkey
 }
 
 // GetCreatorVaultPDA derives the creator vault PDA
 func GetCreatorVaultPDA(creator solana.PublicKey) solana.PublicKey {
 	seeds := [][]byte{
-		[]byte("creator-vault"),
+		PumpFunCreatorVaultSeed,
 		creator[:],
 	}
-	pubkey, _, _ := solana.FindProgramAddress(seeds, constants.PUMPFUN_PROGRAM_ID)
+	pubkey, _, _ := solana.FindProgramAddress(seeds, PUMPFUN_PROGRAM)
 	return pubkey
 }
 
@@ -112,7 +124,7 @@ func CreateAssociatedTokenAccountInstruction(
 		{PublicKey: constants.RENT, IsSigner: false, IsWritable: false},
 	}
 
-	return solana.NewInstruction(constants.ASSOCIATED_TOKEN_PROGRAM_ID, accounts, data)
+	return newInstruction(constants.ASSOCIATED_TOKEN_PROGRAM_ID, accounts, data)
 }
 
 // BuildCloseAccountInstruction builds a close token account instruction
@@ -128,7 +140,7 @@ func BuildCloseAccountInstruction(
 		{PublicKey: owner, IsSigner: true, IsWritable: false},
 	}
 
-	return solana.NewInstruction(tokenProgram, accounts, data)
+	return newInstruction(tokenProgram, accounts, data)
 }
 
 // Hash computes SHA256 hash

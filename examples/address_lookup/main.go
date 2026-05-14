@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/your-org/sol-trade-sdk-go/pkg/addresslookup"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/addresslookup"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -30,6 +30,7 @@ func main() {
 		ctx,
 		rpcClient,
 		altAddress,
+		rpc.CommitmentConfirmed,
 	)
 	if err != nil {
 		log.Printf("Failed to fetch ALT: %v", err)

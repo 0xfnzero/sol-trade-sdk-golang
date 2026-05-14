@@ -132,34 +132,34 @@ type LatencyBucket struct {
 
 // LatencyHistogram tracks latency distribution
 type LatencyHistogram struct {
-	buckets    []LatencyBucket
-	counts     []uint64
-	sum        atomic.Int64
-	count      atomic.Uint64
-	min        atomic.Int64
-	max        atomic.Int64
-	mu         sync.RWMutex
+	buckets []LatencyBucket
+	counts  []uint64
+	sum     atomic.Int64
+	count   atomic.Uint64
+	min     atomic.Int64
+	max     atomic.Int64
+	mu      sync.RWMutex
 }
 
 // DefaultLatencyBuckets returns default bucket boundaries in microseconds
 func DefaultLatencyBuckets() []int64 {
 	return []int64{
-		10,       // 10us
-		25,       // 25us
-		50,       // 50us
-		100,      // 100us
-		250,      // 250us
-		500,      // 500us
-		1000,     // 1ms
-		2500,     // 2.5ms
-		5000,     // 5ms
-		10000,    // 10ms
-		25000,    // 25ms
-		50000,    // 50ms
-		100000,   // 100ms
-		250000,   // 250ms
-		500000,   // 500ms
-		1000000,  // 1s
+		10,      // 10us
+		25,      // 25us
+		50,      // 50us
+		100,     // 100us
+		250,     // 250us
+		500,     // 500us
+		1000,    // 1ms
+		2500,    // 2.5ms
+		5000,    // 5ms
+		10000,   // 10ms
+		25000,   // 25ms
+		50000,   // 50ms
+		100000,  // 100ms
+		250000,  // 250ms
+		500000,  // 500ms
+		1000000, // 1s
 	}
 }
 
@@ -241,13 +241,13 @@ func (h *LatencyHistogram) Snapshot() HistogramSnapshot {
 	}
 
 	return HistogramSnapshot{
-		Buckets:   h.buckets,
-		Counts:    counts,
-		Sum:       h.sum.Load(),
-		Count:     h.count.Load(),
-		Min:       min,
-		Max:       h.max.Load(),
-		Mean:      h.mean(),
+		Buckets: h.buckets,
+		Counts:  counts,
+		Sum:     h.sum.Load(),
+		Count:   h.count.Load(),
+		Min:     min,
+		Max:     h.max.Load(),
+		Mean:    h.mean(),
 	}
 }
 

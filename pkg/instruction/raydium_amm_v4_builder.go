@@ -10,8 +10,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 
-	"github.com/your-org/sol-trade-sdk-go/pkg/calc"
-	"github.com/your-org/sol-trade-sdk-go/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
 )
 
 // ===== Raydium AMM V4 Program Constants from Rust: src/instruction/utils/raydium_amm_v4.rs =====
@@ -106,9 +106,6 @@ func RaydiumAmmV4BuildBuyInstructions(params *RaydiumAmmV4BuildBuyParams) ([]sol
 		return nil, ErrInvalidPool
 	}
 
-	// Determine if base is input (WSOL/USDC)
-	isBaseIn := pp.CoinMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.CoinMint.Equals(constants.USDC_TOKEN_ACCOUNT)
-
 	// Calculate swap amounts
 	amountIn := params.InputAmount
 	var minimumAmountOut uint64
@@ -173,7 +170,7 @@ func RaydiumAmmV4BuildBuyInstructions(params *RaydiumAmmV4BuildBuyParams) ([]sol
 		{PublicKey: params.Payer, IsSigner: true, IsWritable: false},                // 16: User Source Owner
 	}
 
-	instructions = append(instructions, solana.NewInstruction(RAYDIUM_AMM_V4_PROGRAM, accounts, data))
+	instructions = append(instructions, newInstruction(RAYDIUM_AMM_V4_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
 	if params.CloseInputMintAta {
@@ -198,9 +195,6 @@ func RaydiumAmmV4BuildSellInstructions(params *RaydiumAmmV4BuildSellParams) ([]s
 	if !isWsol && !isUsdc {
 		return nil, ErrInvalidPool
 	}
-
-	// Determine if base is input (token being sold)
-	isBaseIn := pp.PcMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.PcMint.Equals(constants.USDC_TOKEN_ACCOUNT)
 
 	// Calculate swap amounts
 	var minimumAmountOut uint64
@@ -260,7 +254,7 @@ func RaydiumAmmV4BuildSellInstructions(params *RaydiumAmmV4BuildSellParams) ([]s
 		{PublicKey: params.Payer, IsSigner: true, IsWritable: false},                // 16: User Source Owner
 	}
 
-	instructions = append(instructions, solana.NewInstruction(RAYDIUM_AMM_V4_PROGRAM, accounts, data))
+	instructions = append(instructions, newInstruction(RAYDIUM_AMM_V4_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
 	if params.CloseOutputMintAta {
@@ -304,56 +298,56 @@ type RaydiumAmmFees struct {
 
 // RaydiumAmmOutputData represents output data structure
 type RaydiumAmmOutputData struct {
-	NeedTakePnlCoin      uint64
-	NeedTakePnlPc        uint64
-	TotalPnlPc           uint64
-	TotalPnlCoin         uint64
-	PoolOpenTime         uint64
-	PunishPcAmount       uint64
-	PunishCoinAmount     uint64
-	OrderbookToInitTime  uint64
-	SwapCoinInAmount     uint64
-	SwapPcOutAmount      uint64
-	SwapTakePcFee        uint64
-	SwapPcInAmount       uint64
-	SwapCoinOutAmount    uint64
-	SwapTakeCoinFee      uint64
+	NeedTakePnlCoin     uint64
+	NeedTakePnlPc       uint64
+	TotalPnlPc          uint64
+	TotalPnlCoin        uint64
+	PoolOpenTime        uint64
+	PunishPcAmount      uint64
+	PunishCoinAmount    uint64
+	OrderbookToInitTime uint64
+	SwapCoinInAmount    uint64
+	SwapPcOutAmount     uint64
+	SwapTakePcFee       uint64
+	SwapPcInAmount      uint64
+	SwapCoinOutAmount   uint64
+	SwapTakeCoinFee     uint64
 }
 
 // RaydiumAmmInfo represents decoded AMM info
 type RaydiumAmmInfo struct {
-	Status              uint64
-	Nonce               uint64
-	OrderNum            uint64
-	Depth               uint64
-	CoinDecimals        uint64
-	PcDecimals          uint64
-	State               uint64
-	ResetFlag           uint64
-	MinSize             uint64
-	VolMaxCutRatio      uint64
-	AmountWave          uint64
-	CoinLotSize         uint64
-	PcLotSize           uint64
-	MinPriceMultiplier  uint64
-	MaxPriceMultiplier  uint64
-	SysDecimalValue     uint64
-	Fees                RaydiumAmmFees
-	Output              RaydiumAmmOutputData
-	TokenCoin           solana.PublicKey
-	TokenPc             solana.PublicKey
-	CoinMint            solana.PublicKey
-	PcMint              solana.PublicKey
-	LpMint              solana.PublicKey
-	OpenOrders          solana.PublicKey
-	Market              solana.PublicKey
-	SerumDex            solana.PublicKey
-	TargetOrders        solana.PublicKey
-	WithdrawQueue       solana.PublicKey
-	TokenTempLp         solana.PublicKey
-	AmmOwner            solana.PublicKey
-	LpAmount            uint64
-	ClientOrderId       uint64
+	Status             uint64
+	Nonce              uint64
+	OrderNum           uint64
+	Depth              uint64
+	CoinDecimals       uint64
+	PcDecimals         uint64
+	State              uint64
+	ResetFlag          uint64
+	MinSize            uint64
+	VolMaxCutRatio     uint64
+	AmountWave         uint64
+	CoinLotSize        uint64
+	PcLotSize          uint64
+	MinPriceMultiplier uint64
+	MaxPriceMultiplier uint64
+	SysDecimalValue    uint64
+	Fees               RaydiumAmmFees
+	Output             RaydiumAmmOutputData
+	TokenCoin          solana.PublicKey
+	TokenPc            solana.PublicKey
+	CoinMint           solana.PublicKey
+	PcMint             solana.PublicKey
+	LpMint             solana.PublicKey
+	OpenOrders         solana.PublicKey
+	Market             solana.PublicKey
+	SerumDex           solana.PublicKey
+	TargetOrders       solana.PublicKey
+	WithdrawQueue      solana.PublicKey
+	TokenTempLp        solana.PublicKey
+	AmmOwner           solana.PublicKey
+	LpAmount           uint64
+	ClientOrderId      uint64
 }
 
 // DecodeAmmInfo decodes Raydium AMM v4 info from account data.

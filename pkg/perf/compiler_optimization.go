@@ -89,12 +89,6 @@ func ParallelHint() {}
 
 // ===== Cache Optimizer =====
 
-// CacheOptimizer provides cache optimization utilities
-type CacheOptimizer struct{}
-
-// CacheLineSize is the typical CPU cache line size
-const CacheLineSize = 64
-
 // AlignedBuffer provides cache-line aligned buffer
 type AlignedBuffer struct {
 	data   []byte

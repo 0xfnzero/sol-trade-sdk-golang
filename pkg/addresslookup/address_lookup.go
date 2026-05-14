@@ -9,8 +9,11 @@ import (
 	"sync"
 
 	"github.com/gagliardetto/solana-go"
+	addresslookuptable "github.com/gagliardetto/solana-go/programs/address-lookup-table"
 	"github.com/gagliardetto/solana-go/rpc"
 )
+
+var addressLookupTableProgramID = solana.MustPublicKeyFromBase58("AddressLookupTab1e1111111111111111111111111")
 
 // AddressLookupTableAccount represents an address lookup table account
 type AddressLookupTableAccount struct {
@@ -56,32 +59,14 @@ func FetchAddressLookupTableAccount(
 		return nil, fmt.Errorf("invalid lookup table data size: %d", len(data))
 	}
 
-	// Parse header (56 bytes):
-	// - authority: 32 bytes
-	// - deactivation_slot: 8 bytes
-	// - last_extended_slot: 8 bytes
-	// - last_extended_slot_start_index: 1 byte
-	// - padding: 7 bytes
-
-	// Remaining bytes are addresses (each 32 bytes)
-	addressesData := data[56:]
-	addresses := make([]solana.PublicKey, 0, len(addressesData)/32)
-
-	for i := 0; i+32 <= len(addressesData); i += 32 {
-		var addr solana.PublicKey
-		copy(addr[:], addressesData[i:i+32])
-		addresses = append(addresses, &addr)
-	}
-
-	// Convert to regular addresses
-	result := make([]solana.PublicKey, len(addresses))
-	for i, addr := range addresses {
-		result[i] = *addr
+	state, err := addresslookuptable.DecodeAddressLookupTableState(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode lookup table: %w", err)
 	}
 
 	return &AddressLookupTableAccount{
 		Key:       lookupTableAddress,
-		Addresses: result,
+		Addresses: []solana.PublicKey(state.Addresses),
 	}, nil
 }
 
@@ -136,17 +121,14 @@ func CompileLookupTableAddresses(
 ) ([][]uint16, error) {
 	// Maps to track address indices in lookup tables
 	writableIndices := make([][]uint16, len(lookupTables))
-	readableIndices := make([][]uint16, len(lookupTables))
-
 	// Track which addresses are found
 	foundWritable := make(map[solana.PublicKey]bool)
-	foundReadable := make(map[solana.PublicKey]bool)
 
 	for _, addr := range requiredAddresses {
 		for tableIdx, table := range lookupTables {
 			for addrIdx, tableAddr := range table.Addresses {
 				if tableAddr.Equals(addr) {
-					if !foundWritable[addr] && !foundReadable[addr] {
+					if !foundWritable[addr] {
 						writableIndices[tableIdx] = append(writableIndices[tableIdx], uint16(addrIdx))
 						foundWritable[addr] = true
 					}
@@ -216,5 +198,5 @@ func DeriveLookupTableAddress(
 		authority[:],
 	}
 
-	return solana.FindProgramAddress(seeds, solana.AddressLookupTableProgramID)
+	return solana.FindProgramAddress(seeds, addressLookupTableProgramID)
 }

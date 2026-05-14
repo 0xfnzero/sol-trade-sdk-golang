@@ -45,12 +45,12 @@ type RetryConfig struct {
 // DefaultRetryConfig returns a default retry configuration
 func DefaultRetryConfig() *RetryConfig {
 	return &RetryConfig{
-		MaxRetries:     3,
-		InitialDelay:   100 * time.Millisecond,
-		MaxDelay:       30 * time.Second,
-		Multiplier:     2.0,
-		Jitter:         0.1,
-		Timeout:        60 * time.Second,
+		MaxRetries:         3,
+		InitialDelay:       100 * time.Millisecond,
+		MaxDelay:           30 * time.Second,
+		Multiplier:         2.0,
+		Jitter:             0.1,
+		Timeout:            60 * time.Second,
 		RetryableErrors:    make([]error, 0),
 		NonRetryableErrors: make([]error, 0),
 	}
@@ -78,9 +78,9 @@ func (c *RetryConfig) Validate() error {
 
 // ExponentialBackoff implements exponential backoff retry strategy
 type ExponentialBackoff struct {
-	config     *RetryConfig
-	attempt    int
-	mu         sync.Mutex
+	config  *RetryConfig
+	attempt int
+	mu      sync.Mutex
 }
 
 // NewExponentialBackoff creates a new exponential backoff strategy
@@ -157,8 +157,8 @@ func (e *ExponentialBackoff) Reset() {
 
 // LinearBackoff implements linear backoff retry strategy
 type LinearBackoff struct {
-	config  *RetryConfig
-	mu      sync.Mutex
+	config *RetryConfig
+	mu     sync.Mutex
 }
 
 // NewLinearBackoff creates a new linear backoff strategy
@@ -430,14 +430,14 @@ type CircuitStats struct {
 
 // RetryHandler handles retry logic with circuit breaker
 type RetryHandler struct {
-	config          *RetryConfig
-	strategy        RetryStrategy
-	circuitBreaker  *CircuitBreaker
-	totalAttempts   int64
-	successCount    int64
-	failureCount    int64
-	retryCount      int64
-	mu              sync.RWMutex
+	config         *RetryConfig
+	strategy       RetryStrategy
+	circuitBreaker *CircuitBreaker
+	totalAttempts  int64
+	successCount   int64
+	failureCount   int64
+	retryCount     int64
+	mu             sync.RWMutex
 }
 
 // NewRetryHandler creates a new retry handler

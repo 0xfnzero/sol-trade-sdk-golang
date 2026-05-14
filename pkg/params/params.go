@@ -26,6 +26,11 @@ type PumpFunParams struct {
 	CreatorVault              solana.PublicKey
 	TokenProgram              solana.PublicKey
 	CloseTokenAccountWhenSell *bool
+	ObservedTradeCreator      solana.PublicKey
+	FeeSharingCreatorVault    solana.PublicKey
+	FeeRecipient              solana.PublicKey
+	QuoteMint                 solana.PublicKey
+	UseV2Ix                   bool
 }
 
 // NewPumpFunParams creates new PumpFun params
@@ -55,21 +60,34 @@ func (p *PumpFunParams) WithCreatorVault(vault solana.PublicKey) *PumpFunParams 
 	return p
 }
 
+// WithQuoteMint sets the PumpFun V2 quote mint and enables V2 instructions.
+func (p *PumpFunParams) WithQuoteMint(quoteMint solana.PublicKey) *PumpFunParams {
+	p.QuoteMint = quoteMint
+	p.UseV2Ix = true
+	return p
+}
+
+// WithFeeRecipient sets the observed PumpFun fee recipient from parser/grpc events.
+func (p *PumpFunParams) WithFeeRecipient(feeRecipient solana.PublicKey) *PumpFunParams {
+	p.FeeRecipient = feeRecipient
+	return p
+}
+
 // PumpSwapParams represents PumpSwap protocol specific parameters
 type PumpSwapParams struct {
-	Pool                    solana.PublicKey
-	BaseMint                solana.PublicKey
-	QuoteMint               solana.PublicKey
-	PoolBaseTokenAccount    solana.PublicKey
-	PoolQuoteTokenAccount   solana.PublicKey
-	PoolBaseTokenReserves   uint64
-	PoolQuoteTokenReserves  uint64
-	CoinCreatorVaultATA     solana.PublicKey
-	CoinCreatorVaultAuth    solana.PublicKey
-	BaseTokenProgram        solana.PublicKey
-	QuoteTokenProgram       solana.PublicKey
-	IsMayhemMode            bool
-	IsCashbackCoin          bool
+	Pool                   solana.PublicKey
+	BaseMint               solana.PublicKey
+	QuoteMint              solana.PublicKey
+	PoolBaseTokenAccount   solana.PublicKey
+	PoolQuoteTokenAccount  solana.PublicKey
+	PoolBaseTokenReserves  uint64
+	PoolQuoteTokenReserves uint64
+	CoinCreatorVaultATA    solana.PublicKey
+	CoinCreatorVaultAuth   solana.PublicKey
+	BaseTokenProgram       solana.PublicKey
+	QuoteTokenProgram      solana.PublicKey
+	IsMayhemMode           bool
+	IsCashbackCoin         bool
 }
 
 // NewPumpSwapParams creates new PumpSwap params
@@ -186,13 +204,13 @@ func NewRaydiumAmmV4Params(
 
 // MeteoraDammV2Params represents Meteora DAMM V2 protocol specific parameters
 type MeteoraDammV2Params struct {
-	Pool           solana.PublicKey
-	TokenAVault    solana.PublicKey
-	TokenBVault    solana.PublicKey
-	TokenAMint     solana.PublicKey
-	TokenBMint     solana.PublicKey
-	TokenAProgram  solana.PublicKey
-	TokenBProgram  solana.PublicKey
+	Pool          solana.PublicKey
+	TokenAVault   solana.PublicKey
+	TokenBVault   solana.PublicKey
+	TokenAMint    solana.PublicKey
+	TokenBMint    solana.PublicKey
+	TokenAProgram solana.PublicKey
+	TokenBProgram solana.PublicKey
 }
 
 // NewMeteoraDammV2Params creates new Meteora DAMM V2 params

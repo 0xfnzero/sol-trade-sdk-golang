@@ -38,8 +38,8 @@ type ComputeBudgetCacheKey struct {
 // ComputeBudgetCache stores compute budget instructions
 // Uses RWMutex for high-performance concurrent access
 type ComputeBudgetCache struct {
-	mu     sync.RWMutex
-	cache  map[ComputeBudgetCacheKey][][]byte
+	mu    sync.RWMutex
+	cache map[ComputeBudgetCacheKey][][]byte
 }
 
 // Global cache instance

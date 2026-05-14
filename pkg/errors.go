@@ -27,6 +27,8 @@ var (
 	ErrUnsupportedDEX = errors.New("unsupported DEX type")
 	// ErrUnsupportedToken is returned when token type is not supported for DEX
 	ErrUnsupportedToken = errors.New("unsupported token type for this DEX")
+	// ErrTradingExecutionUnavailable is returned when a client facade has no execution backend.
+	ErrTradingExecutionUnavailable = errors.New("trading execution backend is not configured")
 )
 
 // TradeError represents a trading error with details

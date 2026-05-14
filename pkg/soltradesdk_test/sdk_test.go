@@ -1,15 +1,18 @@
 package soltradesdk_test
 
 import (
+	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
-	"github.com/your-org/sol-trade-sdk-go/pkg/cache"
-	"github.com/your-org/sol-trade-sdk-go/pkg/common"
-	"github.com/your-org/sol-trade-sdk-go/pkg/pool"
-	"github.com/your-org/sol-trade-sdk-go/pkg/utils"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/cache"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/pool"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/utils"
+	"github.com/gagliardetto/solana-go"
 )
 
 // ===== Gas Fee Strategy Tests =====
@@ -76,8 +79,11 @@ func TestGasFeeStrategy_Concurrent(t *testing.T) {
 
 	// Verify no race conditions
 	value, ok := strategy.Get(soltradesdk.SwqosTypeJito, soltradesdk.TradeTypeBuy, common.GasFeeStrategyTypeNormal)
-	if ok && value.CuLimit < 100 {
-		t.Error("unexpected concurrent write result")
+	if !ok {
+		t.Fatal("expected strategy value for Jito after concurrent writes")
+	}
+	if value.CuLimit%10 != 0 || value.CuLimit > 90 {
+		t.Errorf("unexpected concurrent write result: %d", value.CuLimit)
 	}
 }
 
@@ -211,9 +217,12 @@ func TestShardedCache(t *testing.T) {
 func TestWorkerPool_Submit(t *testing.T) {
 	p := pool.NewWorkerPool(4, 100)
 
-	result := p.SubmitWait(func() (interface{}, error) {
+	result, err := p.SubmitWait(func() (interface{}, error) {
 		return 42, nil
 	})
+	if err != nil {
+		t.Fatalf("unexpected SubmitWait error: %v", err)
+	}
 
 	if result != 42 {
 		t.Errorf("expected result 42, got %v", result)
@@ -257,6 +266,27 @@ func TestRateLimiter(t *testing.T) {
 
 	if elapsed < 90*time.Millisecond {
 		t.Errorf("expected rate limiter to delay, got %v", elapsed)
+	}
+}
+
+func TestRootTradingClient_ReturnsExplicitExecutionError(t *testing.T) {
+	payer, err := solana.NewRandomPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := soltradesdk.NewTradingClient(
+		context.Background(),
+		&payer,
+		soltradesdk.NewTradeConfig("http://localhost:8899", nil),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = client.Buy(context.Background(), soltradesdk.TradeBuyParams{})
+	if !errors.Is(err, soltradesdk.ErrTradingExecutionUnavailable) {
+		t.Fatalf("expected explicit unavailable error, got %v", err)
 	}
 }
 

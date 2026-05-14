@@ -2,7 +2,9 @@ package swqos
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
@@ -13,15 +15,18 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	mathrand "math/rand"
 	"math/big"
+	mathrand "math/rand"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 	"github.com/gagliardetto/solana-go"
+	"github.com/google/uuid"
 	"github.com/quic-go/quic-go"
 )
 
@@ -32,27 +37,29 @@ type SwqosRegion = soltradesdk.SwqosRegion
 type TradeType = soltradesdk.TradeType
 
 const (
-	SwqosTypeJito        = soltradesdk.SwqosTypeJito
-	SwqosTypeNextBlock   = soltradesdk.SwqosTypeNextBlock
-	SwqosTypeZeroSlot    = soltradesdk.SwqosTypeZeroSlot
-	SwqosTypeTemporal    = soltradesdk.SwqosTypeTemporal
-	SwqosTypeBloxroute   = soltradesdk.SwqosTypeBloxroute
-	SwqosTypeNode1       = soltradesdk.SwqosTypeNode1
-	SwqosTypeFlashBlock  = soltradesdk.SwqosTypeFlashBlock
-	SwqosTypeBlockRazor  = soltradesdk.SwqosTypeBlockRazor
-	SwqosTypeAstralane   = soltradesdk.SwqosTypeAstralane
-	SwqosTypeStellium    = soltradesdk.SwqosTypeStellium
-	SwqosTypeLightspeed  = soltradesdk.SwqosTypeLightspeed
-	SwqosTypeSoyas       = soltradesdk.SwqosTypeSoyas
+	SwqosTypeJito         = soltradesdk.SwqosTypeJito
+	SwqosTypeNextBlock    = soltradesdk.SwqosTypeNextBlock
+	SwqosTypeZeroSlot     = soltradesdk.SwqosTypeZeroSlot
+	SwqosTypeTemporal     = soltradesdk.SwqosTypeTemporal
+	SwqosTypeBloxroute    = soltradesdk.SwqosTypeBloxroute
+	SwqosTypeNode1        = soltradesdk.SwqosTypeNode1
+	SwqosTypeFlashBlock   = soltradesdk.SwqosTypeFlashBlock
+	SwqosTypeBlockRazor   = soltradesdk.SwqosTypeBlockRazor
+	SwqosTypeAstralane    = soltradesdk.SwqosTypeAstralane
+	SwqosTypeStellium     = soltradesdk.SwqosTypeStellium
+	SwqosTypeLightspeed   = soltradesdk.SwqosTypeLightspeed
+	SwqosTypeSoyas        = soltradesdk.SwqosTypeSoyas
 	SwqosTypeSpeedlanding = soltradesdk.SwqosTypeSpeedlanding
-	SwqosTypeHelius      = soltradesdk.SwqosTypeHelius
-	SwqosTypeDefault     = soltradesdk.SwqosTypeDefault
+	SwqosTypeHelius       = soltradesdk.SwqosTypeHelius
+	SwqosTypeDefault      = soltradesdk.SwqosTypeDefault
 
 	SwqosRegionNewYork    = soltradesdk.SwqosRegionNewYork
 	SwqosRegionFrankfurt  = soltradesdk.SwqosRegionFrankfurt
 	SwqosRegionAmsterdam  = soltradesdk.SwqosRegionAmsterdam
+	SwqosRegionDublin     = soltradesdk.SwqosRegionDublin
 	SwqosRegionSLC        = soltradesdk.SwqosRegionSLC
 	SwqosRegionTokyo      = soltradesdk.SwqosRegionTokyo
+	SwqosRegionSingapore  = soltradesdk.SwqosRegionSingapore
 	SwqosRegionLondon     = soltradesdk.SwqosRegionLondon
 	SwqosRegionLosAngeles = soltradesdk.SwqosRegionLosAngeles
 	SwqosRegionDefault    = soltradesdk.SwqosRegionDefault
@@ -256,30 +263,36 @@ var jitoEndpoints = map[SwqosRegion]string{
 	SwqosRegionNewYork:    "https://ny.mainnet.block-engine.jito.wtf",
 	SwqosRegionFrankfurt:  "https://frankfurt.mainnet.block-engine.jito.wtf",
 	SwqosRegionAmsterdam:  "https://amsterdam.mainnet.block-engine.jito.wtf",
+	SwqosRegionDublin:     "https://dublin.mainnet.block-engine.jito.wtf",
 	SwqosRegionSLC:        "https://slc.mainnet.block-engine.jito.wtf",
 	SwqosRegionTokyo:      "https://tokyo.mainnet.block-engine.jito.wtf",
+	SwqosRegionSingapore:  "https://singapore.mainnet.block-engine.jito.wtf",
 	SwqosRegionLondon:     "https://london.mainnet.block-engine.jito.wtf",
-	SwqosRegionLosAngeles: "https://ny.mainnet.block-engine.jito.wtf",
+	SwqosRegionLosAngeles: "https://slc.mainnet.block-engine.jito.wtf",
 	SwqosRegionDefault:    "https://mainnet.block-engine.jito.wtf",
 }
 
 var nextBlockEndpoints = map[SwqosRegion]string{
 	SwqosRegionNewYork:    "http://ny.nextblock.io",
-	SwqosRegionFrankfurt:  "http://frankfurt.nextblock.io",
-	SwqosRegionAmsterdam:  "http://amsterdam.nextblock.io",
+	SwqosRegionFrankfurt:  "http://fra.nextblock.io",
+	SwqosRegionAmsterdam:  "http://ams.nextblock.io",
+	SwqosRegionDublin:     "http://dublin.nextblock.io",
 	SwqosRegionSLC:        "http://slc.nextblock.io",
 	SwqosRegionTokyo:      "http://tokyo.nextblock.io",
+	SwqosRegionSingapore:  "http://sgp.nextblock.io",
 	SwqosRegionLondon:     "http://london.nextblock.io",
-	SwqosRegionLosAngeles: "http://singapore.nextblock.io",
-	SwqosRegionDefault:    "http://frankfurt.nextblock.io",
+	SwqosRegionLosAngeles: "http://slc.nextblock.io",
+	SwqosRegionDefault:    "http://fra.nextblock.io",
 }
 
 var zeroSlotEndpoints = map[SwqosRegion]string{
 	SwqosRegionNewYork:    "http://ny.0slot.trade",
 	SwqosRegionFrankfurt:  "http://de2.0slot.trade",
 	SwqosRegionAmsterdam:  "http://ams.0slot.trade",
-	SwqosRegionSLC:        "http://ny.0slot.trade",
+	SwqosRegionDublin:     "http://ams.0slot.trade",
+	SwqosRegionSLC:        "http://la.0slot.trade",
 	SwqosRegionTokyo:      "http://jp.0slot.trade",
+	SwqosRegionSingapore:  "http://jp.0slot.trade",
 	SwqosRegionLondon:     "http://ams.0slot.trade",
 	SwqosRegionLosAngeles: "http://la.0slot.trade",
 	SwqosRegionDefault:    "http://de2.0slot.trade",
@@ -289,10 +302,12 @@ var temporalEndpoints = map[SwqosRegion]string{
 	SwqosRegionNewYork:    "http://ewr1.nozomi.temporal.xyz",
 	SwqosRegionFrankfurt:  "http://fra2.nozomi.temporal.xyz",
 	SwqosRegionAmsterdam:  "http://ams1.nozomi.temporal.xyz",
-	SwqosRegionSLC:        "http://ewr1.nozomi.temporal.xyz",
+	SwqosRegionDublin:     "http://lon1.nozomi.temporal.xyz",
+	SwqosRegionSLC:        "http://lax1.nozomi.temporal.xyz",
 	SwqosRegionTokyo:      "http://tyo1.nozomi.temporal.xyz",
-	SwqosRegionLondon:     "http://sgp1.nozomi.temporal.xyz",
-	SwqosRegionLosAngeles: "http://pit1.nozomi.temporal.xyz",
+	SwqosRegionSingapore:  "http://sgp1.nozomi.temporal.xyz",
+	SwqosRegionLondon:     "http://lon1.nozomi.temporal.xyz",
+	SwqosRegionLosAngeles: "http://lax1.nozomi.temporal.xyz",
 	SwqosRegionDefault:    "http://fra2.nozomi.temporal.xyz",
 }
 
@@ -300,8 +315,10 @@ var bloxrouteEndpoints = map[SwqosRegion]string{
 	SwqosRegionNewYork:    "https://ny.solana.dex.blxrbdn.com",
 	SwqosRegionFrankfurt:  "https://germany.solana.dex.blxrbdn.com",
 	SwqosRegionAmsterdam:  "https://amsterdam.solana.dex.blxrbdn.com",
+	SwqosRegionDublin:     "https://uk.solana.dex.blxrbdn.com",
 	SwqosRegionSLC:        "https://ny.solana.dex.blxrbdn.com",
 	SwqosRegionTokyo:      "https://tokyo.solana.dex.blxrbdn.com",
+	SwqosRegionSingapore:  "https://tokyo.solana.dex.blxrbdn.com",
 	SwqosRegionLondon:     "https://uk.solana.dex.blxrbdn.com",
 	SwqosRegionLosAngeles: "https://la.solana.dex.blxrbdn.com",
 	SwqosRegionDefault:    "https://global.solana.dex.blxrbdn.com",
@@ -311,8 +328,10 @@ var node1Endpoints = map[SwqosRegion]string{
 	SwqosRegionNewYork:    "http://ny.node1.me",
 	SwqosRegionFrankfurt:  "http://fra.node1.me",
 	SwqosRegionAmsterdam:  "http://ams.node1.me",
+	SwqosRegionDublin:     "http://lon.node1.me",
 	SwqosRegionSLC:        "http://ny.node1.me",
 	SwqosRegionTokyo:      "http://tk.node1.me",
+	SwqosRegionSingapore:  "http://tk.node1.me",
 	SwqosRegionLondon:     "http://lon.node1.me",
 	SwqosRegionLosAngeles: "http://ny.node1.me",
 	SwqosRegionDefault:    "http://fra.node1.me",
@@ -322,8 +341,10 @@ var flashBlockEndpoints = map[SwqosRegion]string{
 	SwqosRegionNewYork:    "http://ny.flashblock.trade",
 	SwqosRegionFrankfurt:  "http://fra.flashblock.trade",
 	SwqosRegionAmsterdam:  "http://ams.flashblock.trade",
+	SwqosRegionDublin:     "http://london.flashblock.trade",
 	SwqosRegionSLC:        "http://slc.flashblock.trade",
-	SwqosRegionTokyo:      "http://singapore.flashblock.trade",
+	SwqosRegionTokyo:      "http://tokyo.flashblock.trade",
+	SwqosRegionSingapore:  "http://singapore.flashblock.trade",
 	SwqosRegionLondon:     "http://london.flashblock.trade",
 	SwqosRegionLosAngeles: "http://ny.flashblock.trade",
 	SwqosRegionDefault:    "http://ny.flashblock.trade",
@@ -333,8 +354,10 @@ var blockRazorEndpoints = map[SwqosRegion]string{
 	SwqosRegionNewYork:    "http://newyork.solana.blockrazor.xyz:443/v2/sendTransaction",
 	SwqosRegionFrankfurt:  "http://frankfurt.solana.blockrazor.xyz:443/v2/sendTransaction",
 	SwqosRegionAmsterdam:  "http://amsterdam.solana.blockrazor.xyz:443/v2/sendTransaction",
+	SwqosRegionDublin:     "http://london.solana.blockrazor.xyz:443/v2/sendTransaction",
 	SwqosRegionSLC:        "http://newyork.solana.blockrazor.xyz:443/v2/sendTransaction",
 	SwqosRegionTokyo:      "http://tokyo.solana.blockrazor.xyz:443/v2/sendTransaction",
+	SwqosRegionSingapore:  "http://tokyo.solana.blockrazor.xyz:443/v2/sendTransaction",
 	SwqosRegionLondon:     "http://london.solana.blockrazor.xyz:443/v2/sendTransaction",
 	SwqosRegionLosAngeles: "http://newyork.solana.blockrazor.xyz:443/v2/sendTransaction",
 	SwqosRegionDefault:    "http://frankfurt.solana.blockrazor.xyz:443/v2/sendTransaction",
@@ -344,19 +367,36 @@ var astralaneEndpoints = map[SwqosRegion]string{
 	SwqosRegionNewYork:    "http://ny.gateway.astralane.io/irisb",
 	SwqosRegionFrankfurt:  "http://fr.gateway.astralane.io/irisb",
 	SwqosRegionAmsterdam:  "http://ams.gateway.astralane.io/irisb",
+	SwqosRegionDublin:     "http://ams.gateway.astralane.io/irisb",
 	SwqosRegionSLC:        "http://ny.gateway.astralane.io/irisb",
 	SwqosRegionTokyo:      "http://jp.gateway.astralane.io/irisb",
-	SwqosRegionLondon:     "http://ny.gateway.astralane.io/irisb",
+	SwqosRegionSingapore:  "http://lim.gateway.astralane.io/irisb",
+	SwqosRegionLondon:     "http://ams.gateway.astralane.io/irisb",
 	SwqosRegionLosAngeles: "http://lax.gateway.astralane.io/irisb",
 	SwqosRegionDefault:    "http://lim.gateway.astralane.io/irisb",
+}
+
+var astralaneQuicHosts = map[SwqosRegion]string{
+	SwqosRegionNewYork:    "ny.gateway.astralane.io",
+	SwqosRegionFrankfurt:  "fr.gateway.astralane.io",
+	SwqosRegionAmsterdam:  "ams.gateway.astralane.io",
+	SwqosRegionDublin:     "ams.gateway.astralane.io",
+	SwqosRegionSLC:        "ny.gateway.astralane.io",
+	SwqosRegionTokyo:      "jp.gateway.astralane.io",
+	SwqosRegionSingapore:  "lim.gateway.astralane.io",
+	SwqosRegionLondon:     "ams.gateway.astralane.io",
+	SwqosRegionLosAngeles: "lax.gateway.astralane.io",
+	SwqosRegionDefault:    "lim.gateway.astralane.io",
 }
 
 var stelliumEndpoints = map[SwqosRegion]string{
 	SwqosRegionNewYork:    "http://ewr1.flashrpc.com",
 	SwqosRegionFrankfurt:  "http://fra1.flashrpc.com",
 	SwqosRegionAmsterdam:  "http://ams1.flashrpc.com",
+	SwqosRegionDublin:     "http://lhr1.flashrpc.com",
 	SwqosRegionSLC:        "http://ewr1.flashrpc.com",
 	SwqosRegionTokyo:      "http://tyo1.flashrpc.com",
+	SwqosRegionSingapore:  "http://tyo1.flashrpc.com",
 	SwqosRegionLondon:     "http://lhr1.flashrpc.com",
 	SwqosRegionLosAngeles: "http://ewr1.flashrpc.com",
 	SwqosRegionDefault:    "http://fra1.flashrpc.com",
@@ -366,10 +406,12 @@ var heliusEndpoints = map[SwqosRegion]string{
 	SwqosRegionNewYork:    "http://ewr-sender.helius-rpc.com/fast",
 	SwqosRegionFrankfurt:  "http://fra-sender.helius-rpc.com/fast",
 	SwqosRegionAmsterdam:  "http://ams-sender.helius-rpc.com/fast",
+	SwqosRegionDublin:     "http://lon-sender.helius-rpc.com/fast",
 	SwqosRegionSLC:        "http://slc-sender.helius-rpc.com/fast",
 	SwqosRegionTokyo:      "http://tyo-sender.helius-rpc.com/fast",
+	SwqosRegionSingapore:  "http://sg-sender.helius-rpc.com/fast",
 	SwqosRegionLondon:     "http://lon-sender.helius-rpc.com/fast",
-	SwqosRegionLosAngeles: "http://sg-sender.helius-rpc.com/fast",
+	SwqosRegionLosAngeles: "http://slc-sender.helius-rpc.com/fast",
 	SwqosRegionDefault:    "https://sender.helius-rpc.com/fast",
 }
 
@@ -392,8 +434,8 @@ type SwqosClient interface {
 
 // TradeError represents a trade error
 type TradeError struct {
-	Code       uint32
-	Message    string
+	Code        uint32
+	Message     string
 	Instruction *uint8
 }
 
@@ -542,9 +584,9 @@ func (c *JitoClient) SendTransactions(ctx context.Context, tradeType TradeType, 
 	return []solana.Signature{sig}, nil
 }
 
-func (c *JitoClient) GetTipAccount() string    { return randomTipAccount(jitoTipAccounts) }
-func (c *JitoClient) GetSwqosType() SwqosType  { return SwqosTypeJito }
-func (c *JitoClient) MinTipSol() float64       { return MinTipJito }
+func (c *JitoClient) GetTipAccount() string   { return randomTipAccount(jitoTipAccounts) }
+func (c *JitoClient) GetSwqosType() SwqosType { return SwqosTypeJito }
+func (c *JitoClient) MinTipSol() float64      { return MinTipJito }
 
 // ===== NextBlock Client =====
 
@@ -563,7 +605,7 @@ func (c *NextBlockClient) SendTransaction(ctx context.Context, tradeType TradeTy
 	encoded := base64.StdEncoding.EncodeToString(transaction)
 
 	payload := map[string]interface{}{
-		"transaction":          map[string]interface{}{"content": encoded},
+		"transaction":            map[string]interface{}{"content": encoded},
 		"frontRunningProtection": false,
 	}
 
@@ -612,9 +654,9 @@ func (c *NextBlockClient) SendTransactions(ctx context.Context, tradeType TradeT
 	return sigs, nil
 }
 
-func (c *NextBlockClient) GetTipAccount() string    { return randomTipAccount(nextBlockTipAccounts) }
-func (c *NextBlockClient) GetSwqosType() SwqosType  { return SwqosTypeNextBlock }
-func (c *NextBlockClient) MinTipSol() float64       { return MinTipNextBlock }
+func (c *NextBlockClient) GetTipAccount() string   { return randomTipAccount(nextBlockTipAccounts) }
+func (c *NextBlockClient) GetSwqosType() SwqosType { return SwqosTypeNextBlock }
+func (c *NextBlockClient) MinTipSol() float64      { return MinTipNextBlock }
 
 // ===== ZeroSlot Client =====
 
@@ -673,9 +715,9 @@ func (c *ZeroSlotClient) SendTransactions(ctx context.Context, tradeType TradeTy
 	return sigs, nil
 }
 
-func (c *ZeroSlotClient) GetTipAccount() string    { return randomTipAccount(zeroSlotTipAccounts) }
-func (c *ZeroSlotClient) GetSwqosType() SwqosType  { return SwqosTypeZeroSlot }
-func (c *ZeroSlotClient) MinTipSol() float64       { return MinTipZeroSlot }
+func (c *ZeroSlotClient) GetTipAccount() string   { return randomTipAccount(zeroSlotTipAccounts) }
+func (c *ZeroSlotClient) GetSwqosType() SwqosType { return SwqosTypeZeroSlot }
+func (c *ZeroSlotClient) MinTipSol() float64      { return MinTipZeroSlot }
 
 // ===== Temporal Client =====
 
@@ -734,9 +776,9 @@ func (c *TemporalClient) SendTransactions(ctx context.Context, tradeType TradeTy
 	return sigs, nil
 }
 
-func (c *TemporalClient) GetTipAccount() string    { return randomTipAccount(temporalTipAccounts) }
-func (c *TemporalClient) GetSwqosType() SwqosType  { return SwqosTypeTemporal }
-func (c *TemporalClient) MinTipSol() float64       { return MinTipTemporal }
+func (c *TemporalClient) GetTipAccount() string   { return randomTipAccount(temporalTipAccounts) }
+func (c *TemporalClient) GetSwqosType() SwqosType { return SwqosTypeTemporal }
+func (c *TemporalClient) MinTipSol() float64      { return MinTipTemporal }
 
 // ===== Bloxroute Client =====
 
@@ -755,9 +797,9 @@ func (c *BloxrouteClient) SendTransaction(ctx context.Context, tradeType TradeTy
 	encoded := base64.StdEncoding.EncodeToString(transaction)
 
 	payload := map[string]interface{}{
-		"transaction":      map[string]interface{}{"content": encoded},
+		"transaction":            map[string]interface{}{"content": encoded},
 		"frontRunningProtection": false,
-		"useStakedRPCs":    true,
+		"useStakedRPCs":          true,
 	}
 
 	jsonData, _ := json.Marshal(payload)
@@ -803,9 +845,9 @@ func (c *BloxrouteClient) SendTransactions(ctx context.Context, tradeType TradeT
 	return sigs, nil
 }
 
-func (c *BloxrouteClient) GetTipAccount() string    { return randomTipAccount(bloxrouteTipAccounts) }
-func (c *BloxrouteClient) GetSwqosType() SwqosType  { return SwqosTypeBloxroute }
-func (c *BloxrouteClient) MinTipSol() float64       { return MinTipBloxroute }
+func (c *BloxrouteClient) GetTipAccount() string   { return randomTipAccount(bloxrouteTipAccounts) }
+func (c *BloxrouteClient) GetSwqosType() SwqosType { return SwqosTypeBloxroute }
+func (c *BloxrouteClient) MinTipSol() float64      { return MinTipBloxroute }
 
 // ===== Node1 Client =====
 
@@ -869,9 +911,9 @@ func (c *Node1Client) SendTransactions(ctx context.Context, tradeType TradeType,
 	return sigs, nil
 }
 
-func (c *Node1Client) GetTipAccount() string    { return randomTipAccount(node1TipAccounts) }
-func (c *Node1Client) GetSwqosType() SwqosType  { return SwqosTypeNode1 }
-func (c *Node1Client) MinTipSol() float64       { return MinTipNode1 }
+func (c *Node1Client) GetTipAccount() string   { return randomTipAccount(node1TipAccounts) }
+func (c *Node1Client) GetSwqosType() SwqosType { return SwqosTypeNode1 }
+func (c *Node1Client) MinTipSol() float64      { return MinTipNode1 }
 
 // ===== FlashBlock Client =====
 
@@ -938,9 +980,9 @@ func (c *FlashBlockClient) SendTransactions(ctx context.Context, tradeType Trade
 	return sigs, nil
 }
 
-func (c *FlashBlockClient) GetTipAccount() string    { return randomTipAccount(flashBlockTipAccounts) }
-func (c *FlashBlockClient) GetSwqosType() SwqosType  { return SwqosTypeFlashBlock }
-func (c *FlashBlockClient) MinTipSol() float64       { return MinTipFlashBlock }
+func (c *FlashBlockClient) GetTipAccount() string   { return randomTipAccount(flashBlockTipAccounts) }
+func (c *FlashBlockClient) GetSwqosType() SwqosType { return SwqosTypeFlashBlock }
+func (c *FlashBlockClient) MinTipSol() float64      { return MinTipFlashBlock }
 
 // ===== BlockRazor Client =====
 
@@ -1011,9 +1053,9 @@ func (c *BlockRazorClient) SendTransactions(ctx context.Context, tradeType Trade
 	return sigs, nil
 }
 
-func (c *BlockRazorClient) GetTipAccount() string    { return randomTipAccount(blockRazorTipAccounts) }
-func (c *BlockRazorClient) GetSwqosType() SwqosType  { return SwqosTypeBlockRazor }
-func (c *BlockRazorClient) MinTipSol() float64       { return MinTipBlockRazor }
+func (c *BlockRazorClient) GetTipAccount() string   { return randomTipAccount(blockRazorTipAccounts) }
+func (c *BlockRazorClient) GetSwqosType() SwqosType { return SwqosTypeBlockRazor }
+func (c *BlockRazorClient) MinTipSol() float64      { return MinTipBlockRazor }
 
 // ===== Astralane Client =====
 
@@ -1073,9 +1115,9 @@ func (c *AstralaneClient) SendTransactions(ctx context.Context, tradeType TradeT
 	return sigs, nil
 }
 
-func (c *AstralaneClient) GetTipAccount() string    { return randomTipAccount(astralaneTipAccounts) }
-func (c *AstralaneClient) GetSwqosType() SwqosType  { return SwqosTypeAstralane }
-func (c *AstralaneClient) MinTipSol() float64       { return MinTipAstralane }
+func (c *AstralaneClient) GetTipAccount() string   { return randomTipAccount(astralaneTipAccounts) }
+func (c *AstralaneClient) GetSwqosType() SwqosType { return SwqosTypeAstralane }
+func (c *AstralaneClient) MinTipSol() float64      { return MinTipAstralane }
 
 // ===== Stellium Client =====
 
@@ -1137,9 +1179,9 @@ func (c *StelliumClient) SendTransactions(ctx context.Context, tradeType TradeTy
 	return sigs, nil
 }
 
-func (c *StelliumClient) GetTipAccount() string    { return randomTipAccount(stelliumTipAccounts) }
-func (c *StelliumClient) GetSwqosType() SwqosType  { return SwqosTypeStellium }
-func (c *StelliumClient) MinTipSol() float64       { return MinTipStellium }
+func (c *StelliumClient) GetTipAccount() string   { return randomTipAccount(stelliumTipAccounts) }
+func (c *StelliumClient) GetSwqosType() SwqosType { return SwqosTypeStellium }
+func (c *StelliumClient) MinTipSol() float64      { return MinTipStellium }
 
 // ===== Lightspeed Client =====
 
@@ -1202,9 +1244,9 @@ func (c *LightspeedClient) SendTransactions(ctx context.Context, tradeType Trade
 	return sigs, nil
 }
 
-func (c *LightspeedClient) GetTipAccount() string    { return randomTipAccount(lightspeedTipAccounts) }
-func (c *LightspeedClient) GetSwqosType() SwqosType  { return SwqosTypeLightspeed }
-func (c *LightspeedClient) MinTipSol() float64       { return MinTipLightspeed }
+func (c *LightspeedClient) GetTipAccount() string   { return randomTipAccount(lightspeedTipAccounts) }
+func (c *LightspeedClient) GetSwqosType() SwqosType { return SwqosTypeLightspeed }
+func (c *LightspeedClient) MinTipSol() float64      { return MinTipLightspeed }
 
 // ===== Soyas Client =====
 
@@ -1279,6 +1321,247 @@ func sendViaQUIC(ctx context.Context, addr, serverName string, txBytes []byte) e
 	}
 	return stream.Close()
 }
+
+func hostPortFromHTTP(endpoint string, port string) string {
+	parsed, err := url.Parse(endpoint)
+	if err == nil && parsed.Hostname() != "" {
+		return net.JoinHostPort(parsed.Hostname(), port)
+	}
+	host := endpoint
+	host = strings.TrimPrefix(host, "http://")
+	host = strings.TrimPrefix(host, "https://")
+	if slash := strings.IndexByte(host, '/'); slash >= 0 {
+		host = host[:slash]
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return net.JoinHostPort(host, port)
+}
+
+func newNode1QuicTLSConfig(serverName string) *tls.Config {
+	return &tls.Config{
+		InsecureSkipVerify: true, //nolint:gosec // Node1 QUIC uses provider-managed certificates; matches Rust SDK behavior.
+		NextProtos:         []string{"h3"},
+		MinVersion:         tls.VersionTLS13,
+		ServerName:         serverName,
+	}
+}
+
+// Node1QuicClient reuses one authenticated QUIC connection.
+// Protocol: first bidirectional stream sends a 16-byte UUID API key; each tx uses
+// a new bidirectional stream and expects status u16 + msg length u32 + msg.
+type Node1QuicClient struct {
+	endpoint   string
+	serverName string
+	apiKey     uuid.UUID
+	mu         sync.Mutex
+	conn       *quic.Conn
+}
+
+func NewNode1QuicClient(endpoint, apiKey string) (*Node1QuicClient, error) {
+	parsed, err := uuid.Parse(apiKey)
+	if err != nil {
+		return nil, fmt.Errorf("Node1 QUIC API key must be UUID: %w", err)
+	}
+	serverName := serverNameFromEndpoint(endpoint)
+	return &Node1QuicClient{endpoint: endpoint, serverName: serverName, apiKey: parsed}, nil
+}
+
+func (c *Node1QuicClient) connectLocked(ctx context.Context) error {
+	if c.conn != nil {
+		return nil
+	}
+	conn, err := quic.DialAddr(ctx, c.endpoint, newNode1QuicTLSConfig(c.serverName), &quic.Config{
+		MaxIdleTimeout:  60 * time.Second,
+		KeepAlivePeriod: 15 * time.Second,
+	})
+	if err != nil {
+		return fmt.Errorf("Node1 QUIC dial %s: %w", c.endpoint, err)
+	}
+	stream, err := conn.OpenStreamSync(ctx)
+	if err != nil {
+		conn.CloseWithError(1, "auth stream failed") //nolint:errcheck
+		return fmt.Errorf("Node1 QUIC auth open stream: %w", err)
+	}
+	if _, err = stream.Write(c.apiKey[:]); err != nil {
+		conn.CloseWithError(1, "auth write failed") //nolint:errcheck
+		return fmt.Errorf("Node1 QUIC auth write: %w", err)
+	}
+	if err = stream.Close(); err != nil {
+		conn.CloseWithError(1, "auth close failed") //nolint:errcheck
+		return fmt.Errorf("Node1 QUIC auth close: %w", err)
+	}
+	var reply [1]byte
+	if _, err = io.ReadFull(stream, reply[:]); err != nil {
+		conn.CloseWithError(1, "auth read failed") //nolint:errcheck
+		return fmt.Errorf("Node1 QUIC auth read: %w", err)
+	}
+	if reply[0] != 0 {
+		conn.CloseWithError(1, "auth rejected") //nolint:errcheck
+		return fmt.Errorf("Node1 QUIC auth rejected: %d", reply[0])
+	}
+	c.conn = conn
+	return nil
+}
+
+func (c *Node1QuicClient) sendBytes(ctx context.Context, txBytes []byte) (uint16, string, error) {
+	if len(txBytes) > 1232 {
+		return 0, "", fmt.Errorf("Node1 QUIC transaction too large: %d > 1232", len(txBytes))
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err := c.connectLocked(ctx); err != nil {
+		return 0, "", err
+	}
+	stream, err := c.conn.OpenStreamSync(ctx)
+	if err != nil {
+		c.conn = nil
+		return 0, "", fmt.Errorf("Node1 QUIC open tx stream: %w", err)
+	}
+	if _, err = stream.Write(txBytes); err != nil {
+		return 0, "", fmt.Errorf("Node1 QUIC write tx: %w", err)
+	}
+	if err = stream.Close(); err != nil {
+		return 0, "", fmt.Errorf("Node1 QUIC close tx stream: %w", err)
+	}
+	var header [6]byte
+	if _, err = io.ReadFull(stream, header[:]); err != nil {
+		return 0, "", fmt.Errorf("Node1 QUIC read response header: %w", err)
+	}
+	status := uint16(header[0])<<8 | uint16(header[1])
+	msgLen := int(header[2])<<24 | int(header[3])<<16 | int(header[4])<<8 | int(header[5])
+	msg := make([]byte, msgLen)
+	if msgLen > 0 {
+		if _, err = io.ReadFull(stream, msg); err != nil {
+			return 0, "", fmt.Errorf("Node1 QUIC read response body: %w", err)
+		}
+	}
+	return status, string(msg), nil
+}
+
+func (c *Node1QuicClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	status, msg, err := c.sendBytes(ctx, transaction)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 500, Message: err.Error()}
+	}
+	if status != 200 {
+		return solana.Signature{}, &TradeError{Code: uint32(status), Message: fmt.Sprintf("Node1 QUIC submit failed: %s", msg)}
+	}
+	return solana.Signature{}, nil
+}
+
+func (c *Node1QuicClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	sigs := make([]solana.Signature, 0, len(transactions))
+	for _, tx := range transactions {
+		sig, err := c.SendTransaction(ctx, tradeType, tx, waitConfirmation)
+		if err != nil {
+			return sigs, err
+		}
+		sigs = append(sigs, sig)
+	}
+	return sigs, nil
+}
+
+func (c *Node1QuicClient) GetTipAccount() string   { return randomTipAccount(node1TipAccounts) }
+func (c *Node1QuicClient) GetSwqosType() SwqosType { return SwqosTypeNode1 }
+func (c *Node1QuicClient) MinTipSol() float64      { return MinTipNode1 }
+
+func newAstralaneQuicTLSConfig(apiKey string) (*tls.Config, error) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("generate ecdsa key: %w", err)
+	}
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 62))
+	if err != nil {
+		return nil, fmt.Errorf("generate serial: %w", err)
+	}
+	tmpl := &x509.Certificate{
+		Version:            3,
+		SerialNumber:       serial,
+		Subject:            pkix.Name{CommonName: apiKey},
+		Issuer:             pkix.Name{CommonName: apiKey},
+		SignatureAlgorithm: x509.ECDSAWithSHA256,
+		NotBefore:          time.Now().Add(-time.Hour),
+		NotAfter:           time.Now().Add(365 * 24 * time.Hour),
+		KeyUsage:           x509.KeyUsageDigitalSignature,
+	}
+	derBytes, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &priv.PublicKey, priv)
+	if err != nil {
+		return nil, fmt.Errorf("create certificate: %w", err)
+	}
+	privBytes, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		return nil, fmt.Errorf("marshal private key: %w", err)
+	}
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return nil, fmt.Errorf("X509KeyPair: %w", err)
+	}
+	return &tls.Config{
+		InsecureSkipVerify: true, //nolint:gosec // Astralane server may use self-signed cert; matches Rust SDK behavior.
+		NextProtos:         []string{"astralane-tpu"},
+		Certificates:       []tls.Certificate{cert},
+		MinVersion:         tls.VersionTLS13,
+		ServerName:         "astralane",
+	}, nil
+}
+
+type AstralaneQuicClient struct {
+	endpoint string
+	apiKey   string
+}
+
+func NewAstralaneQuicClient(endpoint, apiKey string) *AstralaneQuicClient {
+	return &AstralaneQuicClient{endpoint: endpoint, apiKey: apiKey}
+}
+
+func (c *AstralaneQuicClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	if len(transaction) > 1232 {
+		return solana.Signature{}, &TradeError{Code: 400, Message: fmt.Sprintf("Astralane QUIC transaction too large: %d > 1232", len(transaction))}
+	}
+	tlsCfg, err := newAstralaneQuicTLSConfig(c.apiKey)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 500, Message: err.Error()}
+	}
+	conn, err := quic.DialAddr(ctx, c.endpoint, tlsCfg, &quic.Config{
+		MaxIdleTimeout:  30 * time.Second,
+		KeepAlivePeriod: 25 * time.Second,
+	})
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Astralane QUIC dial %s: %v", c.endpoint, err)}
+	}
+	defer conn.CloseWithError(0, "done") //nolint:errcheck
+	stream, err := conn.OpenUniStreamSync(ctx)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Astralane QUIC open stream: %v", err)}
+	}
+	if _, err = stream.Write(transaction); err != nil {
+		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Astralane QUIC write: %v", err)}
+	}
+	if err = stream.Close(); err != nil {
+		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Astralane QUIC close: %v", err)}
+	}
+	return solana.Signature{}, nil
+}
+
+func (c *AstralaneQuicClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	sigs := make([]solana.Signature, 0, len(transactions))
+	for _, tx := range transactions {
+		sig, err := c.SendTransaction(ctx, tradeType, tx, waitConfirmation)
+		if err != nil {
+			return sigs, err
+		}
+		sigs = append(sigs, sig)
+	}
+	return sigs, nil
+}
+
+func (c *AstralaneQuicClient) GetTipAccount() string   { return randomTipAccount(astralaneTipAccounts) }
+func (c *AstralaneQuicClient) GetSwqosType() SwqosType { return SwqosTypeAstralane }
+func (c *AstralaneQuicClient) MinTipSol() float64      { return MinTipAstralane }
 
 // SoyasClient submits transactions via QUIC (Solana TPU ALPN "solana-tpu").
 // Server name for TLS SNI: "soyas-landing" (matches Rust SDK).
@@ -1442,8 +1725,8 @@ func (c *HeliusClient) SendTransactions(ctx context.Context, tradeType TradeType
 	return sigs, nil
 }
 
-func (c *HeliusClient) GetTipAccount() string    { return randomTipAccount(heliusTipAccounts) }
-func (c *HeliusClient) GetSwqosType() SwqosType  { return SwqosTypeHelius }
+func (c *HeliusClient) GetTipAccount() string   { return randomTipAccount(heliusTipAccounts) }
+func (c *HeliusClient) GetSwqosType() SwqosType { return SwqosTypeHelius }
 func (c *HeliusClient) MinTipSol() float64 {
 	if c.swqosOnly {
 		return MinTipHelius
@@ -1506,9 +1789,9 @@ func (c *DefaultClient) SendTransactions(ctx context.Context, tradeType TradeTyp
 	return sigs, nil
 }
 
-func (c *DefaultClient) GetTipAccount() string    { return "" }
-func (c *DefaultClient) GetSwqosType() SwqosType  { return SwqosTypeDefault }
-func (c *DefaultClient) MinTipSol() float64       { return MinTipDefault }
+func (c *DefaultClient) GetTipAccount() string   { return "" }
+func (c *DefaultClient) GetSwqosType() SwqosType { return SwqosTypeDefault }
+func (c *DefaultClient) MinTipSol() float64      { return MinTipDefault }
 
 // ===== GetAllSwqosTypes =====
 
@@ -1588,6 +1871,9 @@ func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL stri
 		if config.CustomURL != "" {
 			endpoint = config.CustomURL
 		}
+		if config.Transport != nil && *config.Transport == soltradesdk.SwqosTransportQUIC {
+			return NewNode1QuicClient(hostPortFromHTTP(endpoint, "16666"), config.APIKey)
+		}
 		return NewNode1Client(endpoint, config.APIKey), nil
 
 	case SwqosTypeFlashBlock:
@@ -1617,6 +1903,32 @@ func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL stri
 		}
 		if config.CustomURL != "" {
 			endpoint = config.CustomURL
+		}
+		if config.AstralaneMode != nil {
+			switch *config.AstralaneMode {
+			case soltradesdk.AstralaneTransportPlain:
+				endpoint = strings.Replace(endpoint, "/irisb", "/iris", 1)
+			case soltradesdk.AstralaneTransportQUIC:
+				quicEndpoint := config.CustomURL
+				if quicEndpoint == "" {
+					host, ok := astralaneQuicHosts[config.Region]
+					if !ok {
+						host = astralaneQuicHosts[SwqosRegionDefault]
+					}
+					port := "7000"
+					if config.MEVProtection {
+						port = "9000"
+					}
+					quicEndpoint = net.JoinHostPort(host, port)
+				} else if strings.HasPrefix(quicEndpoint, "http://") || strings.HasPrefix(quicEndpoint, "https://") {
+					port := "7000"
+					if config.MEVProtection {
+						port = "9000"
+					}
+					quicEndpoint = hostPortFromHTTP(quicEndpoint, port)
+				}
+				return NewAstralaneQuicClient(quicEndpoint, config.APIKey), nil
+			}
 		}
 		return NewAstralaneClient(endpoint, config.APIKey), nil
 
@@ -1662,7 +1974,11 @@ func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL stri
 		if config.CustomURL != "" {
 			endpoint = config.CustomURL
 		}
-		return NewHeliusClient(endpoint, config.APIKey, false), nil
+		swqosOnly := false
+		if config.SwqosOnly != nil {
+			swqosOnly = *config.SwqosOnly
+		}
+		return NewHeliusClient(endpoint, config.APIKey, swqosOnly), nil
 
 	case SwqosTypeDefault:
 		return NewDefaultClient(rpcURL), nil

@@ -69,7 +69,7 @@ func MnemonicFromEntropy(entropy []byte) (*Mnemonic, error) {
 	data[len(entropy)] = checksumByte
 
 	// Convert to word indices
-	wordCount := (len(entropy) * 8 + checksumBits) / 11
+	wordCount := (len(entropy)*8 + checksumBits) / 11
 	words := make([]string, wordCount)
 
 	for i := 0; i < wordCount; i++ {
@@ -144,10 +144,10 @@ func (m *Mnemonic) ToSeed(passphrase string) []byte {
 
 // DerivationPath represents a BIP-44 derivation path
 type DerivationPath struct {
-	Purpose    uint32
-	CoinType   uint32
-	Account    uint32
-	Change     uint32
+	Purpose      uint32
+	CoinType     uint32
+	Account      uint32
+	Change       uint32
 	AddressIndex uint32
 }
 
@@ -155,11 +155,11 @@ type DerivationPath struct {
 // m/44'/501'/0'/0'
 func DefaultDerivationPath() *DerivationPath {
 	return &DerivationPath{
-		Purpose:      44 + 0x80000000, // 44' (hardened)
+		Purpose:      44 + 0x80000000,  // 44' (hardened)
 		CoinType:     501 + 0x80000000, // 501' (Solana, hardened)
-		Account:      0 + 0x80000000, // 0' (hardened)
-		Change:       0,               // 0 (non-hardened)
-		AddressIndex: 0,               // 0 (non-hardened)
+		Account:      0 + 0x80000000,   // 0' (hardened)
+		Change:       0,                // 0 (non-hardened)
+		AddressIndex: 0,                // 0 (non-hardened)
 	}
 }
 
@@ -436,8 +436,8 @@ func DeriveKeyPairFromMnemonicAtIndex(phrase, passphrase string, account, index 
 // ===== Errors =====
 
 var (
-	ErrInvalidMnemonic     = errors.New("invalid mnemonic")
+	ErrInvalidMnemonic       = errors.New("invalid mnemonic")
 	ErrInvalidDerivationPath = errors.New("invalid derivation path")
-	ErrInvalidSeed         = errors.New("invalid seed")
-	ErrInvalidKeyPair      = errors.New("invalid key pair")
+	ErrInvalidSeed           = errors.New("invalid seed")
+	ErrInvalidKeyPair        = errors.New("invalid key pair")
 )

@@ -3,10 +3,10 @@ package instruction
 import (
 	"fmt"
 
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/params"
 	"github.com/gagliardetto/solana-go"
-	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
-	"github.com/your-org/sol-trade-sdk-go/pkg/constants"
-	"github.com/your-org/sol-trade-sdk-go/pkg/params"
 )
 
 // InstructionBuilder defines the interface for building trade instructions
@@ -84,11 +84,10 @@ func (b *PumpFunInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([]sol
 		// buy_exact_sol_in
 		copy(buyData[0:8], constants.BUY_EXACT_SOL_IN_DISCRIMINATOR[:])
 		// Amount in
-		leBytes := uint64ToLEBytes(bp.InputAmount)
-		copy(buyData[8:16], leBytes[:])
+		putUint64LE(buyData[8:16], bp.InputAmount)
 		// Min tokens out (with slippage)
 		minTokensOut := calculateMinOutput(0, bp.SlippageBasisPoints) // Simplified
-		copy(buyData[16:24], uint64ToLEBytes(minTokensOut)[:])
+		putUint64LE(buyData[16:24], minTokensOut)
 		// Track volume
 		trackVolume := [2]byte{1, 0}
 		if protocolParams.BondingCurve.IsCashbackCoin {
@@ -99,10 +98,10 @@ func (b *PumpFunInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([]sol
 		// Regular buy
 		copy(buyData[0:8], constants.BUY_DISCRIMINATOR[:])
 		// Token amount
-		copy(buyData[8:16], uint64ToLEBytes(0)[:]) // Simplified
+		putUint64LE(buyData[8:16], 0) // Simplified
 		// Max SOL cost
 		maxSolCost := calculateMaxCost(bp.InputAmount, bp.SlippageBasisPoints)
-		copy(buyData[16:24], uint64ToLEBytes(maxSolCost)[:])
+		putUint64LE(buyData[16:24], maxSolCost)
 	}
 
 	// Build accounts
@@ -122,7 +121,7 @@ func (b *PumpFunInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([]sol
 		// Additional accounts...
 	}
 
-	buyIx := solana.NewInstruction(
+	buyIx := newInstruction(
 		constants.PUMPFUN_PROGRAM_ID,
 		accounts,
 		buyData,
@@ -163,9 +162,9 @@ func (b *PumpFunInstructionBuilder) BuildSellInstructions(bp *BuildParams) ([]so
 	// Build sell instruction data
 	sellData := make([]byte, 24)
 	copy(sellData[0:8], constants.SELL_DISCRIMINATOR[:])
-	copy(sellData[8:16], uint64ToLEBytes(bp.InputAmount)[:])
+	putUint64LE(sellData[8:16], bp.InputAmount)
 	minSolOutput := calculateMinOutput(0, bp.SlippageBasisPoints) // Simplified
-	copy(sellData[16:24], uint64ToLEBytes(minSolOutput)[:])
+	putUint64LE(sellData[16:24], minSolOutput)
 
 	// Build accounts
 	accounts := []solana.AccountMeta{
@@ -193,7 +192,7 @@ func (b *PumpFunInstructionBuilder) BuildSellInstructions(bp *BuildParams) ([]so
 		})
 	}
 
-	sellIx := solana.NewInstruction(
+	sellIx := newInstruction(
 		constants.PUMPFUN_PROGRAM_ID,
 		accounts,
 		sellData,
@@ -298,7 +297,7 @@ func (b *PumpSwapInstructionBuilder) buildSwapInstruction(bp *BuildParams, param
 		// Add more accounts...
 	}
 
-	return solana.NewInstruction(constants.PUMPSWAP_PROGRAM_ID, accounts, data)
+	return newInstruction(constants.PUMPSWAP_PROGRAM_ID, accounts, data)
 }
 
 // Helper functions
@@ -314,6 +313,11 @@ func uint64ToLEBytes(v uint64) [8]byte {
 		byte(v >> 48),
 		byte(v >> 56),
 	}
+}
+
+func putUint64LE(dst []byte, v uint64) {
+	leBytes := uint64ToLEBytes(v)
+	copy(dst, leBytes[:])
 }
 
 func calculateMinOutput(amount, slippage uint64) uint64 {
@@ -339,7 +343,7 @@ func CreateInstructionBuilder(dexType soltradesdk.DexType) (InstructionBuilder, 
 		return NewPumpSwapInstructionBuilder(), nil
 	case soltradesdk.DexTypeBonk:
 		return NewBonkInstructionBuilder(), nil
-	case soltradesdk.DexTypeRaydiumCPMM:
+	case soltradesdk.DexTypeRaydiumCpmm:
 		return NewRaydiumCPMMInstructionBuilder(), nil
 	case soltradesdk.DexTypeRaydiumAmmV4:
 		return NewRaydiumAmmV4InstructionBuilder(), nil
@@ -385,7 +389,7 @@ func (b *BonkInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([]solana
 			bp.Payer,
 			bp.Payer,
 			bp.OutputMint,
-			protocolParams.TokenProgram,
+			constants.TOKEN_PROGRAM,
 		)
 		instructions = append(instructions, createATAIx)
 	}
@@ -393,9 +397,12 @@ func (b *BonkInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([]solana
 	// Build instruction data
 	data := make([]byte, 24)
 	copy(data[0:8], BONK_BUY_DISCRIMINATOR)
-	copy(data[8:16], uint64ToLEBytes(bp.InputAmount)[:])
+	putUint64LE(data[8:16], bp.InputAmount)
 	minAmountOut := calculateMinOutput(0, bp.SlippageBasisPoints)
-	copy(data[16:24], uint64ToLEBytes(minAmountOut)[:])
+	putUint64LE(data[16:24], minAmountOut)
+
+	userBaseTokenAccount := GetAssociatedTokenAddress(bp.Payer, bp.OutputMint, protocolParams.MintTokenProgram)
+	userQuoteTokenAccount := GetAssociatedTokenAddress(bp.Payer, bp.InputMint, constants.TOKEN_PROGRAM)
 
 	// Build accounts
 	accounts := []solana.AccountMeta{
@@ -408,14 +415,14 @@ func (b *BonkInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([]solana
 		{PublicKey: protocolParams.PlatformAssociatedAccount, IsSigner: false, IsWritable: true},
 		{PublicKey: protocolParams.CreatorAssociatedAccount, IsSigner: false, IsWritable: true},
 		{PublicKey: protocolParams.GlobalConfig, IsSigner: false, IsWritable: false},
-		{PublicKey: protocolParams.UserBaseTokenAccount, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.UserQuoteTokenAccount, IsSigner: false, IsWritable: true},
+		{PublicKey: userBaseTokenAccount, IsSigner: false, IsWritable: true},
+		{PublicKey: userQuoteTokenAccount, IsSigner: false, IsWritable: true},
 		{PublicKey: bp.Payer, IsSigner: true, IsWritable: true},
 		{PublicKey: constants.TOKEN_PROGRAM, IsSigner: false, IsWritable: false},
 		{PublicKey: constants.SYSTEM_PROGRAM, IsSigner: false, IsWritable: false},
 	}
 
-	buyIx := solana.NewInstruction(constants.BONK_PROGRAM_ID, accounts, data)
+	buyIx := newInstruction(constants.BONK_PROGRAM_ID, accounts, data)
 	instructions = append(instructions, buyIx)
 
 	return instructions, nil
@@ -437,9 +444,12 @@ func (b *BonkInstructionBuilder) BuildSellInstructions(bp *BuildParams) ([]solan
 	// Build instruction data
 	data := make([]byte, 24)
 	copy(data[0:8], BONK_SELL_DISCRIMINATOR)
-	copy(data[8:16], uint64ToLEBytes(bp.InputAmount)[:])
+	putUint64LE(data[8:16], bp.InputAmount)
 	minAmountOut := calculateMinOutput(0, bp.SlippageBasisPoints)
-	copy(data[16:24], uint64ToLEBytes(minAmountOut)[:])
+	putUint64LE(data[16:24], minAmountOut)
+
+	userBaseTokenAccount := GetAssociatedTokenAddress(bp.Payer, bp.InputMint, protocolParams.MintTokenProgram)
+	userQuoteTokenAccount := GetAssociatedTokenAddress(bp.Payer, bp.OutputMint, constants.TOKEN_PROGRAM)
 
 	// Build accounts (swap mints for sell)
 	accounts := []solana.AccountMeta{
@@ -452,14 +462,14 @@ func (b *BonkInstructionBuilder) BuildSellInstructions(bp *BuildParams) ([]solan
 		{PublicKey: protocolParams.PlatformAssociatedAccount, IsSigner: false, IsWritable: true},
 		{PublicKey: protocolParams.CreatorAssociatedAccount, IsSigner: false, IsWritable: true},
 		{PublicKey: protocolParams.GlobalConfig, IsSigner: false, IsWritable: false},
-		{PublicKey: protocolParams.UserBaseTokenAccount, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.UserQuoteTokenAccount, IsSigner: false, IsWritable: true},
+		{PublicKey: userBaseTokenAccount, IsSigner: false, IsWritable: true},
+		{PublicKey: userQuoteTokenAccount, IsSigner: false, IsWritable: true},
 		{PublicKey: bp.Payer, IsSigner: true, IsWritable: true},
 		{PublicKey: constants.TOKEN_PROGRAM, IsSigner: false, IsWritable: false},
 		{PublicKey: constants.SYSTEM_PROGRAM, IsSigner: false, IsWritable: false},
 	}
 
-	sellIx := solana.NewInstruction(constants.BONK_PROGRAM_ID, accounts, data)
+	sellIx := newInstruction(constants.BONK_PROGRAM_ID, accounts, data)
 	instructions = append(instructions, sellIx)
 
 	return instructions, nil
@@ -482,7 +492,7 @@ var (
 
 // BuildBuyInstructions builds buy instructions for Raydium CPMM
 func (b *RaydiumCPMMInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([]solana.Instruction, error) {
-	protocolParams, ok := bp.ProtocolParams.(*params.RaydiumCPMMParams)
+	protocolParams, ok := bp.ProtocolParams.(*params.RaydiumCpmmParams)
 	if !ok {
 		return nil, soltradesdk.ErrInvalidProtocolParams
 	}
@@ -499,7 +509,7 @@ func (b *RaydiumCPMMInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([
 			bp.Payer,
 			bp.Payer,
 			bp.OutputMint,
-			protocolParams.TokenProgram,
+			protocolParams.QuoteTokenProgram,
 		)
 		instructions = append(instructions, createATAIx)
 	}
@@ -507,28 +517,30 @@ func (b *RaydiumCPMMInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([
 	// Build instruction data
 	data := make([]byte, 24)
 	copy(data[0:8], RAYDIUM_CPMM_SWAP_DISCRIMINATOR)
-	copy(data[8:16], uint64ToLEBytes(bp.InputAmount)[:])
+	putUint64LE(data[8:16], bp.InputAmount)
 	minAmountOut := calculateMinOutput(0, bp.SlippageBasisPoints)
-	copy(data[16:24], uint64ToLEBytes(minAmountOut)[:])
+	putUint64LE(data[16:24], minAmountOut)
+
+	inputTokenAccount := GetAssociatedTokenAddress(bp.Payer, bp.InputMint, protocolParams.BaseTokenProgram)
+	outputTokenAccount := GetAssociatedTokenAddress(bp.Payer, bp.OutputMint, protocolParams.QuoteTokenProgram)
 
 	// Build accounts
 	accounts := []solana.AccountMeta{
 		{PublicKey: bp.Payer, IsSigner: true, IsWritable: true},
-		{PublicKey: protocolParams.Authority, IsSigner: false, IsWritable: false},
 		{PublicKey: protocolParams.AmmConfig, IsSigner: false, IsWritable: false},
 		{PublicKey: protocolParams.PoolState, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.InputTokenAccount, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.OutputTokenAccount, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.InputVault, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.OutputVault, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.InputTokenProgram, IsSigner: false, IsWritable: false},
-		{PublicKey: protocolParams.OutputTokenProgram, IsSigner: false, IsWritable: false},
+		{PublicKey: inputTokenAccount, IsSigner: false, IsWritable: true},
+		{PublicKey: outputTokenAccount, IsSigner: false, IsWritable: true},
+		{PublicKey: protocolParams.BaseVault, IsSigner: false, IsWritable: true},
+		{PublicKey: protocolParams.QuoteVault, IsSigner: false, IsWritable: true},
+		{PublicKey: protocolParams.BaseTokenProgram, IsSigner: false, IsWritable: false},
+		{PublicKey: protocolParams.QuoteTokenProgram, IsSigner: false, IsWritable: false},
 		{PublicKey: bp.InputMint, IsSigner: false, IsWritable: false},
 		{PublicKey: bp.OutputMint, IsSigner: false, IsWritable: false},
 		{PublicKey: protocolParams.ObservationState, IsSigner: false, IsWritable: true},
 	}
 
-	swapIx := solana.NewInstruction(constants.RAYDIUM_CPMM_PROGRAM_ID, accounts, data)
+	swapIx := newInstruction(constants.RAYDIUM_CPMM_PROGRAM_ID, accounts, data)
 	instructions = append(instructions, swapIx)
 
 	return instructions, nil
@@ -574,7 +586,7 @@ func (b *RaydiumAmmV4InstructionBuilder) BuildBuyInstructions(bp *BuildParams) (
 			bp.Payer,
 			bp.Payer,
 			bp.OutputMint,
-			protocolParams.TokenProgram,
+			constants.TOKEN_PROGRAM,
 		)
 		instructions = append(instructions, createATAIx)
 	}
@@ -582,32 +594,26 @@ func (b *RaydiumAmmV4InstructionBuilder) BuildBuyInstructions(bp *BuildParams) (
 	// Build instruction data
 	data := make([]byte, 24)
 	copy(data[0:8], RAYDIUM_AMM_V4_SWAP_DISCRIMINATOR)
-	copy(data[8:16], uint64ToLEBytes(bp.InputAmount)[:])
+	putUint64LE(data[8:16], bp.InputAmount)
 	minAmountOut := calculateMinOutput(0, bp.SlippageBasisPoints)
-	copy(data[16:24], uint64ToLEBytes(minAmountOut)[:])
+	putUint64LE(data[16:24], minAmountOut)
 
-	// Build accounts (17 accounts for Raydium AMM V4 swap)
+	userSourceTokenAccount := GetAssociatedTokenAddress(bp.Payer, bp.InputMint, constants.TOKEN_PROGRAM)
+	userDestinationTokenAccount := GetAssociatedTokenAddress(bp.Payer, bp.OutputMint, constants.TOKEN_PROGRAM)
+
+	// Build accounts for Raydium AMM V4 swap.
 	accounts := []solana.AccountMeta{
 		{PublicKey: protocolParams.Amm, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.AmmAuthority, IsSigner: false, IsWritable: false},
-		{PublicKey: protocolParams.AmmOpenOrders, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.AmmTargetOrders, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.PoolCoinTokenAccount, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.PoolPcTokenAccount, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.SerumProgram, IsSigner: false, IsWritable: false},
-		{PublicKey: protocolParams.SerumMarket, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.SerumBids, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.SerumAsks, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.SerumEventQueue, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.SerumCoinVaultAccount, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.SerumPcVaultAccount, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.SerumVaultSigner, IsSigner: false, IsWritable: false},
-		{PublicKey: protocolParams.UserSourceTokenAccount, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.UserDestinationTokenAccount, IsSigner: false, IsWritable: true},
+		{PublicKey: protocolParams.TokenCoin, IsSigner: false, IsWritable: true},
+		{PublicKey: protocolParams.TokenPc, IsSigner: false, IsWritable: true},
+		{PublicKey: protocolParams.CoinMint, IsSigner: false, IsWritable: false},
+		{PublicKey: protocolParams.PcMint, IsSigner: false, IsWritable: false},
+		{PublicKey: userSourceTokenAccount, IsSigner: false, IsWritable: true},
+		{PublicKey: userDestinationTokenAccount, IsSigner: false, IsWritable: true},
 		{PublicKey: bp.Payer, IsSigner: true, IsWritable: false},
 	}
 
-	swapIx := solana.NewInstruction(constants.RAYDIUM_AMM_V4_PROGRAM_ID, accounts, data)
+	swapIx := newInstruction(constants.RAYDIUM_AMM_V4_PROGRAM_ID, accounts, data)
 	instructions = append(instructions, swapIx)
 
 	return instructions, nil
@@ -661,9 +667,12 @@ func (b *MeteoraDammV2InstructionBuilder) BuildBuyInstructions(bp *BuildParams) 
 	// Build instruction data
 	data := make([]byte, 24)
 	copy(data[0:8], METEORA_DAMM_V2_SWAP_DISCRIMINATOR)
-	copy(data[8:16], uint64ToLEBytes(bp.InputAmount)[:])
+	putUint64LE(data[8:16], bp.InputAmount)
 	minAmountOut := calculateMinOutput(0, bp.SlippageBasisPoints)
-	copy(data[16:24], uint64ToLEBytes(minAmountOut)[:])
+	putUint64LE(data[16:24], minAmountOut)
+
+	userSourceTokenAccount := GetAssociatedTokenAddress(bp.Payer, bp.InputMint, protocolParams.TokenAProgram)
+	userDestinationTokenAccount := GetAssociatedTokenAddress(bp.Payer, bp.OutputMint, protocolParams.TokenBProgram)
 
 	// Build accounts
 	accounts := []solana.AccountMeta{
@@ -673,14 +682,14 @@ func (b *MeteoraDammV2InstructionBuilder) BuildBuyInstructions(bp *BuildParams) 
 		{PublicKey: protocolParams.TokenBVault, IsSigner: false, IsWritable: true},
 		{PublicKey: bp.InputMint, IsSigner: false, IsWritable: false},
 		{PublicKey: bp.OutputMint, IsSigner: false, IsWritable: false},
-		{PublicKey: protocolParams.UserSourceTokenAccount, IsSigner: false, IsWritable: true},
-		{PublicKey: protocolParams.UserDestinationTokenAccount, IsSigner: false, IsWritable: true},
+		{PublicKey: userSourceTokenAccount, IsSigner: false, IsWritable: true},
+		{PublicKey: userDestinationTokenAccount, IsSigner: false, IsWritable: true},
 		{PublicKey: protocolParams.TokenAProgram, IsSigner: false, IsWritable: false},
 		{PublicKey: protocolParams.TokenBProgram, IsSigner: false, IsWritable: false},
 		{PublicKey: constants.SYSTEM_PROGRAM, IsSigner: false, IsWritable: false},
 	}
 
-	swapIx := solana.NewInstruction(constants.METEORA_DAMM_V2_PROGRAM_ID, accounts, data)
+	swapIx := newInstruction(constants.METEORA_DAMM_V2_PROGRAM_ID, accounts, data)
 	instructions = append(instructions, swapIx)
 
 	return instructions, nil

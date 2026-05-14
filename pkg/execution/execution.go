@@ -32,9 +32,7 @@ func (b *BranchOptimizer) Unlikely(condition bool) bool {
 // PrefetchReadData triggers CPU prefetch for soon-to-be-accessed data
 // This is a no-op on non-x86_64 architectures
 func (b *BranchOptimizer) PrefetchReadData(ptr unsafe.Pointer) {
-	// Go doesn't have direct prefetch intrinsics
-	// On x86_64, this would use _mm_prefetch
-	// For now, this is a placeholder for the pattern
+	_ = ptr
 }
 
 // ===== Prefetch Helper =====
@@ -62,6 +60,9 @@ func (p *Prefetch) Instructions(instructions []Instruction) {
 
 // Pubkey prefetches a pubkey into cache
 func (p *Prefetch) Pubkey(pubkey []byte) {
+	if len(pubkey) == 0 {
+		return
+	}
 	_ = pubkey[0] // Touch to load into cache
 }
 
@@ -176,8 +177,8 @@ type Instruction struct {
 
 // AccountMeta represents account metadata
 type AccountMeta struct {
-	Pubkey  []byte
-	IsSigner bool
+	Pubkey     []byte
+	IsSigner   bool
 	IsWritable bool
 }
 

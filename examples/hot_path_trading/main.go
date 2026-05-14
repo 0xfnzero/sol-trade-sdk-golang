@@ -1,3 +1,6 @@
+//go:build live_examples
+// +build live_examples
+
 package main
 
 import (
@@ -6,8 +9,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/your-org/sol-trade-sdk-go/hotpath"
-	"github.com/your-org/sol-trade-sdk-go/swqos"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/hotpath"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/swqos"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -15,12 +18,12 @@ import (
 // HotPathTrader demonstrates zero-RPC trading execution
 // All data is prefetched before the hot path
 type HotPathTrader struct {
-	executor       *hotpath.HotPathExecutor
-	state          *hotpath.HotPathState
-	accountCache   *hotpath.AccountStateCache
-	poolCache      *hotpath.PoolStateCache
-	rpcClient      *rpc.Client
-	swqosClients   []swqos.SwqosClient
+	executor     *hotpath.HotPathExecutor
+	state        *hotpath.HotPathState
+	accountCache *hotpath.AccountStateCache
+	poolCache    *hotpath.PoolStateCache
+	rpcClient    *rpc.Client
+	swqosClients []swqos.SwqosClient
 }
 
 // NewHotPathTrader creates a new hot path trader
@@ -314,8 +317,8 @@ func main() {
 		payer,
 		mint,
 		bondingCurve,
-		1000000,           // amount
-		1000000000,         // 1 SOL max cost
+		1000000,    // amount
+		1000000000, // 1 SOL max cost
 		tokenAccount,
 	)
 	if err != nil {

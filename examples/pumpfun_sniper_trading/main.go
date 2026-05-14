@@ -1,3 +1,6 @@
+//go:build live_examples
+// +build live_examples
+
 // PumpFun Sniper Trading Example
 //
 // This example demonstrates how to snipe new tokens on PumpFun.
@@ -11,9 +14,9 @@ import (
 	"log"
 	"os"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go"
-	"github.com/your-org/sol-trade-sdk-go/pkg/common"
-	"github.com/your-org/sol-trade-sdk-go/pkg/trading"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -81,30 +84,30 @@ func pumpfunSniperTrade(
 	buySOLAmount := uint64(100_000) // 0.0001 SOL
 
 	buyParams := &trading.TradeBuyParams{
-		DexType:              soltradesdk.DexTypePumpFun,
-		InputTokenType:       soltradesdk.TradeTokenTypeSOL,
-		Mint:                 mint,
-		InputTokenAmount:     buySOLAmount,
-		SlippageBasisPoints:  &slippageBasisPoints,
-		RecentBlockhash:      &recentBlockhash,
-		WaitConfirmed:        true,
-		CreateInputTokenATA:  true,
-		CloseInputTokenATA:   true,
-		CreateMintATA:        true,
-		GasFeeStrategy:       gasFeeStrategy,
+		DexType:             soltradesdk.DexTypePumpFun,
+		InputTokenType:      soltradesdk.TradeTokenTypeSOL,
+		Mint:                mint,
+		InputTokenAmount:    buySOLAmount,
+		SlippageBasisPoints: &slippageBasisPoints,
+		RecentBlockhash:     &recentBlockhash,
+		WaitConfirmed:       true,
+		CreateInputTokenATA: true,
+		CloseInputTokenATA:  true,
+		CreateMintATA:       true,
+		GasFeeStrategy:      gasFeeStrategy,
 		ExtensionParams: &trading.PumpFunParams{
-			BondingCurve:         bondingCurve,
+			BondingCurve:           bondingCurve,
 			AssociatedBondingCurve: associatedBondingCurve,
-			Mint:                 mint,
-			Creator:              creator,
-			CreatorVault:         creatorVault,
-			VirtualTokenReserves: virtualTokenReserves,
-			VirtualSolReserves:   virtualSolReserves,
-			RealTokenReserves:    realTokenReserves,
-			RealSolReserves:      realSolReserves,
-			HasCreator:           true,
-			FeeRecipient:         feeRecipient,
-			IsCashbackCoin:       isCashbackCoin,
+			Mint:                   mint,
+			Creator:                creator,
+			CreatorVault:           creatorVault,
+			VirtualTokenReserves:   virtualTokenReserves,
+			VirtualSolReserves:     virtualSolReserves,
+			RealTokenReserves:      realTokenReserves,
+			RealSolReserves:        realSolReserves,
+			HasCreator:             true,
+			FeeRecipient:           feeRecipient,
+			IsCashbackCoin:         isCashbackCoin,
 		},
 	}
 
@@ -135,18 +138,18 @@ func pumpfunSniperTrade(
 		CloseOutputTokenATA:  true,
 		GasFeeStrategy:       gasFeeStrategy,
 		ExtensionParams: &trading.PumpFunParams{
-			BondingCurve:         bondingCurve,
+			BondingCurve:           bondingCurve,
 			AssociatedBondingCurve: associatedBondingCurve,
-			Mint:                 mint,
-			Creator:              creator,
-			CreatorVault:         creatorVault,
-			VirtualTokenReserves: virtualTokenReserves,
-			VirtualSolReserves:   virtualSolReserves,
-			RealTokenReserves:    realTokenReserves,
-			RealSolReserves:      realSolReserves,
-			HasCreator:           true,
-			FeeRecipient:         feeRecipient,
-			IsCashbackCoin:       isCashbackCoin,
+			Mint:                   mint,
+			Creator:                creator,
+			CreatorVault:           creatorVault,
+			VirtualTokenReserves:   virtualTokenReserves,
+			VirtualSolReserves:     virtualSolReserves,
+			RealTokenReserves:      realTokenReserves,
+			RealSolReserves:        realSolReserves,
+			HasCreator:             true,
+			FeeRecipient:           feeRecipient,
+			IsCashbackCoin:         isCashbackCoin,
 		},
 	}
 

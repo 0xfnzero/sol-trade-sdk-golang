@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
@@ -30,18 +31,24 @@ func (t *TradingUtils) GetMultiTokenBalances(
 	token1Vault solana.PublicKey,
 ) (uint64, uint64, error) {
 	// Get token0 balance
-	token0Result, err := t.client.GetTokenAccountBalance(ctx, token0Vault.String(), rpc.CommitmentConfirmed)
+	token0Result, err := t.client.GetTokenAccountBalance(ctx, token0Vault, rpc.CommitmentConfirmed)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to get token0 balance: %w", err)
 	}
-	token0Amount := token0Result.Value.Amount
+	token0Amount, err := strconv.ParseUint(token0Result.Value.Amount, 10, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to parse token0 balance: %w", err)
+	}
 
 	// Get token1 balance
-	token1Result, err := t.client.GetTokenAccountBalance(ctx, token1Vault.String(), rpc.CommitmentConfirmed)
+	token1Result, err := t.client.GetTokenAccountBalance(ctx, token1Vault, rpc.CommitmentConfirmed)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to get token1 balance: %w", err)
 	}
-	token1Amount := token1Result.Value.Amount
+	token1Amount, err := strconv.ParseUint(token1Result.Value.Amount, 10, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to parse token1 balance: %w", err)
+	}
 
 	return token0Amount, token1Amount, nil
 }
@@ -77,12 +84,12 @@ func (t *TradingUtils) GetTokenBalanceWithOptions(
 		return 0, err
 	}
 
-	result, err := t.client.GetTokenAccountBalance(ctx, ata.String(), rpc.CommitmentConfirmed)
+	result, err := t.client.GetTokenAccountBalance(ctx, ata, rpc.CommitmentConfirmed)
 	if err != nil {
 		return 0, err
 	}
 
-	return result.Value.Amount, nil
+	return strconv.ParseUint(result.Value.Amount, 10, 64)
 }
 
 // GetSolBalance gets SOL balance for an account.
@@ -91,7 +98,7 @@ func (t *TradingUtils) GetSolBalance(
 	ctx context.Context,
 	account solana.PublicKey,
 ) (uint64, error) {
-	result, err := t.client.GetBalance(ctx, account.String(), rpc.CommitmentConfirmed)
+	result, err := t.client.GetBalance(ctx, account, rpc.CommitmentConfirmed)
 	if err != nil {
 		return 0, err
 	}
@@ -120,8 +127,8 @@ func (t *TradingUtils) TransferSOL(
 
 	// Create transfer instruction
 	transferIx := system.NewTransferInstructionBuilder().
-		SetFromPubkey(payer.PublicKey()).
-		SetToPubkey(receiveWallet).
+		SetFundingAccount(payer.PublicKey()).
+		SetRecipientAccount(receiveWallet).
 		SetLamports(amount).
 		Build()
 
@@ -173,7 +180,7 @@ func (t *TradingUtils) CloseTokenAccount(
 	}
 
 	// Check if account exists
-	accountInfo, err := t.client.GetAccountInfo(ctx, ata.String())
+	accountInfo, err := t.client.GetAccountInfo(ctx, ata)
 	if err != nil || accountInfo == nil || accountInfo.Value == nil {
 		// Account doesn't exist, return success
 		return solana.Signature{}, nil

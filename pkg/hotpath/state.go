@@ -209,14 +209,14 @@ func (h *HotPathState) GetMetrics() (count, errors uint64, lastTime time.Time) {
 
 // AccountState holds cached account state
 type AccountState struct {
-	Pubkey    solana.PublicKey
-	Data      []byte
-	Lamports  uint64
-	Owner     solana.PublicKey
+	Pubkey     solana.PublicKey
+	Data       []byte
+	Lamports   uint64
+	Owner      solana.PublicKey
 	Executable bool
-	RentEpoch uint64
-	FetchedAt time.Time
-	Slot      uint64
+	RentEpoch  uint64
+	FetchedAt  time.Time
+	Slot       uint64
 }
 
 // AccountStateCache caches account states for hot path access
@@ -398,8 +398,8 @@ type TradingContext struct {
 	LastValidHeight uint64
 
 	// Account states
-	TokenAccounts  map[string]*AccountState
-	PoolStates     map[string]*PoolState
+	TokenAccounts map[string]*AccountState
+	PoolStates    map[string]*PoolState
 
 	// Creation time for timeout checks
 	CreatedAt time.Time

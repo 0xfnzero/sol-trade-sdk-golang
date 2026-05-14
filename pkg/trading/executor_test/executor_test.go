@@ -3,9 +3,9 @@ package trading_test
 import (
 	"testing"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
-	"github.com/your-org/sol-trade-sdk-go/pkg/common"
-	"github.com/your-org/sol-trade-sdk-go/pkg/trading"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
 )
 
 func TestGasFeeStrategy_Create(t *testing.T) {
@@ -260,8 +260,8 @@ func TestTradeExecutor_DefaultOptions(t *testing.T) {
 		t.Errorf("expected MaxRetries 3, got %d", opts.MaxRetries)
 	}
 
-	if opts.ParallelSubmit {
-		t.Error("expected ParallelSubmit to be false by default")
+	if !opts.ParallelSubmit {
+		t.Error("expected ParallelSubmit to be true by default")
 	}
 }
 

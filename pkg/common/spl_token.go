@@ -257,6 +257,18 @@ type TokenInstructionBuilder struct {
 	programID solana.PublicKey
 }
 
+func newAccountMetaSlice(accounts ...*solana.AccountMeta) solana.AccountMetaSlice {
+	return solana.AccountMetaSlice(accounts)
+}
+
+func newGenericInstruction(
+	programID solana.PublicKey,
+	accounts solana.AccountMetaSlice,
+	data []byte,
+) *solana.GenericInstruction {
+	return solana.NewInstruction(programID, accounts, data)
+}
+
 // TokenInstructionType represents the type of token instruction
 type TokenInstructionType uint8
 
@@ -327,7 +339,7 @@ func (b *TokenInstructionBuilder) BuildTransfer(
 	data[0] = byte(TokenInstructionTransfer)
 	binary.LittleEndian.PutUint64(data[1:], amount)
 
-	accounts := solana.NewAccountMetaSlice(
+	accounts := newAccountMetaSlice(
 		solana.NewAccountMeta(source, false, true),
 		solana.NewAccountMeta(destination, false, true),
 		solana.NewAccountMeta(owner, len(signers) == 0, false),
@@ -337,7 +349,7 @@ func (b *TokenInstructionBuilder) BuildTransfer(
 		accounts.Append(solana.NewAccountMeta(signer, true, false))
 	}
 
-	return solana.NewGenericInstruction(b.programID, accounts, data)
+	return newGenericInstruction(b.programID, accounts, data)
 }
 
 // BuildTransferChecked creates a checked transfer instruction
@@ -352,7 +364,7 @@ func (b *TokenInstructionBuilder) BuildTransferChecked(
 	binary.LittleEndian.PutUint64(data[1:9], amount)
 	data[9] = decimals
 
-	accounts := solana.NewAccountMetaSlice(
+	accounts := newAccountMetaSlice(
 		solana.NewAccountMeta(source, false, true),
 		solana.NewAccountMeta(mint, false, false),
 		solana.NewAccountMeta(destination, false, true),
@@ -363,7 +375,7 @@ func (b *TokenInstructionBuilder) BuildTransferChecked(
 		accounts.Append(solana.NewAccountMeta(signer, true, false))
 	}
 
-	return solana.NewGenericInstruction(b.programID, accounts, data)
+	return newGenericInstruction(b.programID, accounts, data)
 }
 
 // BuildInitializeAccount creates an initialize account instruction
@@ -372,14 +384,14 @@ func (b *TokenInstructionBuilder) BuildInitializeAccount(
 ) *solana.GenericInstruction {
 	data := []byte{byte(TokenInstructionInitializeAccount)}
 
-	accounts := solana.NewAccountMetaSlice(
+	accounts := newAccountMetaSlice(
 		solana.NewAccountMeta(account, false, true),
 		solana.NewAccountMeta(mint, false, false),
 		solana.NewAccountMeta(owner, false, false),
 		solana.NewAccountMeta(solana.SysVarRentPubkey, false, false),
 	)
 
-	return solana.NewGenericInstruction(b.programID, accounts, data)
+	return newGenericInstruction(b.programID, accounts, data)
 }
 
 // BuildCloseAccount creates a close account instruction
@@ -389,7 +401,7 @@ func (b *TokenInstructionBuilder) BuildCloseAccount(
 ) *solana.GenericInstruction {
 	data := []byte{byte(TokenInstructionCloseAccount)}
 
-	accounts := solana.NewAccountMetaSlice(
+	accounts := newAccountMetaSlice(
 		solana.NewAccountMeta(account, false, true),
 		solana.NewAccountMeta(destination, false, true),
 		solana.NewAccountMeta(owner, len(signers) == 0, false),
@@ -399,7 +411,7 @@ func (b *TokenInstructionBuilder) BuildCloseAccount(
 		accounts.Append(solana.NewAccountMeta(signer, true, false))
 	}
 
-	return solana.NewGenericInstruction(b.programID, accounts, data)
+	return newGenericInstruction(b.programID, accounts, data)
 }
 
 // BuildSyncNative creates a sync native instruction (for WSOL)
@@ -408,11 +420,11 @@ func (b *TokenInstructionBuilder) BuildSyncNative(
 ) *solana.GenericInstruction {
 	data := []byte{byte(TokenInstructionSyncNative)}
 
-	accounts := solana.NewAccountMetaSlice(
+	accounts := newAccountMetaSlice(
 		solana.NewAccountMeta(account, false, true),
 	)
 
-	return solana.NewGenericInstruction(b.programID, accounts, data)
+	return newGenericInstruction(b.programID, accounts, data)
 }
 
 // BuildApprove creates an approve instruction
@@ -425,7 +437,7 @@ func (b *TokenInstructionBuilder) BuildApprove(
 	data[0] = byte(TokenInstructionApprove)
 	binary.LittleEndian.PutUint64(data[1:], amount)
 
-	accounts := solana.NewAccountMetaSlice(
+	accounts := newAccountMetaSlice(
 		solana.NewAccountMeta(source, false, true),
 		solana.NewAccountMeta(delegate, false, false),
 		solana.NewAccountMeta(owner, len(signers) == 0, false),
@@ -435,7 +447,7 @@ func (b *TokenInstructionBuilder) BuildApprove(
 		accounts.Append(solana.NewAccountMeta(signer, true, false))
 	}
 
-	return solana.NewGenericInstruction(b.programID, accounts, data)
+	return newGenericInstruction(b.programID, accounts, data)
 }
 
 // BuildRevoke creates a revoke instruction
@@ -445,7 +457,7 @@ func (b *TokenInstructionBuilder) BuildRevoke(
 ) *solana.GenericInstruction {
 	data := []byte{byte(TokenInstructionRevoke)}
 
-	accounts := solana.NewAccountMetaSlice(
+	accounts := newAccountMetaSlice(
 		solana.NewAccountMeta(source, false, true),
 		solana.NewAccountMeta(owner, len(signers) == 0, false),
 	)
@@ -454,7 +466,7 @@ func (b *TokenInstructionBuilder) BuildRevoke(
 		accounts.Append(solana.NewAccountMeta(signer, true, false))
 	}
 
-	return solana.NewGenericInstruction(b.programID, accounts, data)
+	return newGenericInstruction(b.programID, accounts, data)
 }
 
 // BuildMintTo creates a mint to instruction
@@ -467,7 +479,7 @@ func (b *TokenInstructionBuilder) BuildMintTo(
 	data[0] = byte(TokenInstructionMintTo)
 	binary.LittleEndian.PutUint64(data[1:], amount)
 
-	accounts := solana.NewAccountMetaSlice(
+	accounts := newAccountMetaSlice(
 		solana.NewAccountMeta(mint, false, true),
 		solana.NewAccountMeta(account, false, true),
 		solana.NewAccountMeta(mintAuthority, len(signers) == 0, false),
@@ -477,7 +489,7 @@ func (b *TokenInstructionBuilder) BuildMintTo(
 		accounts.Append(solana.NewAccountMeta(signer, true, false))
 	}
 
-	return solana.NewGenericInstruction(b.programID, accounts, data)
+	return newGenericInstruction(b.programID, accounts, data)
 }
 
 // BuildBurn creates a burn instruction
@@ -490,7 +502,7 @@ func (b *TokenInstructionBuilder) BuildBurn(
 	data[0] = byte(TokenInstructionBurn)
 	binary.LittleEndian.PutUint64(data[1:], amount)
 
-	accounts := solana.NewAccountMetaSlice(
+	accounts := newAccountMetaSlice(
 		solana.NewAccountMeta(account, false, true),
 		solana.NewAccountMeta(mint, false, true),
 		solana.NewAccountMeta(owner, len(signers) == 0, false),
@@ -500,7 +512,7 @@ func (b *TokenInstructionBuilder) BuildBurn(
 		accounts.Append(solana.NewAccountMeta(signer, true, false))
 	}
 
-	return solana.NewGenericInstruction(b.programID, accounts, data)
+	return newGenericInstruction(b.programID, accounts, data)
 }
 
 // ===== Associated Token Account =====
@@ -541,7 +553,7 @@ func BuildCreateAssociatedTokenAccount(
 		return nil, solana.PublicKey{}, err
 	}
 
-	accounts := solana.NewAccountMetaSlice(
+	accounts := newAccountMetaSlice(
 		solana.NewAccountMeta(payer, true, true),
 		solana.NewAccountMeta(ata, false, true),
 		solana.NewAccountMeta(wallet, false, false),
@@ -551,7 +563,7 @@ func BuildCreateAssociatedTokenAccount(
 	)
 
 	ataProgram := solana.MustPublicKeyFromBase58(AssociatedTokenProgramID)
-	ix := solana.NewGenericInstruction(ataProgram, accounts, []byte{})
+	ix := newGenericInstruction(ataProgram, accounts, []byte{})
 
 	return ix, ata, nil
 }
@@ -572,7 +584,7 @@ func BuildCreateIdempotentATA(
 	}
 
 	// Idempotent instruction uses data byte 0x01
-	accounts := solana.NewAccountMetaSlice(
+	accounts := newAccountMetaSlice(
 		solana.NewAccountMeta(payer, true, true),
 		solana.NewAccountMeta(ata, false, true),
 		solana.NewAccountMeta(wallet, false, false),
@@ -582,7 +594,7 @@ func BuildCreateIdempotentATA(
 	)
 
 	ataProgram := solana.MustPublicKeyFromBase58(AssociatedTokenProgramID)
-	ix := solana.NewGenericInstruction(ataProgram, accounts, []byte{0x01})
+	ix := newGenericInstruction(ataProgram, accounts, []byte{0x01})
 
 	return ix, ata, nil
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 
-	"github.com/your-org/sol-trade-sdk-go/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
 )
 
 // ===== Meteora DAMM V2 Program Constants from Rust: src/instruction/utils/meteora_damm_v2.rs =====
@@ -119,17 +119,15 @@ func MeteoraDammV2BuildBuyInstructions(params *MeteoraDammV2BuildBuyParams) ([]s
 
 	// Get user token accounts
 	var inputTokenAccount, outputTokenAccount solana.PublicKey
-	var inputTokenProgram, outputTokenProgram solana.PublicKey
+	var outputTokenProgram solana.PublicKey
 
 	if isAIn {
 		inputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.InputMint, pp.TokenAProgram)
 		outputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.OutputMint, pp.TokenBProgram)
-		inputTokenProgram = pp.TokenAProgram
 		outputTokenProgram = pp.TokenBProgram
 	} else {
 		inputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.InputMint, pp.TokenBProgram)
 		outputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.OutputMint, pp.TokenAProgram)
-		inputTokenProgram = pp.TokenBProgram
 		outputTokenProgram = pp.TokenAProgram
 	}
 
@@ -175,7 +173,7 @@ func MeteoraDammV2BuildBuyInstructions(params *MeteoraDammV2BuildBuyParams) ([]s
 		{PublicKey: METEORA_DAMM_V2_PROGRAM, IsSigner: false, IsWritable: false},   // 13: Program (readonly)
 	}
 
-	instructions = append(instructions, solana.NewInstruction(METEORA_DAMM_V2_PROGRAM, accounts, data))
+	instructions = append(instructions, newInstruction(METEORA_DAMM_V2_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
 	if params.CloseInputMintAta {
@@ -214,16 +212,13 @@ func MeteoraDammV2BuildSellInstructions(params *MeteoraDammV2BuildSellParams) ([
 
 	// Get user token accounts
 	var inputTokenAccount, outputTokenAccount solana.PublicKey
-	var inputTokenProgram solana.PublicKey
 
 	if isAIn {
 		inputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.InputMint, pp.TokenAProgram)
 		outputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.OutputMint, pp.TokenBProgram)
-		inputTokenProgram = pp.TokenAProgram
 	} else {
 		inputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.InputMint, pp.TokenBProgram)
 		outputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.OutputMint, pp.TokenAProgram)
-		inputTokenProgram = pp.TokenBProgram
 	}
 
 	// Get event authority
@@ -263,7 +258,7 @@ func MeteoraDammV2BuildSellInstructions(params *MeteoraDammV2BuildSellParams) ([
 		{PublicKey: METEORA_DAMM_V2_PROGRAM, IsSigner: false, IsWritable: false},   // 13: Program (readonly)
 	}
 
-	instructions = append(instructions, solana.NewInstruction(METEORA_DAMM_V2_PROGRAM, accounts, data))
+	instructions = append(instructions, newInstruction(METEORA_DAMM_V2_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
 	if params.CloseOutputMintAta {

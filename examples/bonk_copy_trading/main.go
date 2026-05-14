@@ -1,3 +1,6 @@
+//go:build live_examples
+// +build live_examples
+
 // Bonk Copy Trading Example
 //
 // This example demonstrates how to copy trade on Bonk.
@@ -11,9 +14,9 @@ import (
 	"log"
 	"os"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go"
-	"github.com/your-org/sol-trade-sdk-go/pkg/common"
-	"github.com/your-org/sol-trade-sdk-go/pkg/trading"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -90,33 +93,33 @@ func bonkCopyTrade(
 
 	// Build params from trade
 	bonkParams := &trading.BonkParams{
-		VirtualBase:              virtualBase,
-		VirtualQuote:             virtualQuote,
-		RealBaseAfter:            realBaseAfter,
-		RealQuoteAfter:           realQuoteAfter,
-		PoolState:                poolState,
-		BaseVault:                baseVault,
-		QuoteVault:               quoteVault,
-		BaseTokenProgram:         baseTokenProgram,
-		PlatformConfig:           platformConfig,
+		VirtualBase:               virtualBase,
+		VirtualQuote:              virtualQuote,
+		RealBaseAfter:             realBaseAfter,
+		RealQuoteAfter:            realQuoteAfter,
+		PoolState:                 poolState,
+		BaseVault:                 baseVault,
+		QuoteVault:                quoteVault,
+		BaseTokenProgram:          baseTokenProgram,
+		PlatformConfig:            platformConfig,
 		PlatformAssociatedAccount: platformAssociatedAccount,
-		CreatorAssociatedAccount: creatorAssociatedAccount,
-		GlobalConfig:             globalConfig,
+		CreatorAssociatedAccount:  creatorAssociatedAccount,
+		GlobalConfig:              globalConfig,
 	}
 
 	buyParams := &trading.TradeBuyParams{
-		DexType:              soltradesdk.DexTypeBonk,
-		InputTokenType:       inputTokenType,
-		Mint:                 baseTokenMint,
-		InputTokenAmount:     buySOLAmount,
-		SlippageBasisPoints:  &slippageBasisPoints,
-		RecentBlockhash:      &recentBlockhash,
-		WaitConfirmed:        true,
-		CreateInputTokenATA:  true,
-		CloseInputTokenATA:   false,
-		CreateMintATA:        true,
-		GasFeeStrategy:       gasFeeStrategy,
-		ExtensionParams:      bonkParams,
+		DexType:             soltradesdk.DexTypeBonk,
+		InputTokenType:      inputTokenType,
+		Mint:                baseTokenMint,
+		InputTokenAmount:    buySOLAmount,
+		SlippageBasisPoints: &slippageBasisPoints,
+		RecentBlockhash:     &recentBlockhash,
+		WaitConfirmed:       true,
+		CreateInputTokenATA: true,
+		CloseInputTokenATA:  false,
+		CreateMintATA:       true,
+		GasFeeStrategy:      gasFeeStrategy,
+		ExtensionParams:     bonkParams,
 	}
 
 	// Execute buy

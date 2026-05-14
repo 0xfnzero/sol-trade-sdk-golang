@@ -3,21 +3,23 @@ package trading
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	soltradesdk "github.com/your-org/sol-trade-sdk-go/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/rpc"
 )
 
 // TradeExecutor handles the execution of trades with parallel SWQOS submissions
 type TradeExecutor struct {
-	rpcClient     *rpc.Client
-	swqosClients  []soltradesdk.SwqosClient
-	gasStrategy   *soltradesdk.GasFeeStrategy
-	config        *soltradesdk.TradeConfig
+	rpcClient    *rpc.Client
+	swqosClients []soltradesdk.SwqosClient
+	gasStrategy  *soltradesdk.GasFeeStrategy
+	config       *soltradesdk.TradeConfig
 
 	// Confirmation polling settings
 	confirmationTimeout time.Duration
@@ -31,10 +33,10 @@ func NewTradeExecutor(
 	gasStrategy *soltradesdk.GasFeeStrategy,
 ) *TradeExecutor {
 	return &TradeExecutor{
-		rpcClient:          rpcClient,
-		swqosClients:       make([]soltradesdk.SwqosClient, 0),
-		gasStrategy:        gasStrategy,
-		config:             config,
+		rpcClient:           rpcClient,
+		swqosClients:        make([]soltradesdk.SwqosClient, 0),
+		gasStrategy:         gasStrategy,
+		config:              config,
 		confirmationTimeout: 30 * time.Second,
 		confirmationRetry:   30,
 	}
@@ -47,21 +49,21 @@ func (e *TradeExecutor) AddSwqosClient(client soltradesdk.SwqosClient) {
 
 // ExecuteResult represents the result of a trade execution
 type ExecuteResult struct {
-	Signature       solana.Signature
-	Success         bool
-	Error           error
-	ConfirmationMs  int64
-	SubmittedAt     time.Time
-	ConfirmedAt     time.Time
-	SwqosType       soltradesdk.SwqosType
+	Signature      solana.Signature
+	Success        bool
+	Error          error
+	ConfirmationMs int64
+	SubmittedAt    time.Time
+	ConfirmedAt    time.Time
+	SwqosType      soltradesdk.SwqosType
 }
 
 // ExecuteOptions represents options for trade execution
 type ExecuteOptions struct {
 	WaitConfirmation bool
-	MaxRetries        int
-	RetryDelayMs      int
-	ParallelSubmit    bool
+	MaxRetries       int
+	RetryDelayMs     int
+	ParallelSubmit   bool
 }
 
 // DefaultExecuteOptions returns default execution options
@@ -284,19 +286,28 @@ func (e *TradeExecutor) GetGasConfig(
 		}
 	}
 
-	value, ok := e.gasStrategy.Get(swqosType, tradeType, strategyType)
-	if !ok {
+	_ = swqosType
+	_ = strategyType
+
+	switch tradeType {
+	case soltradesdk.TradeTypeSell:
+		return &GasFeeConfig{
+			ComputeUnitLimit: e.gasStrategy.SellComputeUnits,
+			ComputeUnitPrice: e.gasStrategy.SellPriorityFee,
+			PriorityFee:      e.gasStrategy.SellTipLamports,
+		}
+	case soltradesdk.TradeTypeBuy:
+		return &GasFeeConfig{
+			ComputeUnitLimit: e.gasStrategy.BuyComputeUnits,
+			ComputeUnitPrice: e.gasStrategy.BuyPriorityFee,
+			PriorityFee:      e.gasStrategy.BuyTipLamports,
+		}
+	default:
 		return &GasFeeConfig{
 			ComputeUnitLimit: 200000,
 			ComputeUnitPrice: 100000,
 			PriorityFee:      100000,
 		}
-	}
-
-	return &GasFeeConfig{
-		ComputeUnitLimit: uint64(value.CuLimit),
-		ComputeUnitPrice: value.CuPrice,
-		PriorityFee:      uint64(value.Tip * solana.LAMPORTS_PER_SOL),
 	}
 }
 
@@ -304,12 +315,12 @@ func (e *TradeExecutor) GetGasConfig(
 
 // BuildTransactionOptions represents options for building a transaction
 type BuildTransactionOptions struct {
-	Payer             solana.PublicKey
-	RecentBlockhash   solana.Hash
-	Instructions      []solana.Instruction
-	Signers           []*solana.PrivateKey
-	AddressLookupTables []*solana.AddressLookupTableAccount
-	GasConfig         *GasFeeConfig
+	Payer               solana.PublicKey
+	RecentBlockhash     solana.Hash
+	Instructions        []solana.Instruction
+	Signers             []*solana.PrivateKey
+	AddressLookupTables map[solana.PublicKey]solana.PublicKeySlice
+	GasConfig           *GasFeeConfig
 }
 
 // BuildTransaction builds a transaction from options
@@ -317,21 +328,52 @@ func (e *TradeExecutor) BuildTransaction(opts BuildTransactionOptions) (*solana.
 	// Add compute budget instructions if gas config is provided
 	var instructions []solana.Instruction
 	if opts.GasConfig != nil {
+		if opts.GasConfig.ComputeUnitLimit > math.MaxUint32 {
+			return nil, fmt.Errorf("compute unit limit exceeds uint32: %d", opts.GasConfig.ComputeUnitLimit)
+		}
+
+		unitLimitIx, err := computebudget.NewSetComputeUnitLimitInstruction(
+			uint32(opts.GasConfig.ComputeUnitLimit),
+		).ValidateAndBuild()
+		if err != nil {
+			return nil, fmt.Errorf("failed to build compute unit limit instruction: %w", err)
+		}
+
+		unitPriceIx, err := computebudget.NewSetComputeUnitPriceInstruction(
+			opts.GasConfig.ComputeUnitPrice,
+		).ValidateAndBuild()
+		if err != nil {
+			return nil, fmt.Errorf("failed to build compute unit price instruction: %w", err)
+		}
+
 		instructions = append(instructions,
-			solana.NewComputeBudgetSetComputeUnitLimitInstruction(opts.GasConfig.ComputeUnitLimit),
-			solana.NewComputeBudgetSetComputeUnitPriceInstruction(opts.GasConfig.ComputeUnitPrice),
+			unitLimitIx,
+			unitPriceIx,
 		)
 	}
 	instructions = append(instructions, opts.Instructions...)
 
-	tx, err := solana.NewTransaction(
-		instructions,
-		opts.RecentBlockhash,
-		solana.TransactionPayer(opts.Payer),
-		solana.TransactionWithSigners(opts.Signers...),
-	)
+	txOpts := []solana.TransactionOption{solana.TransactionPayer(opts.Payer)}
+	if len(opts.AddressLookupTables) > 0 {
+		txOpts = append(txOpts, solana.TransactionAddressTables(opts.AddressLookupTables))
+	}
+
+	tx, err := solana.NewTransaction(instructions, opts.RecentBlockhash, txOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build transaction: %w", err)
+	}
+
+	if len(opts.Signers) > 0 {
+		if _, err := tx.Sign(func(key solana.PublicKey) *solana.PrivateKey {
+			for _, signer := range opts.Signers {
+				if signer != nil && (*signer).PublicKey().Equals(key) {
+					return signer
+				}
+			}
+			return nil
+		}); err != nil {
+			return nil, fmt.Errorf("failed to sign transaction: %w", err)
+		}
 	}
 
 	return tx, nil

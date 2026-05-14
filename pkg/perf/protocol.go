@@ -1,18 +1,21 @@
 package perf
 
 import (
+	"bytes"
+	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/binary"
+	"sort"
 )
 
 // TransactionConfig configuration for optimized transactions
 type TransactionConfig struct {
-	ComputeUnitLimit      uint32
-	ComputeUnitPrice      uint64
-	SkipPreflight         bool
-	MaxRetries            uint8
-	PreflightCommitment   string
-	Encoding              string
+	ComputeUnitLimit    uint32
+	ComputeUnitPrice    uint64
+	SkipPreflight       bool
+	MaxRetries          uint8
+	PreflightCommitment string
+	Encoding            string
 }
 
 // DefaultTransactionConfig returns default config
@@ -77,11 +80,11 @@ func (i *OptimizedInstruction) Serialize() []byte {
 
 // OptimizedTransaction represents an optimized transaction
 type OptimizedTransaction struct {
-	Signatures       [][64]byte
-	Message          []byte
-	Instructions     []OptimizedInstruction
-	RecentBlockhash  [32]byte
-	FeePayer         [32]byte
+	Signatures      [][64]byte
+	Message         []byte
+	Instructions    []OptimizedInstruction
+	RecentBlockhash [32]byte
+	FeePayer        [32]byte
 }
 
 // Serialize serializes transaction
@@ -217,16 +220,38 @@ func (b *TransactionBuilder) buildMessage(recentBlockhash [32]byte, feePayer [32
 }
 
 func (b *TransactionBuilder) signMessage(message []byte) [][64]byte {
-	signatures := make([][64]byte, 0, len(b.signers))
+	keys := make([][32]byte, 0, len(b.signers))
+	for pubkey := range b.signers {
+		keys = append(keys, pubkey)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return bytes.Compare(keys[i][:], keys[j][:]) < 0
+	})
 
-	// In real implementation, use ed25519 signing
-	// This is a placeholder
-	for range b.signers {
-		var sig [64]byte
-		signatures = append(signatures, sig)
+	signatures := make([][64]byte, 0, len(keys))
+	for _, pubkey := range keys {
+		privateKey, ok := normalizeEd25519PrivateKey(b.signers[pubkey])
+		if !ok {
+			continue
+		}
+		sig := ed25519.Sign(privateKey, message)
+		var fixed [64]byte
+		copy(fixed[:], sig)
+		signatures = append(signatures, fixed)
 	}
 
 	return signatures
+}
+
+func normalizeEd25519PrivateKey(secretKey []byte) (ed25519.PrivateKey, bool) {
+	switch len(secretKey) {
+	case ed25519.PrivateKeySize:
+		return ed25519.PrivateKey(secretKey), true
+	case ed25519.SeedSize:
+		return ed25519.NewKeyFromSeed(secretKey), true
+	default:
+		return nil, false
+	}
 }
 
 // SerializationOptimizer provides optimized serialization
