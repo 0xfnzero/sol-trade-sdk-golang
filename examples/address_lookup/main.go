@@ -1,15 +1,11 @@
-// Address Lookup Table Example
-//
-// This example demonstrates how to use Address Lookup Tables (ALT)
-// to optimize transaction size and reduce fees.
-
 package main
 
 import (
 	"context"
 	"fmt"
-	"log"
+	"os"
 
+	"github.com/0xfnzero/sol-trade-sdk-golang/examples/internal/exampleutil"
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/addresslookup"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -17,33 +13,18 @@ import (
 
 func main() {
 	ctx := context.Background()
-	fmt.Println("Address Lookup Table Example")
-
-	// Create RPC client
-	rpcClient := rpc.New("https://api.mainnet-beta.solana.com")
-
-	// Example ALT address
-	altAddress := solana.MustPublicKeyFromBase58("your_alt_address_here")
-
-	// Fetch ALT from chain
-	alt, err := addresslookup.FetchAddressLookupTableAccount(
-		ctx,
-		rpcClient,
-		altAddress,
-		rpc.CommitmentConfirmed,
-	)
-	if err != nil {
-		log.Printf("Failed to fetch ALT: %v", err)
-		fmt.Println("ALT example completed (no real ALT provided)")
+	altAddressText := os.Getenv("ALT_ADDRESS")
+	fmt.Println("Address Lookup Table example prepared.")
+	if altAddressText == "" {
+		fmt.Println("Set ALT_ADDRESS to fetch a real lookup table.")
 		return
 	}
 
-	fmt.Printf("ALT contains %d addresses\n", len(alt.Addresses))
-
-	// List addresses
-	for i, addr := range alt.Addresses {
-		fmt.Printf("  [%d] %s\n", i, addr.String())
+	altAddress := solana.MustPublicKeyFromBase58(altAddressText)
+	alt, err := addresslookup.FetchAddressLookupTableAccount(ctx, rpc.New(exampleutil.RPCURL()), altAddress, rpc.CommitmentConfirmed)
+	if err != nil {
+		fmt.Println("Failed to fetch ALT:", err)
+		return
 	}
-
-	fmt.Println("\nAddress Lookup Table example completed!")
+	fmt.Println("ALT size:", len(alt.Addresses))
 }
