@@ -183,12 +183,12 @@ type PumpFunParams struct {
 	FeeSharingCreatorVault    solana.PublicKey
 	FeeRecipient              solana.PublicKey
 	QuoteMint                 solana.PublicKey
-	UseV2Ix                   bool
 }
 
 // PumpFunBuildBuyParams contains parameters for building buy instructions
 type PumpFunBuildBuyParams struct {
 	Payer               solana.PublicKey
+	InputMint           solana.PublicKey
 	OutputMint          solana.PublicKey
 	InputAmount         uint64
 	SlippageBasisPoints uint64
@@ -197,7 +197,6 @@ type PumpFunBuildBuyParams struct {
 	CreateInputMintAta  bool
 	UseExactSolAmount   bool
 	FixedOutputAmount   *uint64
-	UsePumpFunV2        bool
 }
 
 // PumpFunBuildSellParams contains parameters for building sell instructions
@@ -210,7 +209,7 @@ type PumpFunBuildSellParams struct {
 	CreateOutputMintAta bool
 	CloseInputMintAta   bool
 	FixedOutputAmount   *uint64
-	UsePumpFunV2        bool
+	OutputMint          solana.PublicKey
 }
 
 func pumpFunUsablePubkey(pk solana.PublicKey) bool {
@@ -265,10 +264,36 @@ func pumpFunEffectiveMintTokenProgram(mint solana.PublicKey, pp *PumpFunParams) 
 }
 
 func pumpFunEffectiveQuoteMint(pp *PumpFunParams) solana.PublicKey {
-	if pumpFunUsablePubkey(pp.QuoteMint) {
+	if pumpFunUsablePubkey(pp.QuoteMint) && !pp.QuoteMint.Equals(constants.SOL_TOKEN_ACCOUNT) {
 		return pp.QuoteMint
 	}
 	return constants.WSOL_TOKEN_ACCOUNT
+}
+
+func pumpFunIsSolQuoteMint(mint solana.PublicKey) bool {
+	return mint.Equals(constants.SOL_TOKEN_ACCOUNT) || mint.Equals(constants.WSOL_TOKEN_ACCOUNT)
+}
+
+func pumpFunValidateV2BuyQuoteMint(inputMint, quoteMint solana.PublicKey) error {
+	if pumpFunIsSolQuoteMint(quoteMint) {
+		if inputMint.IsZero() || pumpFunIsSolQuoteMint(inputMint) {
+			return nil
+		}
+	} else if inputMint.Equals(quoteMint) {
+		return nil
+	}
+	return fmt.Errorf("PumpFun V2 buy input_mint %s does not match quote_mint %s; USDC quote pools must be bought with USDC, not SOL", inputMint.String(), quoteMint.String())
+}
+
+func pumpFunValidateV2SellQuoteMint(outputMint, quoteMint solana.PublicKey) error {
+	if pumpFunIsSolQuoteMint(quoteMint) {
+		if outputMint.IsZero() || pumpFunIsSolQuoteMint(outputMint) {
+			return nil
+		}
+	} else if outputMint.Equals(quoteMint) {
+		return nil
+	}
+	return fmt.Errorf("PumpFun V2 sell output_mint %s does not match quote_mint %s; USDC quote pools settle to USDC, not SOL", outputMint.String(), quoteMint.String())
 }
 
 func pumpFunFeeRecipient(pp *PumpFunParams) solana.PublicKey {
@@ -291,7 +316,7 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 	}
 
 	pp := params.ProtocolParams
-	if params.UsePumpFunV2 || pp.UseV2Ix || pumpFunUsablePubkey(pp.QuoteMint) {
+	if pumpFunUsablePubkey(pp.QuoteMint) {
 		return PumpFunBuildBuyV2Instructions(params)
 	}
 	bondingCurve := pp.BondingCurve
@@ -350,9 +375,9 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 	}
 
 	// Build track_volume parameter
-	trackVolume := []byte{1, 0} // Some(false)
+	trackVolume := byte(0)
 	if bondingCurve.IsCashbackCoin {
-		trackVolume = []byte{1, 1} // Some(true)
+		trackVolume = 1
 	}
 
 	// Build instruction data
@@ -360,18 +385,18 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 	if params.UseExactSolAmount {
 		// buy_exact_sol_in(spendable_sol_in: u64, min_tokens_out: u64, track_volume)
 		minTokensOut, _ := calc.CalculateWithSlippageSell(buyTokenAmount, params.SlippageBasisPoints)
-		data = make([]byte, 26)
+		data = make([]byte, 25)
 		copy(data[0:8], PumpFunBuyExactSolInDiscriminator)
 		binary.LittleEndian.PutUint64(data[8:16], params.InputAmount)
 		binary.LittleEndian.PutUint64(data[16:24], minTokensOut)
-		copy(data[24:26], trackVolume)
+		data[24] = trackVolume
 	} else {
 		// buy(token_amount: u64, max_sol_cost: u64, track_volume)
-		data = make([]byte, 26)
+		data = make([]byte, 25)
 		copy(data[0:8], PumpFunBuyDiscriminator)
 		binary.LittleEndian.PutUint64(data[8:16], buyTokenAmount)
 		binary.LittleEndian.PutUint64(data[16:24], maxSolCost)
-		copy(data[24:26], trackVolume)
+		data[24] = trackVolume
 	}
 
 	feeRecipient := pumpFunFeeRecipient(pp)
@@ -414,7 +439,7 @@ func PumpFunBuildSellInstructions(params *PumpFunBuildSellParams) ([]solana.Inst
 	}
 
 	pp := params.ProtocolParams
-	if params.UsePumpFunV2 || pp.UseV2Ix || pumpFunUsablePubkey(pp.QuoteMint) {
+	if pumpFunUsablePubkey(pp.QuoteMint) {
 		return PumpFunBuildSellV2Instructions(params)
 	}
 	bondingCurve := pp.BondingCurve
@@ -543,6 +568,9 @@ func PumpFunBuildBuyV2Instructions(params *PumpFunBuildBuyParams) ([]solana.Inst
 	}
 	baseTokenProgram := pumpFunEffectiveMintTokenProgram(params.OutputMint, pp)
 	quoteMint := pumpFunEffectiveQuoteMint(pp)
+	if err := pumpFunValidateV2BuyQuoteMint(params.InputMint, quoteMint); err != nil {
+		return nil, err
+	}
 	quoteTokenProgram := constants.TOKEN_PROGRAM
 
 	associatedBaseBondingCurve := GetAssociatedTokenAddress(bondingCurveAddr, params.OutputMint, baseTokenProgram)
@@ -652,6 +680,9 @@ func PumpFunBuildSellV2Instructions(params *PumpFunBuildSellParams) ([]solana.In
 	}
 	baseTokenProgram := pumpFunEffectiveMintTokenProgram(params.InputMint, pp)
 	quoteMint := pumpFunEffectiveQuoteMint(pp)
+	if err := pumpFunValidateV2SellQuoteMint(params.OutputMint, quoteMint); err != nil {
+		return nil, err
+	}
 	quoteTokenProgram := constants.TOKEN_PROGRAM
 
 	associatedBaseBondingCurve := GetAssociatedTokenAddress(bondingCurveAddr, params.InputMint, baseTokenProgram)

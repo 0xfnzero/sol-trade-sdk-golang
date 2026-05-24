@@ -26,7 +26,11 @@ var (
 var (
 	// MeteoraDammV2SwapDiscriminator is the discriminator for swap instruction
 	MeteoraDammV2SwapDiscriminator = []byte{248, 198, 158, 145, 225, 117, 135, 200}
+	// MeteoraDammV2Swap2Discriminator is the discriminator for swap2 instruction
+	MeteoraDammV2Swap2Discriminator = []byte{65, 75, 63, 76, 235, 91, 91, 136}
 )
+
+const MeteoraDammV2SwapModePartialFill uint8 = 1
 
 // Seeds - from Rust: src/instruction/utils/meteora_damm_v2.rs seeds
 var (
@@ -89,6 +93,18 @@ type MeteoraDammV2BuildSellParams struct {
 
 // ===== Instruction Builders - 100% from Rust =====
 
+func meteoraDammV2MintMatches(requested, expected solana.PublicKey) bool {
+	return requested.Equals(expected) ||
+		(expected.Equals(constants.WSOL_TOKEN_ACCOUNT) && requested.Equals(constants.SOL_TOKEN_ACCOUNT))
+}
+
+func ensureMeteoraDammV2ExpectedMint(label string, requested, expected solana.PublicKey) error {
+	if !requested.IsZero() && !meteoraDammV2MintMatches(requested, expected) {
+		return fmt.Errorf("%s must match the Meteora DAMM v2 pool side (%s), got %s", label, expected.String(), requested.String())
+	}
+	return nil
+}
+
 // MeteoraDammV2BuildBuyInstructions builds buy instructions for Meteora DAMM V2
 // 100% port from Rust: src/instruction/meteora_damm_v2.rs build_buy_instructions
 func MeteoraDammV2BuildBuyInstructions(params *MeteoraDammV2BuildBuyParams) ([]solana.Instruction, error) {
@@ -117,19 +133,26 @@ func MeteoraDammV2BuildBuyInstructions(params *MeteoraDammV2BuildBuyParams) ([]s
 		return nil, fmt.Errorf("fixed_output_amount must be set for MeteoraDammV2 swap")
 	}
 
-	// Get user token accounts
-	var inputTokenAccount, outputTokenAccount solana.PublicKey
-	var outputTokenProgram solana.PublicKey
-
+	inputMint := pp.TokenBMint
+	outputMint := pp.TokenAMint
+	inputTokenProgram := pp.TokenBProgram
+	outputTokenProgram := pp.TokenAProgram
 	if isAIn {
-		inputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.InputMint, pp.TokenAProgram)
-		outputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.OutputMint, pp.TokenBProgram)
+		inputMint = pp.TokenAMint
+		outputMint = pp.TokenBMint
+		inputTokenProgram = pp.TokenAProgram
 		outputTokenProgram = pp.TokenBProgram
-	} else {
-		inputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.InputMint, pp.TokenBProgram)
-		outputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.OutputMint, pp.TokenAProgram)
-		outputTokenProgram = pp.TokenAProgram
 	}
+	if err := ensureMeteoraDammV2ExpectedMint("InputMint", params.InputMint, inputMint); err != nil {
+		return nil, err
+	}
+	if err := ensureMeteoraDammV2ExpectedMint("OutputMint", params.OutputMint, outputMint); err != nil {
+		return nil, err
+	}
+
+	// Get user token accounts
+	inputTokenAccount := GetAssociatedTokenAddress(params.Payer, inputMint, inputTokenProgram)
+	outputTokenAccount := GetAssociatedTokenAddress(params.Payer, outputMint, outputTokenProgram)
 
 	// Get event authority
 	eventAuthority := GetMeteoraDammV2EventAuthorityPDA()
@@ -137,25 +160,32 @@ func MeteoraDammV2BuildBuyInstructions(params *MeteoraDammV2BuildBuyParams) ([]s
 	// Build instructions
 	instructions := make([]solana.Instruction, 0, 6)
 
-	// Handle WSOL wrapping if needed
+	// Handle input account creation/wrapping
 	if params.CreateInputMintAta {
-		instructions = append(instructions, HandleWsol(params.Payer, amountIn)...)
+		if inputMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
+			instructions = append(instructions, HandleWsol(params.Payer, amountIn)...)
+		} else {
+			instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
+				params.Payer, params.Payer, inputMint, inputTokenProgram,
+			))
+		}
 	}
 
 	// Create output ATA if needed
 	if params.CreateOutputMintAta {
 		instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
-			params.Payer, params.Payer, params.OutputMint, outputTokenProgram,
+			params.Payer, params.Payer, outputMint, outputTokenProgram,
 		))
 	}
 
-	// Build instruction data
-	data := make([]byte, 24)
-	copy(data[0:8], MeteoraDammV2SwapDiscriminator)
+	// Build swap2 instruction data
+	data := make([]byte, 25)
+	copy(data[0:8], MeteoraDammV2Swap2Discriminator)
 	binary.LittleEndian.PutUint64(data[8:16], amountIn)
 	binary.LittleEndian.PutUint64(data[16:24], minimumAmountOut)
+	data[24] = MeteoraDammV2SwapModePartialFill
 
-	// Build accounts array (14 accounts)
+	// Build accounts array (13 accounts)
 	accounts := []solana.AccountMeta{
 		{PublicKey: METEORA_DAMM_V2_AUTHORITY, IsSigner: false, IsWritable: false}, // 0: Pool Authority (readonly)
 		{PublicKey: pp.Pool, IsSigner: false, IsWritable: true},                    // 1: Pool
@@ -168,15 +198,14 @@ func MeteoraDammV2BuildBuyInstructions(params *MeteoraDammV2BuildBuyParams) ([]s
 		{PublicKey: params.Payer, IsSigner: true, IsWritable: true},                // 8: User Transfer Authority
 		{PublicKey: pp.TokenAProgram, IsSigner: false, IsWritable: false},          // 9: Token Program (readonly)
 		{PublicKey: pp.TokenBProgram, IsSigner: false, IsWritable: false},          // 10: Token Program (readonly)
-		{PublicKey: METEORA_DAMM_V2_PROGRAM, IsSigner: false, IsWritable: false},   // 11: Referral Token Account (readonly)
-		{PublicKey: eventAuthority, IsSigner: false, IsWritable: false},            // 12: Event Authority (readonly)
-		{PublicKey: METEORA_DAMM_V2_PROGRAM, IsSigner: false, IsWritable: false},   // 13: Program (readonly)
+		{PublicKey: eventAuthority, IsSigner: false, IsWritable: false},            // 11: Event Authority (readonly)
+		{PublicKey: METEORA_DAMM_V2_PROGRAM, IsSigner: false, IsWritable: false},   // 12: Program (readonly)
 	}
 
 	instructions = append(instructions, newInstruction(METEORA_DAMM_V2_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
-	if params.CloseInputMintAta {
+	if params.CloseInputMintAta && inputMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
 		instructions = append(instructions, CloseWsol(params.Payer))
 	}
 
@@ -210,16 +239,26 @@ func MeteoraDammV2BuildSellInstructions(params *MeteoraDammV2BuildSellParams) ([
 		return nil, fmt.Errorf("fixed_output_amount must be set for MeteoraDammV2 swap")
 	}
 
-	// Get user token accounts
-	var inputTokenAccount, outputTokenAccount solana.PublicKey
-
+	inputMint := pp.TokenBMint
+	outputMint := pp.TokenAMint
+	inputTokenProgram := pp.TokenBProgram
+	outputTokenProgram := pp.TokenAProgram
 	if isAIn {
-		inputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.InputMint, pp.TokenAProgram)
-		outputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.OutputMint, pp.TokenBProgram)
-	} else {
-		inputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.InputMint, pp.TokenBProgram)
-		outputTokenAccount = GetAssociatedTokenAddress(params.Payer, params.OutputMint, pp.TokenAProgram)
+		inputMint = pp.TokenAMint
+		outputMint = pp.TokenBMint
+		inputTokenProgram = pp.TokenAProgram
+		outputTokenProgram = pp.TokenBProgram
 	}
+	if err := ensureMeteoraDammV2ExpectedMint("InputMint", params.InputMint, inputMint); err != nil {
+		return nil, err
+	}
+	if err := ensureMeteoraDammV2ExpectedMint("OutputMint", params.OutputMint, outputMint); err != nil {
+		return nil, err
+	}
+
+	// Get user token accounts
+	inputTokenAccount := GetAssociatedTokenAddress(params.Payer, inputMint, inputTokenProgram)
+	outputTokenAccount := GetAssociatedTokenAddress(params.Payer, outputMint, outputTokenProgram)
 
 	// Get event authority
 	eventAuthority := GetMeteoraDammV2EventAuthorityPDA()
@@ -230,17 +269,18 @@ func MeteoraDammV2BuildSellInstructions(params *MeteoraDammV2BuildSellParams) ([
 	// Create WSOL ATA for receiving if needed
 	if params.CreateOutputMintAta {
 		instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
-			params.Payer, params.Payer, params.OutputMint, constants.TOKEN_PROGRAM,
+			params.Payer, params.Payer, outputMint, outputTokenProgram,
 		))
 	}
 
-	// Build instruction data
-	data := make([]byte, 24)
-	copy(data[0:8], MeteoraDammV2SwapDiscriminator)
+	// Build swap2 instruction data
+	data := make([]byte, 25)
+	copy(data[0:8], MeteoraDammV2Swap2Discriminator)
 	binary.LittleEndian.PutUint64(data[8:16], params.InputAmount)
 	binary.LittleEndian.PutUint64(data[16:24], minimumAmountOut)
+	data[24] = MeteoraDammV2SwapModePartialFill
 
-	// Build accounts array (14 accounts)
+	// Build accounts array (13 accounts)
 	accounts := []solana.AccountMeta{
 		{PublicKey: METEORA_DAMM_V2_AUTHORITY, IsSigner: false, IsWritable: false}, // 0: Pool Authority (readonly)
 		{PublicKey: pp.Pool, IsSigner: false, IsWritable: true},                    // 1: Pool
@@ -253,15 +293,14 @@ func MeteoraDammV2BuildSellInstructions(params *MeteoraDammV2BuildSellParams) ([
 		{PublicKey: params.Payer, IsSigner: true, IsWritable: true},                // 8: User Transfer Authority
 		{PublicKey: pp.TokenAProgram, IsSigner: false, IsWritable: false},          // 9: Token Program (readonly)
 		{PublicKey: pp.TokenBProgram, IsSigner: false, IsWritable: false},          // 10: Token Program (readonly)
-		{PublicKey: METEORA_DAMM_V2_PROGRAM, IsSigner: false, IsWritable: false},   // 11: Referral Token Account (readonly)
-		{PublicKey: eventAuthority, IsSigner: false, IsWritable: false},            // 12: Event Authority (readonly)
-		{PublicKey: METEORA_DAMM_V2_PROGRAM, IsSigner: false, IsWritable: false},   // 13: Program (readonly)
+		{PublicKey: eventAuthority, IsSigner: false, IsWritable: false},            // 11: Event Authority (readonly)
+		{PublicKey: METEORA_DAMM_V2_PROGRAM, IsSigner: false, IsWritable: false},   // 12: Program (readonly)
 	}
 
 	instructions = append(instructions, newInstruction(METEORA_DAMM_V2_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
-	if params.CloseOutputMintAta {
+	if params.CloseOutputMintAta && outputMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
 		instructions = append(instructions, CloseWsol(params.Payer))
 	}
 

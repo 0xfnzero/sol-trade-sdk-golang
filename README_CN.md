@@ -97,7 +97,7 @@ git clone https://github.com/0xfnzero/sol-trade-sdk-golang
 
 ```go
 // 添加到您的 go.mod
-require github.com/0xfnzero/sol-trade-sdk-golang v0.0.0
+require github.com/0xfnzero/sol-trade-sdk-golang v0.1.1
 
 replace github.com/0xfnzero/sol-trade-sdk-golang => ./sol-trade-sdk-golang
 ```
@@ -111,7 +111,7 @@ go mod tidy
 ### 使用 Go Modules
 
 ```bash
-go get github.com/0xfnzero/sol-trade-sdk-golang
+go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.1
 ```
 
 ## 🛠️ 使用示例

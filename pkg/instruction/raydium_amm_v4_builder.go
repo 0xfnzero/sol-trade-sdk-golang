@@ -79,6 +79,7 @@ type RaydiumAmmV4BuildBuyParams struct {
 type RaydiumAmmV4BuildSellParams struct {
 	Payer               solana.PublicKey
 	InputMint           solana.PublicKey
+	OutputMint          solana.PublicKey
 	InputAmount         uint64
 	SlippageBasisPoints uint64
 	ProtocolParams      *RaydiumAmmV4Params
@@ -90,6 +91,42 @@ type RaydiumAmmV4BuildSellParams struct {
 
 // ===== Instruction Builders - 100% from Rust =====
 
+func ensureRaydiumAmmV4MarketAccounts(pp *RaydiumAmmV4Params) error {
+	required := []struct {
+		name    string
+		account solana.PublicKey
+	}{
+		{"AmmOpenOrders", pp.AmmOpenOrders},
+		{"AmmTargetOrders", pp.AmmTargetOrders},
+		{"SerumProgram", pp.SerumProgram},
+		{"SerumMarket", pp.SerumMarket},
+		{"SerumBids", pp.SerumBids},
+		{"SerumAsks", pp.SerumAsks},
+		{"SerumEventQueue", pp.SerumEventQueue},
+		{"SerumCoinVaultAccount", pp.SerumCoinVaultAccount},
+		{"SerumPcVaultAccount", pp.SerumPcVaultAccount},
+		{"SerumVaultSigner", pp.SerumVaultSigner},
+	}
+	for _, item := range required {
+		if item.account.IsZero() {
+			return fmt.Errorf("Raydium AMM v4 requires %s; pass real market accounts from the AMM/market state", item.name)
+		}
+	}
+	return nil
+}
+
+func raydiumAmmV4MintMatches(requested, expected solana.PublicKey) bool {
+	return requested.Equals(expected) ||
+		(expected.Equals(constants.WSOL_TOKEN_ACCOUNT) && requested.Equals(constants.SOL_TOKEN_ACCOUNT))
+}
+
+func ensureRaydiumAmmV4ExpectedMint(label string, requested, expected solana.PublicKey) error {
+	if !requested.IsZero() && !raydiumAmmV4MintMatches(requested, expected) {
+		return fmt.Errorf("%s must match the Raydium AMM v4 pool side (%s), got %s", label, expected.String(), requested.String())
+	}
+	return nil
+}
+
 // RaydiumAmmV4BuildBuyInstructions builds buy instructions for Raydium AMM V4
 // 100% port from Rust: src/instruction/raydium_amm_v4.rs build_buy_instructions
 func RaydiumAmmV4BuildBuyInstructions(params *RaydiumAmmV4BuildBuyParams) ([]solana.Instruction, error) {
@@ -98,6 +135,9 @@ func RaydiumAmmV4BuildBuyInstructions(params *RaydiumAmmV4BuildBuyParams) ([]sol
 	}
 
 	pp := params.ProtocolParams
+	if err := ensureRaydiumAmmV4MarketAccounts(pp); err != nil {
+		return nil, err
+	}
 
 	// Check if pool contains WSOL or USDC
 	isWsol := pp.CoinMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.PcMint.Equals(constants.WSOL_TOKEN_ACCOUNT)
@@ -108,21 +148,34 @@ func RaydiumAmmV4BuildBuyInstructions(params *RaydiumAmmV4BuildBuyParams) ([]sol
 
 	// Calculate swap amounts
 	amountIn := params.InputAmount
+	isBaseIn := pp.CoinMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.CoinMint.Equals(constants.USDC_TOKEN_ACCOUNT)
 	var minimumAmountOut uint64
 	if params.FixedOutputAmount != nil {
 		minimumAmountOut = *params.FixedOutputAmount
 	} else {
-		result := calc.RaydiumAmmV4GetAmountOut(amountIn, pp.CoinReserve, pp.PcReserve)
+		inputReserve := pp.PcReserve
+		outputReserve := pp.CoinReserve
+		if isBaseIn {
+			inputReserve = pp.CoinReserve
+			outputReserve = pp.PcReserve
+		}
+		result := calc.RaydiumAmmV4GetAmountOut(amountIn, inputReserve, outputReserve)
 		minAmountOut, _ := calc.CalculateWithSlippageSell(result, params.SlippageBasisPoints)
 		minimumAmountOut = minAmountOut
 	}
 
 	// Determine input/output mints
-	inputMint := constants.WSOL_TOKEN_ACCOUNT
-	if isUsdc {
-		inputMint = constants.USDC_TOKEN_ACCOUNT
+	inputMint := pp.PcMint
+	if isBaseIn {
+		inputMint = pp.CoinMint
 	}
-	outputMint := params.OutputMint
+	outputMint := pp.CoinMint
+	if isBaseIn {
+		outputMint = pp.PcMint
+	}
+	if err := ensureRaydiumAmmV4ExpectedMint("OutputMint", params.OutputMint, outputMint); err != nil {
+		return nil, err
+	}
 
 	// Get user token accounts
 	userSourceTokenAccount := GetAssociatedTokenAddress(params.Payer, inputMint, constants.TOKEN_PROGRAM)
@@ -133,7 +186,13 @@ func RaydiumAmmV4BuildBuyInstructions(params *RaydiumAmmV4BuildBuyParams) ([]sol
 
 	// Handle WSOL wrapping if needed
 	if params.CreateInputMintAta {
-		instructions = append(instructions, HandleWsol(params.Payer, amountIn)...)
+		if inputMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
+			instructions = append(instructions, HandleWsol(params.Payer, amountIn)...)
+		} else {
+			instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
+				params.Payer, params.Payer, inputMint, constants.TOKEN_PROGRAM,
+			))
+		}
 	}
 
 	// Create output ATA if needed
@@ -145,35 +204,40 @@ func RaydiumAmmV4BuildBuyInstructions(params *RaydiumAmmV4BuildBuyParams) ([]sol
 
 	// Build instruction data (17 bytes: 1 byte discriminator + 2x8 bytes amounts)
 	data := make([]byte, 17)
-	copy(data[0:1], RaydiumAmmV4SwapBaseInDiscriminator)
+	if params.FixedOutputAmount != nil {
+		copy(data[0:1], RaydiumAmmV4SwapBaseOutDiscriminator)
+	} else {
+		copy(data[0:1], RaydiumAmmV4SwapBaseInDiscriminator)
+	}
 	binary.LittleEndian.PutUint64(data[1:9], amountIn)
 	binary.LittleEndian.PutUint64(data[9:17], minimumAmountOut)
 
-	// Build accounts array (17 accounts)
+	// Build accounts array (18 accounts)
 	accounts := []solana.AccountMeta{
 		{PublicKey: constants.TOKEN_PROGRAM, IsSigner: false, IsWritable: false},    // 0: Token Program (readonly)
 		{PublicKey: pp.Amm, IsSigner: false, IsWritable: true},                      // 1: Amm
 		{PublicKey: RAYDIUM_AMM_V4_AUTHORITY, IsSigner: false, IsWritable: false},   // 2: Authority (readonly)
 		{PublicKey: pp.AmmOpenOrders, IsSigner: false, IsWritable: true},            // 3: Amm Open Orders
-		{PublicKey: pp.TokenCoin, IsSigner: false, IsWritable: true},                // 4: Pool Coin Token Account
-		{PublicKey: pp.TokenPc, IsSigner: false, IsWritable: true},                  // 5: Pool Pc Token Account
-		{PublicKey: pp.SerumProgram, IsSigner: false, IsWritable: false},            // 6: Serum Program
-		{PublicKey: pp.SerumMarket, IsSigner: false, IsWritable: true},              // 7: Serum Market
-		{PublicKey: pp.SerumBids, IsSigner: false, IsWritable: true},                // 8: Serum Bids
-		{PublicKey: pp.SerumAsks, IsSigner: false, IsWritable: true},                // 9: Serum Asks
-		{PublicKey: pp.SerumEventQueue, IsSigner: false, IsWritable: true},          // 10: Serum Event Queue
-		{PublicKey: pp.SerumCoinVaultAccount, IsSigner: false, IsWritable: true},    // 11: Serum Coin Vault Account
-		{PublicKey: pp.SerumPcVaultAccount, IsSigner: false, IsWritable: true},      // 12: Serum Pc Vault Account
-		{PublicKey: pp.SerumVaultSigner, IsSigner: false, IsWritable: false},        // 13: Serum Vault Signer
-		{PublicKey: userSourceTokenAccount, IsSigner: false, IsWritable: true},      // 14: User Source Token Account
-		{PublicKey: userDestinationTokenAccount, IsSigner: false, IsWritable: true}, // 15: User Destination Token Account
-		{PublicKey: params.Payer, IsSigner: true, IsWritable: false},                // 16: User Source Owner
+		{PublicKey: pp.AmmTargetOrders, IsSigner: false, IsWritable: true},          // 4: Amm Target Orders
+		{PublicKey: pp.TokenCoin, IsSigner: false, IsWritable: true},                // 5: Pool Coin Token Account
+		{PublicKey: pp.TokenPc, IsSigner: false, IsWritable: true},                  // 6: Pool Pc Token Account
+		{PublicKey: pp.SerumProgram, IsSigner: false, IsWritable: false},            // 7: Serum Program
+		{PublicKey: pp.SerumMarket, IsSigner: false, IsWritable: true},              // 8: Serum Market
+		{PublicKey: pp.SerumBids, IsSigner: false, IsWritable: true},                // 9: Serum Bids
+		{PublicKey: pp.SerumAsks, IsSigner: false, IsWritable: true},                // 10: Serum Asks
+		{PublicKey: pp.SerumEventQueue, IsSigner: false, IsWritable: true},          // 11: Serum Event Queue
+		{PublicKey: pp.SerumCoinVaultAccount, IsSigner: false, IsWritable: true},    // 12: Serum Coin Vault Account
+		{PublicKey: pp.SerumPcVaultAccount, IsSigner: false, IsWritable: true},      // 13: Serum Pc Vault Account
+		{PublicKey: pp.SerumVaultSigner, IsSigner: false, IsWritable: false},        // 14: Serum Vault Signer
+		{PublicKey: userSourceTokenAccount, IsSigner: false, IsWritable: true},      // 15: User Source Token Account
+		{PublicKey: userDestinationTokenAccount, IsSigner: false, IsWritable: true}, // 16: User Destination Token Account
+		{PublicKey: params.Payer, IsSigner: true, IsWritable: false},                // 17: User Source Owner
 	}
 
 	instructions = append(instructions, newInstruction(RAYDIUM_AMM_V4_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
-	if params.CloseInputMintAta {
+	if params.CloseInputMintAta && inputMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
 		instructions = append(instructions, CloseWsol(params.Payer))
 	}
 
@@ -188,6 +252,9 @@ func RaydiumAmmV4BuildSellInstructions(params *RaydiumAmmV4BuildSellParams) ([]s
 	}
 
 	pp := params.ProtocolParams
+	if err := ensureRaydiumAmmV4MarketAccounts(pp); err != nil {
+		return nil, err
+	}
 
 	// Check if pool contains WSOL or USDC
 	isWsol := pp.CoinMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.PcMint.Equals(constants.WSOL_TOKEN_ACCOUNT)
@@ -197,21 +264,39 @@ func RaydiumAmmV4BuildSellInstructions(params *RaydiumAmmV4BuildSellParams) ([]s
 	}
 
 	// Calculate swap amounts
+	isBaseIn := pp.PcMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.PcMint.Equals(constants.USDC_TOKEN_ACCOUNT)
 	var minimumAmountOut uint64
 	if params.FixedOutputAmount != nil {
 		minimumAmountOut = *params.FixedOutputAmount
 	} else {
-		result := calc.RaydiumAmmV4GetAmountOut(params.InputAmount, pp.CoinReserve, pp.PcReserve)
+		inputReserve := pp.PcReserve
+		outputReserve := pp.CoinReserve
+		if isBaseIn {
+			inputReserve = pp.CoinReserve
+			outputReserve = pp.PcReserve
+		}
+		result := calc.RaydiumAmmV4GetAmountOut(params.InputAmount, inputReserve, outputReserve)
 		minAmountOut, _ := calc.CalculateWithSlippageSell(result, params.SlippageBasisPoints)
 		minimumAmountOut = minAmountOut
 	}
 
 	// Determine output mint
-	outputMint := constants.WSOL_TOKEN_ACCOUNT
-	if isUsdc {
-		outputMint = constants.USDC_TOKEN_ACCOUNT
+	outputMint := pp.CoinMint
+	if isBaseIn {
+		outputMint = pp.PcMint
+	}
+	if err := ensureRaydiumAmmV4ExpectedMint("OutputMint", params.OutputMint, outputMint); err != nil {
+		return nil, err
 	}
 	inputMint := params.InputMint
+	expectedInputMint := pp.PcMint
+	if isBaseIn {
+		expectedInputMint = pp.CoinMint
+	}
+	if err := ensureRaydiumAmmV4ExpectedMint("InputMint", inputMint, expectedInputMint); err != nil {
+		return nil, err
+	}
+	inputMint = expectedInputMint
 
 	// Get user token accounts
 	userSourceTokenAccount := GetAssociatedTokenAddress(params.Payer, inputMint, constants.TOKEN_PROGRAM)
@@ -229,35 +314,40 @@ func RaydiumAmmV4BuildSellInstructions(params *RaydiumAmmV4BuildSellParams) ([]s
 
 	// Build instruction data (17 bytes: 1 byte discriminator + 2x8 bytes amounts)
 	data := make([]byte, 17)
-	copy(data[0:1], RaydiumAmmV4SwapBaseInDiscriminator)
+	if params.FixedOutputAmount != nil {
+		copy(data[0:1], RaydiumAmmV4SwapBaseOutDiscriminator)
+	} else {
+		copy(data[0:1], RaydiumAmmV4SwapBaseInDiscriminator)
+	}
 	binary.LittleEndian.PutUint64(data[1:9], params.InputAmount)
 	binary.LittleEndian.PutUint64(data[9:17], minimumAmountOut)
 
-	// Build accounts array (17 accounts)
+	// Build accounts array (18 accounts)
 	accounts := []solana.AccountMeta{
 		{PublicKey: constants.TOKEN_PROGRAM, IsSigner: false, IsWritable: false},    // 0: Token Program (readonly)
 		{PublicKey: pp.Amm, IsSigner: false, IsWritable: true},                      // 1: Amm
 		{PublicKey: RAYDIUM_AMM_V4_AUTHORITY, IsSigner: false, IsWritable: false},   // 2: Authority (readonly)
 		{PublicKey: pp.AmmOpenOrders, IsSigner: false, IsWritable: true},            // 3: Amm Open Orders
-		{PublicKey: pp.TokenCoin, IsSigner: false, IsWritable: true},                // 4: Pool Coin Token Account
-		{PublicKey: pp.TokenPc, IsSigner: false, IsWritable: true},                  // 5: Pool Pc Token Account
-		{PublicKey: pp.SerumProgram, IsSigner: false, IsWritable: false},            // 6: Serum Program
-		{PublicKey: pp.SerumMarket, IsSigner: false, IsWritable: true},              // 7: Serum Market
-		{PublicKey: pp.SerumBids, IsSigner: false, IsWritable: true},                // 8: Serum Bids
-		{PublicKey: pp.SerumAsks, IsSigner: false, IsWritable: true},                // 9: Serum Asks
-		{PublicKey: pp.SerumEventQueue, IsSigner: false, IsWritable: true},          // 10: Serum Event Queue
-		{PublicKey: pp.SerumCoinVaultAccount, IsSigner: false, IsWritable: true},    // 11: Serum Coin Vault Account
-		{PublicKey: pp.SerumPcVaultAccount, IsSigner: false, IsWritable: true},      // 12: Serum Pc Vault Account
-		{PublicKey: pp.SerumVaultSigner, IsSigner: false, IsWritable: false},        // 13: Serum Vault Signer
-		{PublicKey: userSourceTokenAccount, IsSigner: false, IsWritable: true},      // 14: User Source Token Account
-		{PublicKey: userDestinationTokenAccount, IsSigner: false, IsWritable: true}, // 15: User Destination Token Account
-		{PublicKey: params.Payer, IsSigner: true, IsWritable: false},                // 16: User Source Owner
+		{PublicKey: pp.AmmTargetOrders, IsSigner: false, IsWritable: true},          // 4: Amm Target Orders
+		{PublicKey: pp.TokenCoin, IsSigner: false, IsWritable: true},                // 5: Pool Coin Token Account
+		{PublicKey: pp.TokenPc, IsSigner: false, IsWritable: true},                  // 6: Pool Pc Token Account
+		{PublicKey: pp.SerumProgram, IsSigner: false, IsWritable: false},            // 7: Serum Program
+		{PublicKey: pp.SerumMarket, IsSigner: false, IsWritable: true},              // 8: Serum Market
+		{PublicKey: pp.SerumBids, IsSigner: false, IsWritable: true},                // 9: Serum Bids
+		{PublicKey: pp.SerumAsks, IsSigner: false, IsWritable: true},                // 10: Serum Asks
+		{PublicKey: pp.SerumEventQueue, IsSigner: false, IsWritable: true},          // 11: Serum Event Queue
+		{PublicKey: pp.SerumCoinVaultAccount, IsSigner: false, IsWritable: true},    // 12: Serum Coin Vault Account
+		{PublicKey: pp.SerumPcVaultAccount, IsSigner: false, IsWritable: true},      // 13: Serum Pc Vault Account
+		{PublicKey: pp.SerumVaultSigner, IsSigner: false, IsWritable: false},        // 14: Serum Vault Signer
+		{PublicKey: userSourceTokenAccount, IsSigner: false, IsWritable: true},      // 15: User Source Token Account
+		{PublicKey: userDestinationTokenAccount, IsSigner: false, IsWritable: true}, // 16: User Destination Token Account
+		{PublicKey: params.Payer, IsSigner: true, IsWritable: false},                // 17: User Source Owner
 	}
 
 	instructions = append(instructions, newInstruction(RAYDIUM_AMM_V4_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
-	if params.CloseOutputMintAta {
+	if params.CloseOutputMintAta && outputMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
 		instructions = append(instructions, CloseWsol(params.Payer))
 	}
 

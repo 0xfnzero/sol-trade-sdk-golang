@@ -69,7 +69,6 @@ func DefaultSwqosConfigs() []soltradesdk.SwqosConfig {
 func TradeConfig() *soltradesdk.TradeConfig {
 	return soltradesdk.NewTradeConfigBuilder(RPCURL()).
 		SwqosConfigs(DefaultSwqosConfigs()).
-		UsePumpFunV2(true).
 		UseSeedOptimize(true).
 		SwqosCoresFromEnd(true).
 		MaxSwqosSubmitConcurrency(8).
@@ -104,7 +103,6 @@ func PumpFunParams() *dexparams.PumpFunParams {
 		TokenProgram:           constants.TOKEN_PROGRAM,
 		FeeRecipient:           ExamplePublicKey(15),
 		QuoteMint:              constants.WSOL_TOKEN_ACCOUNT,
-		UseV2Ix:                true,
 	}
 }
 
@@ -148,13 +146,17 @@ func RaydiumCpmmParams() *dexparams.RaydiumCpmmParams {
 func RaydiumAmmV4Params() *dexparams.RaydiumAmmV4Params {
 	return dexparams.NewRaydiumAmmV4Params(
 		ExamplePublicKey(51), ExamplePublicKey(52), constants.WSOL_TOKEN_ACCOUNT,
-		ExamplePublicKey(53), ExamplePublicKey(54), 2_000_000_000, 50_000_000_000,
+		ExamplePublicKey(53), ExamplePublicKey(54),
+		ExamplePublicKey(55), ExamplePublicKey(56), ExamplePublicKey(57), ExamplePublicKey(58),
+		ExamplePublicKey(59), ExamplePublicKey(60), ExamplePublicKey(61),
+		ExamplePublicKey(62), ExamplePublicKey(63), ExamplePublicKey(64),
+		2_000_000_000, 50_000_000_000,
 	)
 }
 
 func MeteoraDammV2Params() *dexparams.MeteoraDammV2Params {
 	return dexparams.NewMeteoraDammV2Params(
-		ExamplePublicKey(61), ExamplePublicKey(62), ExamplePublicKey(63), ExamplePublicKey(64), constants.WSOL_TOKEN_ACCOUNT,
+		ExamplePublicKey(71), ExamplePublicKey(72), ExamplePublicKey(73), ExamplePublicKey(74), constants.WSOL_TOKEN_ACCOUNT,
 		constants.TOKEN_PROGRAM, constants.TOKEN_PROGRAM,
 	)
 }
@@ -178,6 +180,21 @@ func ProtocolParams(dexType soltradesdk.DexType) interface{} {
 	}
 }
 
+func DefaultTradeMint(dexType soltradesdk.DexType) solana.PublicKey {
+	switch dexType {
+	case soltradesdk.DexTypePumpSwap:
+		return PumpSwapParams().BaseMint
+	case soltradesdk.DexTypeRaydiumCpmm:
+		return RaydiumCpmmParams().BaseMint
+	case soltradesdk.DexTypeRaydiumAmmV4:
+		return RaydiumAmmV4Params().CoinMint
+	case soltradesdk.DexTypeMeteoraDammV2:
+		return MeteoraDammV2Params().TokenAMint
+	default:
+		return ExamplePublicKey(91)
+	}
+}
+
 func ExampleBuyParams(dexType soltradesdk.DexType) soltradesdk.TradeBuyParams {
 	blockhash := ExampleHash(99)
 	grpcRecvUs := int64(0)
@@ -185,10 +202,10 @@ func ExampleBuyParams(dexType soltradesdk.DexType) soltradesdk.TradeBuyParams {
 	if dexType == soltradesdk.DexTypeBonk {
 		inputTokenType = soltradesdk.TradeTokenTypeUSD1
 	}
-	return soltradesdk.TradeBuyParams{
+	params := soltradesdk.TradeBuyParams{
 		DexType:             dexType,
 		InputTokenType:      inputTokenType,
-		Mint:                ExamplePublicKey(91),
+		Mint:                DefaultTradeMint(dexType),
 		InputTokenAmount:    100_000,
 		SlippageBasisPoints: 300,
 		RecentBlockhash:     &blockhash,
@@ -200,6 +217,11 @@ func ExampleBuyParams(dexType soltradesdk.DexType) soltradesdk.TradeBuyParams {
 		GasFeeStrategy:      LowLatencyGasStrategy(),
 		GrpcRecvUs:          &grpcRecvUs,
 	}
+	if dexType == soltradesdk.DexTypeMeteoraDammV2 {
+		fixedOutput := uint64(90_000)
+		params.FixedOutputTokenAmount = &fixedOutput
+	}
+	return params
 }
 
 func ExampleSellParams(dexType soltradesdk.DexType) soltradesdk.TradeSellParams {
@@ -209,10 +231,10 @@ func ExampleSellParams(dexType soltradesdk.DexType) soltradesdk.TradeSellParams 
 	if dexType == soltradesdk.DexTypeBonk {
 		outputTokenType = soltradesdk.TradeTokenTypeUSD1
 	}
-	return soltradesdk.TradeSellParams{
+	params := soltradesdk.TradeSellParams{
 		DexType:              dexType,
 		OutputTokenType:      outputTokenType,
-		Mint:                 ExamplePublicKey(91),
+		Mint:                 DefaultTradeMint(dexType),
 		InputTokenAmount:     50_000,
 		SlippageBasisPoints:  300,
 		RecentBlockhash:      &blockhash,
@@ -225,6 +247,11 @@ func ExampleSellParams(dexType soltradesdk.DexType) soltradesdk.TradeSellParams 
 		GasFeeStrategy:       LowLatencyGasStrategy(),
 		GrpcRecvUs:           &grpcRecvUs,
 	}
+	if dexType == soltradesdk.DexTypeMeteoraDammV2 {
+		fixedOutput := uint64(45_000)
+		params.FixedOutputTokenAmount = &fixedOutput
+	}
+	return params
 }
 
 func DescribeDryRun(name string) string {

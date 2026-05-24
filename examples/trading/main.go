@@ -20,8 +20,8 @@ func main() {
 
 	fmt.Println(exampleutil.DescribeDryRun("Complete PumpFun buy flow"))
 	fmt.Println("Wallet:", client.GetPayer())
-	fmt.Println("PumpFun v2 enabled:", exampleutil.TradeConfig().UsePumpFunV2)
 	if pp, ok := buyParams.ExtensionParams.(*params.PumpFunParams); ok {
+		fmt.Println("PumpFun quote mint:", pp.QuoteMint)
 		fmt.Println("Cashback flag:", pp.BondingCurve.IsCashbackCoin)
 	}
 }

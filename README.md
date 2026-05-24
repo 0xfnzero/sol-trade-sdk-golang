@@ -97,7 +97,7 @@ Add the dependency to your `go.mod`:
 
 ```go
 // Add to your go.mod
-require github.com/0xfnzero/sol-trade-sdk-golang v0.0.0
+require github.com/0xfnzero/sol-trade-sdk-golang v0.1.1
 
 replace github.com/0xfnzero/sol-trade-sdk-golang => ./sol-trade-sdk-golang
 ```
@@ -111,7 +111,7 @@ go mod tidy
 ### Use Go Modules
 
 ```bash
-go get github.com/0xfnzero/sol-trade-sdk-golang
+go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.1
 ```
 
 ## 🛠️ Usage Examples

@@ -174,7 +174,6 @@ type TradeConfig struct {
 	CheckMinTip               bool
 	UseSeedOptimize           bool
 	CreateWsolAtaOnStartup    bool
-	UsePumpFunV2              bool
 	SwqosCoresFromEnd         bool
 	MaxSwqosSubmitConcurrency int
 }
@@ -207,7 +206,6 @@ type TradeConfigBuilder struct {
 	checkMinTip               bool
 	useSeedOptimize           bool
 	createWsolAtaOnStartup    bool
-	usePumpFunV2              bool
 	swqosCoresFromEnd         bool
 	maxSwqosSubmitConcurrency int
 }
@@ -260,11 +258,6 @@ func (b *TradeConfigBuilder) CreateWsolAtaOnStartup(enabled bool) *TradeConfigBu
 	return b
 }
 
-func (b *TradeConfigBuilder) UsePumpFunV2(enabled bool) *TradeConfigBuilder {
-	b.usePumpFunV2 = enabled
-	return b
-}
-
 func (b *TradeConfigBuilder) SwqosCoresFromEnd(enabled bool) *TradeConfigBuilder {
 	b.swqosCoresFromEnd = enabled
 	return b
@@ -285,7 +278,6 @@ func (b *TradeConfigBuilder) Build() *TradeConfig {
 		CheckMinTip:               b.checkMinTip,
 		UseSeedOptimize:           b.useSeedOptimize,
 		CreateWsolAtaOnStartup:    b.createWsolAtaOnStartup,
-		UsePumpFunV2:              b.usePumpFunV2,
 		SwqosCoresFromEnd:         b.swqosCoresFromEnd,
 		MaxSwqosSubmitConcurrency: b.maxSwqosSubmitConcurrency,
 	}
