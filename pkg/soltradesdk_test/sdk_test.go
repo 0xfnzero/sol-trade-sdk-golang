@@ -290,6 +290,29 @@ func TestRootTradingClient_ReturnsExplicitExecutionError(t *testing.T) {
 	}
 }
 
+func TestTradeConfigAddsDefaultRPCWhenSwqosConfigured(t *testing.T) {
+	config := soltradesdk.NewTradeConfig("https://x", []soltradesdk.SwqosConfig{
+		{Type: soltradesdk.SwqosTypeJito, Region: soltradesdk.SwqosRegionFrankfurt, APIKey: "uuid"},
+	})
+
+	if len(config.SwqosConfigs) != 2 {
+		t.Fatalf("expected 2 swqos configs, got %d", len(config.SwqosConfigs))
+	}
+	if config.SwqosConfigs[0].Type != soltradesdk.SwqosTypeJito {
+		t.Fatalf("expected first route to stay Jito")
+	}
+	if config.SwqosConfigs[1].Type != soltradesdk.SwqosTypeDefault {
+		t.Fatalf("expected default RPC route to be appended")
+	}
+}
+
+func TestTradeConfigDoesNotAddDefaultRPCWhenNoSwqosConfigured(t *testing.T) {
+	config := soltradesdk.NewTradeConfig("https://x", nil)
+	if len(config.SwqosConfigs) != 0 {
+		t.Fatalf("expected no swqos configs, got %d", len(config.SwqosConfigs))
+	}
+}
+
 // ===== Utility Tests =====
 
 func TestUtils_LE(t *testing.T) {

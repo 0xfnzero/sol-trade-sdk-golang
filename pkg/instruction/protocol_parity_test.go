@@ -1,6 +1,7 @@
 package instruction
 
 import (
+	"encoding/binary"
 	"testing"
 
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
@@ -14,6 +15,20 @@ func testPK(seed byte) solana.PublicKey {
 		out[i] = seed
 	}
 	return out
+}
+
+func testPumpFunParams(quoteMint solana.PublicKey) *PumpFunParams {
+	return &PumpFunParams{
+		BondingCurve: &BondingCurve{
+			VirtualTokenReserves: 1_073_000_000_000_000,
+			VirtualSolReserves:   30_000_000_000,
+			RealTokenReserves:    793_100_000_000_000,
+			Creator:              testPK(7),
+		},
+		CreatorVault: testPK(8),
+		TokenProgram: constants.TOKEN_PROGRAM,
+		QuoteMint:    quoteMint,
+	}
 }
 
 func TestRaydiumAmmV4UsesMarketAccountOrder(t *testing.T) {
@@ -102,6 +117,44 @@ func TestRaydiumAmmV4RejectsBuyOutputMintMismatch(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatalf("expected output mint mismatch error")
+	}
+}
+
+func TestRaydiumCPMMUsesSwapBaseOutForFixedOutputBuy(t *testing.T) {
+	fixedOutput := uint64(42)
+	ixs, err := RaydiumCPMMBuildBuyInstructions(&RaydiumCPMMBuildBuyParams{
+		Payer:               testPK(99),
+		OutputMint:          testPK(2),
+		InputAmount:         100_000,
+		SlippageBasisPoints: 300,
+		CreateInputMintAta:  false,
+		CreateOutputMintAta: false,
+		FixedOutputAmount:   &fixedOutput,
+		ProtocolParams: &RaydiumCPMMParams{
+			AmmConfig:         testPK(1),
+			BaseMint:          constants.WSOL_TOKEN_ACCOUNT,
+			QuoteMint:         testPK(2),
+			BaseReserve:       1_000_000_000,
+			QuoteReserve:      2_000_000_000,
+			BaseTokenProgram:  constants.TOKEN_PROGRAM,
+			QuoteTokenProgram: constants.TOKEN_PROGRAM,
+		},
+	})
+	if err != nil {
+		t.Fatalf("build error: %v", err)
+	}
+	data, err := ixs[len(ixs)-1].Data()
+	if err != nil {
+		t.Fatalf("data error: %v", err)
+	}
+	if string(data[:8]) != string(RaydiumCPMMSwapBaseOutDiscriminator) {
+		t.Fatalf("expected swap_base_out discriminator")
+	}
+	if got := binary.LittleEndian.Uint64(data[8:16]); got != 100_000 {
+		t.Fatalf("max input = %d", got)
+	}
+	if got := binary.LittleEndian.Uint64(data[16:24]); got != fixedOutput {
+		t.Fatalf("amount out = %d", got)
 	}
 }
 
@@ -216,5 +269,88 @@ func TestMeteoraDammV2AcceptsSolAliasForWsolInput(t *testing.T) {
 	accounts := ixs[len(ixs)-1].Accounts()
 	if !accounts[6].PublicKey.Equals(constants.WSOL_TOKEN_ACCOUNT) {
 		t.Fatalf("token A mint not normalized to WSOL")
+	}
+}
+
+func TestPumpFunV2BuyUsesCurrentAccountLayout(t *testing.T) {
+	ixs, err := PumpFunBuildBuyInstructions(&PumpFunBuildBuyParams{
+		Payer:               testPK(99),
+		InputMint:           constants.USDC_TOKEN_ACCOUNT,
+		OutputMint:          testPK(2),
+		InputAmount:         100_000,
+		SlippageBasisPoints: 300,
+		CreateInputMintAta:  false,
+		CreateOutputMintAta: false,
+		ProtocolParams:      testPumpFunParams(constants.USDC_TOKEN_ACCOUNT),
+		UseExactSolAmount:   true,
+	})
+	if err != nil {
+		t.Fatalf("build error: %v", err)
+	}
+	accounts := ixs[len(ixs)-1].Accounts()
+	if len(accounts) != 27 {
+		t.Fatalf("accounts len = %d", len(accounts))
+	}
+	if !accounts[16].PublicKey.Equals(testPK(8)) {
+		t.Fatalf("creator vault account not at #16")
+	}
+	if accounts[18].IsWritable {
+		t.Fatalf("sharing config should be readonly")
+	}
+}
+
+func TestPumpFunV2FixedOutputUsesBuyV2(t *testing.T) {
+	fixedOutput := uint64(42)
+	ixs, err := PumpFunBuildBuyInstructions(&PumpFunBuildBuyParams{
+		Payer:               testPK(99),
+		InputMint:           constants.SOL_TOKEN_ACCOUNT,
+		OutputMint:          testPK(2),
+		InputAmount:         100_000,
+		SlippageBasisPoints: 300,
+		FixedOutputAmount:   &fixedOutput,
+		CreateInputMintAta:  false,
+		CreateOutputMintAta: false,
+		ProtocolParams:      testPumpFunParams(constants.WSOL_TOKEN_ACCOUNT),
+		UseExactSolAmount:   true,
+	})
+	if err != nil {
+		t.Fatalf("build error: %v", err)
+	}
+	data, err := ixs[len(ixs)-1].Data()
+	if err != nil {
+		t.Fatalf("data error: %v", err)
+	}
+	if string(data[:8]) != string(PumpFunBuyV2Discriminator) {
+		t.Fatalf("unexpected discriminator")
+	}
+	if got := binary.LittleEndian.Uint64(data[8:16]); got != fixedOutput {
+		t.Fatalf("token amount = %d", got)
+	}
+	if got := binary.LittleEndian.Uint64(data[16:24]); got != 100_000 {
+		t.Fatalf("max quote = %d", got)
+	}
+}
+
+func TestPumpFunV2RegularWsolBuyWrapsMaxQuoteBudget(t *testing.T) {
+	useExact := false
+	ixs, err := PumpFunBuildBuyInstructions(&PumpFunBuildBuyParams{
+		Payer:               testPK(99),
+		InputMint:           constants.SOL_TOKEN_ACCOUNT,
+		OutputMint:          testPK(2),
+		InputAmount:         100_000,
+		SlippageBasisPoints: 1000,
+		CreateInputMintAta:  true,
+		CreateOutputMintAta: false,
+		ProtocolParams:      testPumpFunParams(constants.WSOL_TOKEN_ACCOUNT),
+		UseExactSolAmount:   useExact,
+	})
+	if err != nil {
+		t.Fatalf("build error: %v", err)
+	}
+	if len(ixs) < 4 {
+		t.Fatalf("expected WSOL create/transfer/sync plus swap, got %d instructions", len(ixs))
+	}
+	if !ixs[1].ProgramID().Equals(constants.SYSTEM_PROGRAM) {
+		t.Fatalf("expected system transfer as second instruction")
 	}
 }

@@ -35,6 +35,13 @@ type PumpFunParams struct {
 	QuoteMint                 solana.PublicKey
 }
 
+func pumpFunQuoteMintForLayout(quoteMint solana.PublicKey) solana.PublicKey {
+	if quoteMint.IsZero() || quoteMint.Equals(constants.SOL_TOKEN_ACCOUNT) {
+		return solana.PublicKey{}
+	}
+	return quoteMint
+}
+
 // NewPumpFunParams creates new PumpFun params
 func NewPumpFunParams(
 	bondingCurve *BondingCurveAccount,
@@ -62,9 +69,9 @@ func (p *PumpFunParams) WithCreatorVault(vault solana.PublicKey) *PumpFunParams 
 	return p
 }
 
-// WithQuoteMint sets the PumpFun quote mint. A non-zero quote mint selects V2 instructions.
+// WithQuoteMint sets the PumpFun quote mint. Zero and SOL_TOKEN_ACCOUNT keep legacy SOL layout.
 func (p *PumpFunParams) WithQuoteMint(quoteMint solana.PublicKey) *PumpFunParams {
-	p.QuoteMint = quoteMint
+	p.QuoteMint = pumpFunQuoteMintForLayout(quoteMint)
 	return p
 }
 
@@ -103,7 +110,7 @@ func NewPumpFunParamsFromTrade(
 		CloseTokenAccountWhenSell: closeTokenAccountWhenSell,
 		ObservedTradeCreator:      creator,
 		FeeRecipient:              feeRecipient,
-		QuoteMint:                 quoteMint,
+		QuoteMint:                 pumpFunQuoteMintForLayout(quoteMint),
 	}
 }
 
@@ -161,11 +168,11 @@ func NewPumpFunParamsFromParserTrade(event PumpFunParserTradeEvent) (*PumpFunPar
 		return nil, fmt.Errorf("token_program: %w", err)
 	}
 	virtualQuoteReserves := event.VirtualQuoteReserves
-	if quoteMint.IsZero() {
+	if quoteMint.IsZero() || quoteMint.Equals(constants.SOL_TOKEN_ACCOUNT) {
 		virtualQuoteReserves = event.VirtualSolReserves
 	}
 	realQuoteReserves := event.RealQuoteReserves
-	if quoteMint.IsZero() {
+	if quoteMint.IsZero() || quoteMint.Equals(constants.SOL_TOKEN_ACCOUNT) {
 		realQuoteReserves = event.RealSolReserves
 	}
 	return NewPumpFunParamsFromTrade(

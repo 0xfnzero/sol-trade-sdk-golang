@@ -58,6 +58,31 @@ func TestNewPumpFunParamsFromParserTradePreservesZeroQuoteReserves(t *testing.T)
 	}
 }
 
+func TestNewPumpFunParamsFromParserTradeSolscanSolUsesLegacyReserves(t *testing.T) {
+	p, err := NewPumpFunParamsFromParserTrade(PumpFunParserTradeEvent{
+		QuoteMint:            constants.SOL_TOKEN_ACCOUNT.String(),
+		TokenProgram:         constants.TOKEN_PROGRAM.String(),
+		VirtualTokenReserves: 1_000_000,
+		VirtualSolReserves:   30_123_456_789,
+		VirtualQuoteReserves: 0,
+		RealTokenReserves:    900_000,
+		RealSolReserves:      123_456_789,
+		RealQuoteReserves:    0,
+	})
+	if err != nil {
+		t.Fatalf("NewPumpFunParamsFromParserTrade error: %v", err)
+	}
+	if !p.QuoteMint.IsZero() {
+		t.Fatalf("SOL sentinel should keep legacy layout quote mint, got %s", p.QuoteMint)
+	}
+	if p.BondingCurve.VirtualSolReserves != 30_123_456_789 {
+		t.Fatalf("virtual sol reserve not preserved: %d", p.BondingCurve.VirtualSolReserves)
+	}
+	if p.BondingCurve.RealSolReserves != 123_456_789 {
+		t.Fatalf("real sol reserve not preserved: %d", p.BondingCurve.RealSolReserves)
+	}
+}
+
 func TestNewPumpSwapParamsFromParserTradeUsesCreatorVaultAccounts(t *testing.T) {
 	vault := solana.NewWallet().PublicKey()
 	authority := solana.NewWallet().PublicKey()

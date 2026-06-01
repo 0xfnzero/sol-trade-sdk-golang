@@ -182,11 +182,28 @@ type TradeConfig struct {
 func NewTradeConfig(rpcUrl string, swqosConfigs []SwqosConfig) *TradeConfig {
 	return &TradeConfig{
 		RPCUrl:            rpcUrl,
-		SwqosConfigs:      swqosConfigs,
+		SwqosConfigs:      NormalizeSwqosConfigs(rpcUrl, swqosConfigs),
 		LogEnabled:        true,
 		UseSeedOptimize:   true,
 		SwqosCoresFromEnd: true,
 	}
+}
+
+// NormalizeSwqosConfigs appends the default RPC route whenever explicit SWQOS
+// providers are configured, so RPC submit stays concurrent with SWQOS submit.
+func NormalizeSwqosConfigs(rpcUrl string, configs []SwqosConfig) []SwqosConfig {
+	if len(configs) == 0 {
+		return configs
+	}
+	for _, cfg := range configs {
+		if cfg.Type == SwqosTypeDefault {
+			return configs
+		}
+	}
+	out := make([]SwqosConfig, 0, len(configs)+1)
+	out = append(out, configs...)
+	out = append(out, SwqosConfig{Type: SwqosTypeDefault, Region: SwqosRegionDefault, CustomURL: rpcUrl})
+	return out
 }
 
 // TradeConfigBuilder provides a fluent API for building TradeConfig.
@@ -224,7 +241,7 @@ func NewTradeConfigBuilder(rpcUrl string) *TradeConfigBuilder {
 
 // SwqosConfigs sets the SWQOS configurations
 func (b *TradeConfigBuilder) SwqosConfigs(configs []SwqosConfig) *TradeConfigBuilder {
-	b.swqosConfigs = configs
+	b.swqosConfigs = NormalizeSwqosConfigs(b.rpcUrl, configs)
 	return b
 }
 
@@ -272,7 +289,7 @@ func (b *TradeConfigBuilder) MaxSwqosSubmitConcurrency(limit int) *TradeConfigBu
 func (b *TradeConfigBuilder) Build() *TradeConfig {
 	return &TradeConfig{
 		RPCUrl:                    b.rpcUrl,
-		SwqosConfigs:              b.swqosConfigs,
+		SwqosConfigs:              NormalizeSwqosConfigs(b.rpcUrl, b.swqosConfigs),
 		LogEnabled:                b.logEnabled,
 		MEVProtection:             b.mevProtection,
 		CheckMinTip:               b.checkMinTip,

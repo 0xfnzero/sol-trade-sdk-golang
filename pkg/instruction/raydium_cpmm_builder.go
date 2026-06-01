@@ -157,12 +157,18 @@ func RaydiumCPMMBuildBuyInstructions(params *RaydiumCPMMBuildBuyParams) ([]solan
 	// Determine if base is input (WSOL/USDC)
 	isBaseIn := pp.BaseMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.BaseMint.Equals(constants.USDC_TOKEN_ACCOUNT)
 
-	// Get mint token program for output
-	mintTokenProgram := pp.QuoteTokenProgram
+	inputMint := pp.QuoteMint
+	inputTokenProgram := pp.QuoteTokenProgram
+	outputMint := pp.BaseMint
+	outputTokenProgram := pp.BaseTokenProgram
 	if isBaseIn {
-		mintTokenProgram = pp.QuoteTokenProgram
-	} else {
-		mintTokenProgram = pp.BaseTokenProgram
+		inputMint = pp.BaseMint
+		inputTokenProgram = pp.BaseTokenProgram
+		outputMint = pp.QuoteMint
+		outputTokenProgram = pp.QuoteTokenProgram
+	}
+	if !params.OutputMint.Equals(outputMint) {
+		return nil, fmt.Errorf("output mint must match Raydium CPMM pool side %s", outputMint.String())
 	}
 
 	// Calculate swap amounts
@@ -176,16 +182,9 @@ func RaydiumCPMMBuildBuyInstructions(params *RaydiumCPMMBuildBuyParams) ([]solan
 		minimumAmountOut = minAmountOut
 	}
 
-	// Determine input/output mints
-	inputMint := constants.WSOL_TOKEN_ACCOUNT
-	if isUsdc {
-		inputMint = constants.USDC_TOKEN_ACCOUNT
-	}
-	outputMint := params.OutputMint
-
 	// Get user token accounts
-	inputTokenAccount := GetAssociatedTokenAddress(params.Payer, inputMint, constants.TOKEN_PROGRAM)
-	outputTokenAccount := GetAssociatedTokenAddress(params.Payer, outputMint, mintTokenProgram)
+	inputTokenAccount := GetAssociatedTokenAddress(params.Payer, inputMint, inputTokenProgram)
+	outputTokenAccount := GetAssociatedTokenAddress(params.Payer, outputMint, outputTokenProgram)
 
 	// Get vault accounts
 	inputVaultAccount := GetRaydiumCPMMVaultAccount(poolState, inputMint, pp)
@@ -200,45 +199,56 @@ func RaydiumCPMMBuildBuyInstructions(params *RaydiumCPMMBuildBuyParams) ([]solan
 	// Build instructions
 	instructions := make([]solana.Instruction, 0, 6)
 
-	// Handle WSOL wrapping if needed
+	// Handle input account creation/wrapping
 	if params.CreateInputMintAta {
-		instructions = append(instructions, HandleWsol(params.Payer, amountIn)...)
+		if inputMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
+			instructions = append(instructions, HandleWsol(params.Payer, amountIn)...)
+		} else {
+			instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
+				params.Payer, params.Payer, inputMint, inputTokenProgram,
+			))
+		}
 	}
 
 	// Create output ATA if needed
 	if params.CreateOutputMintAta {
 		instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
-			params.Payer, params.Payer, outputMint, mintTokenProgram,
+			params.Payer, params.Payer, outputMint, outputTokenProgram,
 		))
 	}
 
 	// Build instruction data
 	data := make([]byte, 24)
-	copy(data[0:8], RaydiumCPMMSwapBaseInDiscriminator)
 	binary.LittleEndian.PutUint64(data[8:16], amountIn)
-	binary.LittleEndian.PutUint64(data[16:24], minimumAmountOut)
+	if params.FixedOutputAmount != nil {
+		copy(data[0:8], RaydiumCPMMSwapBaseOutDiscriminator)
+		binary.LittleEndian.PutUint64(data[16:24], *params.FixedOutputAmount)
+	} else {
+		copy(data[0:8], RaydiumCPMMSwapBaseInDiscriminator)
+		binary.LittleEndian.PutUint64(data[16:24], minimumAmountOut)
+	}
 
 	// Build accounts array (13 accounts)
 	accounts := []solana.AccountMeta{
-		{PublicKey: params.Payer, IsSigner: true, IsWritable: true},              // 0: Payer (signer)
-		{PublicKey: RAYDIUM_CPMM_AUTHORITY, IsSigner: false, IsWritable: false},  // 1: Authority (readonly)
-		{PublicKey: pp.AmmConfig, IsSigner: false, IsWritable: false},            // 2: Amm Config (readonly)
-		{PublicKey: poolState, IsSigner: false, IsWritable: true},                // 3: Pool State
-		{PublicKey: inputTokenAccount, IsSigner: false, IsWritable: true},        // 4: Input Token Account
-		{PublicKey: outputTokenAccount, IsSigner: false, IsWritable: true},       // 5: Output Token Account
-		{PublicKey: inputVaultAccount, IsSigner: false, IsWritable: true},        // 6: Input Vault Account
-		{PublicKey: outputVaultAccount, IsSigner: false, IsWritable: true},       // 7: Output Vault Account
-		{PublicKey: constants.TOKEN_PROGRAM, IsSigner: false, IsWritable: false}, // 8: Input Token Program (readonly)
-		{PublicKey: mintTokenProgram, IsSigner: false, IsWritable: false},        // 9: Output Token Program (readonly)
-		{PublicKey: inputMint, IsSigner: false, IsWritable: false},               // 10: Input token mint (readonly)
-		{PublicKey: outputMint, IsSigner: false, IsWritable: false},              // 11: Output token mint (readonly)
-		{PublicKey: observationStateAccount, IsSigner: false, IsWritable: true},  // 12: Observation State Account
+		{PublicKey: params.Payer, IsSigner: true, IsWritable: true},             // 0: Payer (signer)
+		{PublicKey: RAYDIUM_CPMM_AUTHORITY, IsSigner: false, IsWritable: false}, // 1: Authority (readonly)
+		{PublicKey: pp.AmmConfig, IsSigner: false, IsWritable: false},           // 2: Amm Config (readonly)
+		{PublicKey: poolState, IsSigner: false, IsWritable: true},               // 3: Pool State
+		{PublicKey: inputTokenAccount, IsSigner: false, IsWritable: true},       // 4: Input Token Account
+		{PublicKey: outputTokenAccount, IsSigner: false, IsWritable: true},      // 5: Output Token Account
+		{PublicKey: inputVaultAccount, IsSigner: false, IsWritable: true},       // 6: Input Vault Account
+		{PublicKey: outputVaultAccount, IsSigner: false, IsWritable: true},      // 7: Output Vault Account
+		{PublicKey: inputTokenProgram, IsSigner: false, IsWritable: false},      // 8: Input Token Program (readonly)
+		{PublicKey: outputTokenProgram, IsSigner: false, IsWritable: false},     // 9: Output Token Program (readonly)
+		{PublicKey: inputMint, IsSigner: false, IsWritable: false},              // 10: Input token mint (readonly)
+		{PublicKey: outputMint, IsSigner: false, IsWritable: false},             // 11: Output token mint (readonly)
+		{PublicKey: observationStateAccount, IsSigner: false, IsWritable: true}, // 12: Observation State Account
 	}
 
 	instructions = append(instructions, newInstruction(RAYDIUM_CPMM_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
-	if params.CloseInputMintAta {
+	if params.CloseInputMintAta && inputMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
 		instructions = append(instructions, CloseWsol(params.Payer))
 	}
 
@@ -270,12 +280,18 @@ func RaydiumCPMMBuildSellInstructions(params *RaydiumCPMMBuildSellParams) ([]sol
 	// Determine if quote is output (WSOL/USDC)
 	isQuoteOut := pp.QuoteMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.QuoteMint.Equals(constants.USDC_TOKEN_ACCOUNT)
 
-	// Get mint token program for input
-	mintTokenProgram := pp.BaseTokenProgram
+	expectedInputMint := pp.QuoteMint
+	inputTokenProgram := pp.QuoteTokenProgram
+	outputMint := pp.BaseMint
+	outputTokenProgram := pp.BaseTokenProgram
 	if isQuoteOut {
-		mintTokenProgram = pp.BaseTokenProgram
-	} else {
-		mintTokenProgram = pp.QuoteTokenProgram
+		expectedInputMint = pp.BaseMint
+		inputTokenProgram = pp.BaseTokenProgram
+		outputMint = pp.QuoteMint
+		outputTokenProgram = pp.QuoteTokenProgram
+	}
+	if !params.InputMint.Equals(expectedInputMint) {
+		return nil, fmt.Errorf("input mint must match Raydium CPMM pool side %s", expectedInputMint.String())
 	}
 
 	// Calculate minimum amount out
@@ -288,16 +304,11 @@ func RaydiumCPMMBuildSellInstructions(params *RaydiumCPMMBuildSellParams) ([]sol
 		minimumAmountOut = minAmountOut
 	}
 
-	// Determine output mint
-	outputMint := constants.WSOL_TOKEN_ACCOUNT
-	if isUsdc {
-		outputMint = constants.USDC_TOKEN_ACCOUNT
-	}
 	inputMint := params.InputMint
 
 	// Get user token accounts
-	inputTokenAccount := GetAssociatedTokenAddress(params.Payer, inputMint, mintTokenProgram)
-	outputTokenAccount := GetAssociatedTokenAddress(params.Payer, outputMint, constants.TOKEN_PROGRAM)
+	inputTokenAccount := GetAssociatedTokenAddress(params.Payer, inputMint, inputTokenProgram)
+	outputTokenAccount := GetAssociatedTokenAddress(params.Payer, outputMint, outputTokenProgram)
 
 	// Get vault accounts
 	inputVaultAccount := GetRaydiumCPMMVaultAccount(poolState, inputMint, pp)
@@ -315,37 +326,42 @@ func RaydiumCPMMBuildSellInstructions(params *RaydiumCPMMBuildSellParams) ([]sol
 	// Create WSOL ATA for receiving if needed
 	if params.CreateOutputMintAta {
 		instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
-			params.Payer, params.Payer, outputMint, constants.TOKEN_PROGRAM,
+			params.Payer, params.Payer, outputMint, outputTokenProgram,
 		))
 	}
 
 	// Build instruction data
 	data := make([]byte, 24)
-	copy(data[0:8], RaydiumCPMMSwapBaseInDiscriminator)
 	binary.LittleEndian.PutUint64(data[8:16], params.InputAmount)
-	binary.LittleEndian.PutUint64(data[16:24], minimumAmountOut)
+	if params.FixedOutputAmount != nil {
+		copy(data[0:8], RaydiumCPMMSwapBaseOutDiscriminator)
+		binary.LittleEndian.PutUint64(data[16:24], *params.FixedOutputAmount)
+	} else {
+		copy(data[0:8], RaydiumCPMMSwapBaseInDiscriminator)
+		binary.LittleEndian.PutUint64(data[16:24], minimumAmountOut)
+	}
 
 	// Build accounts array (13 accounts)
 	accounts := []solana.AccountMeta{
-		{PublicKey: params.Payer, IsSigner: true, IsWritable: true},              // 0: Payer (signer)
-		{PublicKey: RAYDIUM_CPMM_AUTHORITY, IsSigner: false, IsWritable: false},  // 1: Authority (readonly)
-		{PublicKey: pp.AmmConfig, IsSigner: false, IsWritable: false},            // 2: Amm Config (readonly)
-		{PublicKey: poolState, IsSigner: false, IsWritable: true},                // 3: Pool State
-		{PublicKey: inputTokenAccount, IsSigner: false, IsWritable: true},        // 4: Input Token Account
-		{PublicKey: outputTokenAccount, IsSigner: false, IsWritable: true},       // 5: Output Token Account
-		{PublicKey: inputVaultAccount, IsSigner: false, IsWritable: true},        // 6: Input Vault Account
-		{PublicKey: outputVaultAccount, IsSigner: false, IsWritable: true},       // 7: Output Vault Account
-		{PublicKey: mintTokenProgram, IsSigner: false, IsWritable: false},        // 8: Input Token Program (readonly)
-		{PublicKey: constants.TOKEN_PROGRAM, IsSigner: false, IsWritable: false}, // 9: Output Token Program (readonly)
-		{PublicKey: inputMint, IsSigner: false, IsWritable: false},               // 10: Input token mint (readonly)
-		{PublicKey: outputMint, IsSigner: false, IsWritable: false},              // 11: Output token mint (readonly)
-		{PublicKey: observationStateAccount, IsSigner: false, IsWritable: true},  // 12: Observation State Account
+		{PublicKey: params.Payer, IsSigner: true, IsWritable: true},             // 0: Payer (signer)
+		{PublicKey: RAYDIUM_CPMM_AUTHORITY, IsSigner: false, IsWritable: false}, // 1: Authority (readonly)
+		{PublicKey: pp.AmmConfig, IsSigner: false, IsWritable: false},           // 2: Amm Config (readonly)
+		{PublicKey: poolState, IsSigner: false, IsWritable: true},               // 3: Pool State
+		{PublicKey: inputTokenAccount, IsSigner: false, IsWritable: true},       // 4: Input Token Account
+		{PublicKey: outputTokenAccount, IsSigner: false, IsWritable: true},      // 5: Output Token Account
+		{PublicKey: inputVaultAccount, IsSigner: false, IsWritable: true},       // 6: Input Vault Account
+		{PublicKey: outputVaultAccount, IsSigner: false, IsWritable: true},      // 7: Output Vault Account
+		{PublicKey: inputTokenProgram, IsSigner: false, IsWritable: false},      // 8: Input Token Program (readonly)
+		{PublicKey: outputTokenProgram, IsSigner: false, IsWritable: false},     // 9: Output Token Program (readonly)
+		{PublicKey: inputMint, IsSigner: false, IsWritable: false},              // 10: Input token mint (readonly)
+		{PublicKey: outputMint, IsSigner: false, IsWritable: false},             // 11: Output token mint (readonly)
+		{PublicKey: observationStateAccount, IsSigner: false, IsWritable: true}, // 12: Observation State Account
 	}
 
 	instructions = append(instructions, newInstruction(RAYDIUM_CPMM_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
-	if params.CloseOutputMintAta {
+	if params.CloseOutputMintAta && outputMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
 		instructions = append(instructions, CloseWsol(params.Payer))
 	}
 

@@ -75,6 +75,7 @@ func (b *PumpFunInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([]sol
 		ProtocolParams:      toPumpFunParams(protocolParams),
 		CreateOutputMintAta: bp.CreateOutputATA,
 		CreateInputMintAta:  bp.CreateInputATA,
+		CloseInputMintAta:   bp.CloseInputATA,
 		UseExactSolAmount:   useExact,
 		FixedOutputAmount:   bp.FixedOutputAmount,
 	})

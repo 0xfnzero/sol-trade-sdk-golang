@@ -176,6 +176,7 @@ func NewHighPerfTradeExecutor(config *HighPerfTradeConfig) (*HighPerfTradeExecut
 	if config.RateLimitPerSecond <= 0 {
 		config.RateLimitPerSecond = 100.0
 	}
+	config.SWQoSConfigs = soltradesdk.NormalizeSwqosConfigs(config.RPCUrl, config.SWQoSConfigs)
 
 	executor := &HighPerfTradeExecutor{
 		config:         config,
@@ -214,6 +215,11 @@ func (e *HighPerfTradeExecutor) AddClient(config soltradesdk.SwqosConfig) error 
 	}
 	e.mu.Lock()
 	e.clients[config.Type] = client
+	if config.Type != soltradesdk.SwqosTypeDefault {
+		if _, ok := e.clients[soltradesdk.SwqosTypeDefault]; !ok {
+			e.clients[soltradesdk.SwqosTypeDefault] = swqos.NewDefaultClient(e.config.RPCUrl)
+		}
+	}
 	e.mu.Unlock()
 	return nil
 }

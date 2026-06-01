@@ -9,6 +9,7 @@ import (
 	"time"
 
 	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/swqos"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -45,6 +46,19 @@ func NewTradeExecutor(
 // AddSwqosClient adds a SWQOS client to the executor
 func (e *TradeExecutor) AddSwqosClient(client soltradesdk.SwqosClient) {
 	e.swqosClients = append(e.swqosClients, client)
+	e.ensureDefaultRpcClient()
+}
+
+func (e *TradeExecutor) ensureDefaultRpcClient() {
+	if e == nil || e.config == nil || e.config.RPCUrl == "" {
+		return
+	}
+	for _, client := range e.swqosClients {
+		if client.GetSwqosType() == soltradesdk.SwqosTypeDefault {
+			return
+		}
+	}
+	e.swqosClients = append(e.swqosClients, swqos.NewDefaultClient(e.config.RPCUrl))
 }
 
 // ExecuteResult represents the result of a trade execution
@@ -133,7 +147,6 @@ func (e *TradeExecutor) executeParallel(
 	var lastError error
 	for result := range resultChan {
 		if result.Success {
-			// Cancel pending submissions by closing context
 			return result
 		}
 		lastError = result.Error

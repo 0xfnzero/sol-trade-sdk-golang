@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/programs/token"
 
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
@@ -208,13 +209,11 @@ func HandleWsol(owner solana.PublicKey, amount uint64) []solana.Instruction {
 	// Create ATA (idempotent)
 	instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(owner, owner, constants.WSOL_TOKEN_ACCOUNT, constants.TOKEN_PROGRAM))
 
-	// Transfer SOL to WSOL ATA
-	instructions = append(instructions, token.NewTransferInstruction(
+	// Transfer native SOL lamports to the WSOL ATA.
+	instructions = append(instructions, system.NewTransferInstruction(
 		amount,
 		owner,
 		wsolAta,
-		owner,
-		[]solana.PublicKey{},
 	).Build())
 
 	// Sync native
@@ -247,8 +246,6 @@ func CreateAssociatedTokenAccountIdempotent(payer, owner, mint, tokenProgram sol
 		{PublicKey: mint, IsSigner: false, IsWritable: false},
 		{PublicKey: constants.SYSTEM_PROGRAM, IsSigner: false, IsWritable: false},
 		{PublicKey: tokenProgram, IsSigner: false, IsWritable: false},
-		{PublicKey: constants.ASSOCIATED_TOKEN_PROGRAM_ID, IsSigner: false, IsWritable: false},
-		{PublicKey: constants.RENT, IsSigner: false, IsWritable: false},
 	}
 
 	// Idempotent discriminator = 1

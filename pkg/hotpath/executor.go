@@ -172,14 +172,13 @@ func (e *HotPathExecutor) executeParallel(
 	resultChan := make(chan *ExecuteResult, len(e.swqosClients))
 	var wg sync.WaitGroup
 
-	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
-	defer cancel()
-
 	for _, client := range e.swqosClients {
 		wg.Add(1)
 		go func(c soltradesdk.SwqosClient) {
 			defer wg.Done()
-			sig, err := c.SendTransaction(ctx, tradeType, txBytes, false)
+			sendCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+			defer cancel()
+			sig, err := c.SendTransaction(sendCtx, tradeType, txBytes, false)
 			if err != nil {
 				resultChan <- &ExecuteResult{Success: false, Error: err}
 				return

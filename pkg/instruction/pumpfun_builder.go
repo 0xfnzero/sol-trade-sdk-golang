@@ -195,6 +195,7 @@ type PumpFunBuildBuyParams struct {
 	ProtocolParams      *PumpFunParams
 	CreateOutputMintAta bool
 	CreateInputMintAta  bool
+	CloseInputMintAta   bool
 	UseExactSolAmount   bool
 	FixedOutputAmount   *uint64
 }
@@ -270,6 +271,10 @@ func pumpFunEffectiveQuoteMint(pp *PumpFunParams) solana.PublicKey {
 	return constants.WSOL_TOKEN_ACCOUNT
 }
 
+func pumpFunUsesV2Layout(pp *PumpFunParams) bool {
+	return pumpFunUsablePubkey(pp.QuoteMint) && !pp.QuoteMint.Equals(constants.SOL_TOKEN_ACCOUNT)
+}
+
 func pumpFunIsSolQuoteMint(mint solana.PublicKey) bool {
 	return mint.Equals(constants.SOL_TOKEN_ACCOUNT) || mint.Equals(constants.WSOL_TOKEN_ACCOUNT)
 }
@@ -316,7 +321,7 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 	}
 
 	pp := params.ProtocolParams
-	if pumpFunUsablePubkey(pp.QuoteMint) {
+	if pumpFunUsesV2Layout(pp) {
 		return PumpFunBuildBuyV2Instructions(params)
 	}
 	bondingCurve := pp.BondingCurve
@@ -382,7 +387,13 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 
 	// Build instruction data
 	var data []byte
-	if params.UseExactSolAmount {
+	if params.FixedOutputAmount != nil {
+		data = make([]byte, 25)
+		copy(data[0:8], PumpFunBuyDiscriminator)
+		binary.LittleEndian.PutUint64(data[8:16], *params.FixedOutputAmount)
+		binary.LittleEndian.PutUint64(data[16:24], params.InputAmount)
+		data[24] = trackVolume
+	} else if params.UseExactSolAmount {
 		// buy_exact_sol_in(spendable_sol_in: u64, min_tokens_out: u64, track_volume)
 		minTokensOut, _ := calc.CalculateWithSlippageSell(buyTokenAmount, params.SlippageBasisPoints)
 		data = make([]byte, 25)
@@ -439,7 +450,7 @@ func PumpFunBuildSellInstructions(params *PumpFunBuildSellParams) ([]solana.Inst
 	}
 
 	pp := params.ProtocolParams
-	if pumpFunUsablePubkey(pp.QuoteMint) {
+	if pumpFunUsesV2Layout(pp) {
 		return PumpFunBuildSellV2Instructions(params)
 	}
 	bondingCurve := pp.BondingCurve
@@ -592,12 +603,6 @@ func PumpFunBuildBuyV2Instructions(params *PumpFunBuildBuyParams) ([]solana.Inst
 			params.Payer, params.Payer, params.OutputMint, baseTokenProgram,
 		))
 	}
-	if params.CreateInputMintAta {
-		instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
-			params.Payer, params.Payer, quoteMint, quoteTokenProgram,
-		))
-	}
-
 	var buyTokenAmount uint64
 	if params.FixedOutputAmount != nil {
 		buyTokenAmount = *params.FixedOutputAmount
@@ -613,18 +618,34 @@ func PumpFunBuildBuyV2Instructions(params *PumpFunBuildBuyParams) ([]solana.Inst
 	maxSolCost, _ := calc.CalculateWithSlippageBuy(params.InputAmount, params.SlippageBasisPoints)
 
 	data := make([]byte, 24)
-	if params.UseExactSolAmount {
+	var quoteAmountToFund uint64
+	if params.FixedOutputAmount != nil {
+		copy(data[0:8], PumpFunBuyV2Discriminator)
+		binary.LittleEndian.PutUint64(data[8:16], *params.FixedOutputAmount)
+		binary.LittleEndian.PutUint64(data[16:24], params.InputAmount)
+		quoteAmountToFund = params.InputAmount
+	} else if params.UseExactSolAmount {
 		minTokensOut := buyTokenAmount
-		if params.FixedOutputAmount == nil {
-			minTokensOut, _ = calc.CalculateWithSlippageSell(buyTokenAmount, params.SlippageBasisPoints)
-		}
+		minTokensOut, _ = calc.CalculateWithSlippageSell(buyTokenAmount, params.SlippageBasisPoints)
 		copy(data[0:8], PumpFunBuyExactQuoteInV2Discriminator)
 		binary.LittleEndian.PutUint64(data[8:16], params.InputAmount)
 		binary.LittleEndian.PutUint64(data[16:24], minTokensOut)
+		quoteAmountToFund = params.InputAmount
 	} else {
 		copy(data[0:8], PumpFunBuyV2Discriminator)
 		binary.LittleEndian.PutUint64(data[8:16], buyTokenAmount)
 		binary.LittleEndian.PutUint64(data[16:24], maxSolCost)
+		quoteAmountToFund = maxSolCost
+	}
+
+	if params.CreateInputMintAta {
+		if quoteMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
+			instructions = append(instructions, HandleWsol(params.Payer, quoteAmountToFund)...)
+		} else {
+			instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
+				params.Payer, params.Payer, quoteMint, quoteTokenProgram,
+			))
+		}
 	}
 
 	accounts := []solana.AccountMeta{
@@ -657,6 +678,9 @@ func PumpFunBuildBuyV2Instructions(params *PumpFunBuildBuyParams) ([]solana.Inst
 		{PublicKey: PUMPFUN_PROGRAM, IsSigner: false, IsWritable: false},
 	}
 	instructions = append(instructions, newInstruction(PUMPFUN_PROGRAM, accounts, data))
+	if params.CloseInputMintAta && quoteMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
+		instructions = append(instructions, CloseWsol(params.Payer))
+	}
 	return instructions, nil
 }
 

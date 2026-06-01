@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -311,17 +312,78 @@ func TestAccountStateCacheConcurrentAccess(t *testing.T) {
 // ===== Mock SWQoS Client for Testing =====
 
 type MockSwqosClient struct {
-	swqosType  string
-	sendTxFunc func(ctx context.Context, tradeType string, txBytes []byte) (solana.Signature, error)
+	swqosType  soltradesdk.SwqosType
+	sendTxFunc func(ctx context.Context, tradeType soltradesdk.TradeType, txBytes []byte) (solana.Signature, error)
 }
 
-func (m *MockSwqosClient) SendTransaction(ctx context.Context, tradeType interface{}, txBytes []byte, skipPreflight bool) (solana.Signature, error) {
+func (m *MockSwqosClient) SendTransaction(ctx context.Context, tradeType soltradesdk.TradeType, txBytes []byte, waitConfirmation bool) (solana.Signature, error) {
 	if m.sendTxFunc != nil {
-		return m.sendTxFunc(ctx, tradeType.(string), txBytes)
+		return m.sendTxFunc(ctx, tradeType, txBytes)
 	}
 	return solana.Signature{}, nil
 }
 
-func (m *MockSwqosClient) GetSwqosType() interface{} {
+func (m *MockSwqosClient) SendTransactions(ctx context.Context, tradeType soltradesdk.TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	signatures := make([]solana.Signature, 0, len(transactions))
+	for _, tx := range transactions {
+		sig, err := m.SendTransaction(ctx, tradeType, tx, waitConfirmation)
+		if err != nil {
+			return nil, err
+		}
+		signatures = append(signatures, sig)
+	}
+	return signatures, nil
+}
+
+func (m *MockSwqosClient) GetTipAccount() string {
+	return ""
+}
+
+func (m *MockSwqosClient) GetSwqosType() soltradesdk.SwqosType {
 	return m.swqosType
+}
+
+func (m *MockSwqosClient) MinTipSol() float64 {
+	return 0
+}
+
+func testSignature(n byte) solana.Signature {
+	var sig solana.Signature
+	sig[0] = n
+	return sig
+}
+
+func TestHotPathParallelSubmitDoesNotCancelSlowRoutes(t *testing.T) {
+	executor := NewHotPathExecutor(nil, DefaultHotPathConfig())
+	slowDone := make(chan error, 1)
+
+	executor.AddSwqosClient(&MockSwqosClient{
+		swqosType: soltradesdk.SwqosTypeJito,
+		sendTxFunc: func(ctx context.Context, tradeType soltradesdk.TradeType, txBytes []byte) (solana.Signature, error) {
+			return testSignature(1), nil
+		},
+	})
+	executor.AddSwqosClient(&MockSwqosClient{
+		swqosType: soltradesdk.SwqosTypeDefault,
+		sendTxFunc: func(ctx context.Context, tradeType soltradesdk.TradeType, txBytes []byte) (solana.Signature, error) {
+			select {
+			case <-time.After(20 * time.Millisecond):
+				slowDone <- ctx.Err()
+				return testSignature(2), nil
+			case <-ctx.Done():
+				slowDone <- ctx.Err()
+				return solana.Signature{}, ctx.Err()
+			}
+		},
+	})
+
+	result := executor.executeParallel(
+		context.Background(),
+		soltradesdk.TradeTypeBuy,
+		[]byte("tx"),
+		ExecuteOptions{ParallelSubmit: true, Timeout: 100 * time.Millisecond},
+	)
+
+	require.True(t, result.Success)
+	require.NoError(t, <-slowDone)
 }
