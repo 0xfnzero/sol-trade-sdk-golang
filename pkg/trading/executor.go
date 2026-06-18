@@ -209,12 +209,16 @@ func (e *TradeExecutor) submitToClient(
 	}
 
 	if opts.WaitConfirmation {
-		confirmed, confirmTime := e.waitForConfirmation(ctx, sig)
+		confirmed, confirmTime, confirmErr := e.waitForConfirmation(ctx, sig)
 		result.ConfirmedAt = time.Now()
 		result.ConfirmationMs = confirmTime.Milliseconds()
 		if !confirmed {
 			result.Success = false
-			result.Error = fmt.Errorf("transaction failed to confirm")
+			if confirmErr != nil {
+				result.Error = confirmErr
+			} else {
+				result.Error = fmt.Errorf("transaction failed to confirm")
+			}
 		}
 	}
 
@@ -225,7 +229,7 @@ func (e *TradeExecutor) submitToClient(
 func (e *TradeExecutor) waitForConfirmation(
 	ctx context.Context,
 	sig solana.Signature,
-) (bool, time.Duration) {
+) (bool, time.Duration, error) {
 	start := time.Now()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -233,7 +237,7 @@ func (e *TradeExecutor) waitForConfirmation(
 	for i := 0; i < e.confirmationRetry; i++ {
 		select {
 		case <-ctx.Done():
-			return false, time.Since(start)
+			return false, time.Since(start), ctx.Err()
 		case <-ticker.C:
 			status, err := e.rpcClient.GetSignatureStatuses(ctx, true, sig)
 			if err != nil {
@@ -241,17 +245,32 @@ func (e *TradeExecutor) waitForConfirmation(
 			}
 
 			if len(status.Value) > 0 && status.Value[0] != nil {
-				if status.Value[0].ConfirmationStatus == rpc.ConfirmationStatusFinalized {
-					return true, time.Since(start)
+				if status.Value[0].Err == nil &&
+					(status.Value[0].ConfirmationStatus == rpc.ConfirmationStatusConfirmed ||
+						status.Value[0].ConfirmationStatus == rpc.ConfirmationStatusFinalized) {
+					return true, time.Since(start), nil
 				}
 				if status.Value[0].Err != nil {
-					return false, time.Since(start)
+					return false, time.Since(start), e.transactionError(ctx, sig, status.Value[0].Err)
 				}
 			}
 		}
 	}
 
-	return false, time.Since(start)
+	return false, time.Since(start), fmt.Errorf("transaction confirmation timed out")
+}
+
+func (e *TradeExecutor) transactionError(ctx context.Context, sig solana.Signature, statusErr interface{}) error {
+	var zero uint64
+	tx, err := e.rpcClient.GetTransaction(ctx, sig, &rpc.GetTransactionOpts{
+		Encoding:                       solana.EncodingBase64,
+		Commitment:                     rpc.CommitmentConfirmed,
+		MaxSupportedTransactionVersion: &zero,
+	})
+	if err != nil || tx == nil || tx.Meta == nil {
+		return soltradesdk.FormatParsedTransactionError(statusErr, nil)
+	}
+	return soltradesdk.FormatParsedTransactionError(tx.Meta.Err, tx.Meta.LogMessages)
 }
 
 // ExecuteMultiple executes multiple transactions

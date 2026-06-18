@@ -74,19 +74,23 @@ This SDK is available in multiple languages:
 
 This release refreshes PumpFun V2 and USDC quote-pool handling, keeps the default RPC submit lane active alongside SWQoS lanes, and aligns Raydium CPMM fixed-output swaps with the on-chain `swap_base_out` instruction. Trade execution requires a caller-supplied recent blockhash or durable nonce; hot-path execution does not query RPC for blockhash, account, or balance data.
 
+## Rust v4.0.21 Parity
+
+This SDK now tracks the Rust SDK `v4.0.21` public behavior for high-level trade intent APIs and SWQoS provider coverage. New code can use `BuySimple` / `SellSimple` with `AccountPolicy`, `BuyAmount`, and `SellAmount`; these convert to the existing `Buy` / `Sell` params without removing the legacy API. The root `TradingClient` still documents its execution boundary and does not claim to build or submit trades by itself. SWQoS coverage includes the Rust `Solami` type and defaults (`beam.solami.dev:11000`, min tip `0.0001 SOL`); live Solami submit uses the main QUIC client path and requires the same base58 Solana keypair api token model as Rust. Explicit SWQoS routes still keep the default RPC lane appended.
+
 ## ✨ Features
 
-1. **PumpFun Trading**: Unified `buy`, `sell`, and `buy_exact_quote_in` flow with automatic legacy or V2 instruction selection for SOL and USDC quote pools
-2. **PumpSwap Trading**: Support for PumpSwap pool trading operations
-3. **Bonk Trading**: Support for Bonk trading operations
-4. **Raydium CPMM Trading**: Support for Raydium CPMM (Concentrated Pool Market Maker) trading operations
-5. **Raydium AMM V4 Trading**: Support for Raydium AMM V4 (Automated Market Maker) trading operations
-6. **Meteora DAMM V2 Trading**: Support for Meteora DAMM V2 (Dynamic AMM) trading operations
+1. **PumpFun Builders**: Instruction builders and params for legacy/V2 PumpFun SOL and USDC quote-pool flows
+2. **PumpSwap Builders**: Instruction builders and params for PumpSwap pool operations
+3. **Bonk Builders**: Instruction builders and params for Bonk routing
+4. **Raydium CPMM Builders**: Instruction builders and params for Raydium CPMM fixed-input and fixed-output swaps
+5. **Raydium AMM V4 Builders**: Instruction builders and params for Raydium AMM V4 swaps
+6. **Meteora DAMM V2 Builders**: Instruction builders and params for Meteora DAMM V2 operations
 7. **Multiple MEV Protection**: Support for Jito, Nextblock, ZeroSlot, Temporal, Bloxroute, FlashBlock, BlockRazor, Node1, Astralane and other services
 8. **Concurrent Trading**: Submit through every configured SWQoS provider plus the default RPC lane; the first accepted result can return early while slower routes continue submitting
-9. **Unified Trading Interface**: Use unified trading protocol types for trading operations
-10. **Middleware System**: Support for custom instruction middleware to modify, add, or remove instructions before transaction execution
-11. **Shared Infrastructure**: Share expensive RPC and SWQoS clients across multiple wallets for reduced resource usage
+9. **Unified Trading Interface**: Use unified trading protocol types for trading operations, including Rust-parity `BuySimple` / `SellSimple` intent params
+10. **Middleware System**: Support for custom instruction middleware in lower-level instruction/executor paths
+11. **Reusable Execution Components**: Build and submit prebuilt transactions through `pkg/trading`, `pkg/trading/core`, or `pkg/hotpath`
 12. **Hot-Path RPC Boundary**: Trade execution uses caller-supplied blockhash or durable nonce and never queries RPC for blockhash, account, or balance data
 
 ## 📦 Installation
@@ -125,7 +129,9 @@ go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.2
 
 ### 📋 Example Usage
 
-#### 1. Create TradingClient Instance
+For the high-level intent API, see [Simple Trading](examples/simple_trading/main.go). It shows `AccountPolicyAuto`, `BuyWithMaxInput`, and the conversion to legacy `TradeBuyParams`.
+
+#### 1. Create Root TradingClient Instance
 
 You can refer to [Example: Create TradingClient Instance](examples/trading_client/main.go).
 
@@ -138,55 +144,51 @@ import (
     "fmt"
     "log"
 
-    soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang"
-    "github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
-    "github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
+    soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+    "github.com/gagliardetto/solana-go"
 )
 
 func main() {
     ctx := context.Background()
 
     // Wallet
-    payer := /* your keypair */
+    wallet := solana.NewWallet()
+    payer := wallet.PrivateKey
 
     // RPC URL
     rpcURL := "https://mainnet.helius-rpc.com/?api-key=xxxxxx"
 
     // Multiple SWQoS services can be configured
     swqosConfigs := []soltradesdk.SwqosConfig{
-        {Type: soltradesdk.SwqosTypeDefault, RPCUrl: rpcURL},
-        {Type: soltradesdk.SwqosTypeJito, UUID: "your_uuid", Region: soltradesdk.SwqosRegionFrankfurt},
-        {Type: soltradesdk.SwqosTypeBloxroute, APIToken: "your_api_token", Region: soltradesdk.SwqosRegionFrankfurt},
+        {Type: soltradesdk.SwqosTypeJito, APIKey: "your_uuid", Region: soltradesdk.SwqosRegionFrankfurt},
+        {Type: soltradesdk.SwqosTypeBloxroute, APIKey: "your_api_token", Region: soltradesdk.SwqosRegionFrankfurt},
         {Type: soltradesdk.SwqosTypeAstralane, APIKey: "your_api_key", Region: soltradesdk.SwqosRegionFrankfurt},
     }
 
-    // Create TradeConfig instance
-    config := &soltradesdk.TradeConfig{
-        RPCUrl:      rpcURL,
-        SwqosConfigs: swqosConfigs,
+    config := soltradesdk.NewTradeConfig(rpcURL, swqosConfigs)
+
+    client, err := soltradesdk.NewTradingClient(ctx, &payer, config)
+    if err != nil {
+        log.Fatal(err)
     }
 
-    // Create TradingClient
-    client := trading.NewTradingClient(payer, config)
+    fmt.Println("wallet:", client.GetPayer())
 }
 ```
 
-**Method 2: Shared infrastructure (multiple wallets)**
+**Method 2: Prebuilt transaction executor**
 
-For multi-wallet scenarios, create the infrastructure once and share it across wallets.
-See [Example: Shared Infrastructure](examples/shared_infrastructure/main.go).
+The root `TradingClient` converts high-level simple params but intentionally does not build or submit protocol trades in Go. Submit already-built transactions with `pkg/trading.TradeExecutor`, `pkg/trading/core`, or `pkg/hotpath`.
 
 ```go
-// Create infrastructure once (expensive)
-infraConfig := &common.InfrastructureConfig{
-    RPCUrl:      rpcURL,
-    SwqosConfigs: swqosConfigs,
-}
-infrastructure := trading.NewTradingInfrastructure(infraConfig)
+rpcClient := rpc.New(rpcURL)
+executor := trading.NewTradeExecutor(rpcClient, config, soltradesdk.NewGasFeeStrategy())
+executor.AddSwqosClient(swqos.NewDefaultClient(rpcURL))
 
-// Create multiple clients sharing the same infrastructure (fast)
-client1 := trading.NewTradingClientFromInfrastructure(payer1, infrastructure)
-client2 := trading.NewTradingClientFromInfrastructure(payer2, infrastructure)
+result := executor.Execute(ctx, soltradesdk.TradeTypeBuy, signedTx, trading.DefaultExecuteOptions())
+if !result.Success {
+    log.Fatal(result.Error)
+}
 ```
 
 #### 2. Configure Gas Fee Strategy
@@ -201,27 +203,27 @@ gasStrategy.SetGlobalFeeStrategy(150000, 150000, 500000, 500000, 0.001, 0.001)
 #### 3. Build Trading Parameters
 
 ```go
-buyParams := &soltradesdk.TradeBuyParams{
-    DexType:              soltradesdk.DexTypePumpSwap,
-    InputTokenType:       soltradesdk.TradeTokenTypeWSOL,
-    Mint:                 mintPubkey,
-    InputTokenAmount:     buySolAmount,
-    SlippageBasisPoints:  500,
-    RecentBlockhash:      &recentBlockhash,
-    ExtensionParams:      &soltradesdk.DexParamEnum{Type: "PumpSwap", Params: pumpSwapParams},
-    WaitTransactionConfirmed: true,
-    CreateInputTokenAta:  true,
-    CloseInputTokenAta:   true,
-    CreateMintAta:        true,
-    GasFeeStrategy:       gasStrategy,
-    Simulate:             false,
-}
+simple := soltradesdk.NewSimpleBuyParams(
+    soltradesdk.DexTypePumpSwap,
+    soltradesdk.TradeTokenTypeWSOL,
+    mintPubkey,
+    soltradesdk.BuyWithMaxInput(buySolAmount),
+    pumpSwapParams,
+    recentBlockhash,
+    gasStrategy,
+).
+    SetSlippageBasisPoints(500).
+    SetAccountPolicy(soltradesdk.AccountPolicyAuto)
+buyParams := client.BuildBuyParamsFromSimple(simple)
 ```
 
-#### 4. Execute Trading
+#### 4. Execute Boundary
 
 ```go
 result, err := client.Buy(ctx, buyParams)
+if errors.Is(err, soltradesdk.ErrTradingExecutionUnavailable) {
+    log.Fatal("root TradingClient converted params only; use a lower-level executor for live submission")
+}
 if err != nil {
     log.Fatal(err)
 }
@@ -262,10 +264,10 @@ Please ensure that the parameters your trading logic depends on are available in
 
 ### ⚙️ SWQoS Service Configuration
 
-When configuring SWQoS services, note the different parameter requirements for each service:
+When configuring SWQoS services, use `APIKey` for provider credentials:
 
-- **Jito**: The first parameter is UUID (if no UUID, pass an empty string `""`)
-- **Other MEV services**: The first parameter is the API Token
+- **Jito**: `APIKey` is the Jito UUID (or `""` if not required)
+- **Other MEV services**: `APIKey` is the provider API token
 
 #### Custom URL Support
 
@@ -275,16 +277,16 @@ Each SWQoS service supports an optional custom URL parameter:
 // Using custom URL
 jitoConfig := soltradesdk.SwqosConfig{
     Type:      soltradesdk.SwqosTypeJito,
-    UUID:      "your_uuid",
+    APIKey:    "your_uuid",
     Region:    soltradesdk.SwqosRegionFrankfurt,
     CustomURL: "https://custom-jito-endpoint.com",
 }
 
 // Using default regional endpoint
 bloxrouteConfig := soltradesdk.SwqosConfig{
-    Type:     soltradesdk.SwqosTypeBloxroute,
-    APIToken: "your_api_token",
-    Region:   soltradesdk.SwqosRegionNewYork,
+    Type:   soltradesdk.SwqosTypeBloxroute,
+    APIKey: "your_api_token",
+    Region: soltradesdk.SwqosRegionNewYork,
 }
 ```
 
@@ -344,8 +346,8 @@ if err != nil {
 PumpFun and PumpSwap support **cashback** for eligible tokens: part of the trading fee can be returned to the user. The SDK **must know** whether the token has cashback enabled so that buy/sell instructions include the correct accounts.
 
 - **When params come from RPC**: If you use `PumpFunParams.FromMintByRPC` or `PumpSwapParams.FromPoolAddressByRPC`, the SDK reads `IsCashbackCoin` from chain—no extra step.
-- **When params come from event/parser**: If you build params from trade events (e.g. [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk)), you **must** pass the cashback flag into the SDK:
-  - **PumpFun**: Set `IsCashbackCoin` when building params from parsed events.
+- **When params come from decoded events**: If you build params from already-decoded trade events (for example from a parser service), you **must** pass the cashback flag into the SDK:
+  - **PumpFun**: Set `IsCashbackCoin` when building params from decoded events.
   - **PumpSwap**: Set `IsCashbackCoin` field when constructing params manually.
 
 ## 🛡️ MEV Protection Services

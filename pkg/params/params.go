@@ -75,14 +75,14 @@ func (p *PumpFunParams) WithQuoteMint(quoteMint solana.PublicKey) *PumpFunParams
 	return p
 }
 
-// WithFeeRecipient sets the observed PumpFun fee recipient from parser/grpc events.
+// WithFeeRecipient sets the observed PumpFun fee recipient from already-decoded events.
 func (p *PumpFunParams) WithFeeRecipient(feeRecipient solana.PublicKey) *PumpFunParams {
 	p.FeeRecipient = feeRecipient
 	return p
 }
 
-// NewPumpFunParamsFromTrade builds PumpFun params from sol-parser-sdk trade event fields.
-// Pass VirtualQuoteReserves/RealQuoteReserves from the parser event for quote-aware slippage.
+// NewPumpFunParamsFromTrade builds PumpFun params from already-decoded trade event fields.
+// Pass VirtualQuoteReserves/RealQuoteReserves from the decoded event for quote-aware slippage.
 func NewPumpFunParamsFromTrade(
 	bondingCurve, associatedBondingCurve, mint, quoteMint,
 	creator, creatorVault solana.PublicKey,

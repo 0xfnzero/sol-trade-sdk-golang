@@ -14,8 +14,15 @@ type (
 	SwqosConfig      = soltradesdk.SwqosConfig
 	GasFeeStrategy   = soltradesdk.GasFeeStrategy
 	TradeConfig      = soltradesdk.TradeConfig
+	AccountPolicy    = soltradesdk.AccountPolicy
+	BuyAmountKind    = soltradesdk.BuyAmountKind
+	BuyAmount        = soltradesdk.BuyAmount
+	SellAmountKind   = soltradesdk.SellAmountKind
+	SellAmount       = soltradesdk.SellAmount
 	TradeBuyParams   = soltradesdk.TradeBuyParams
 	TradeSellParams  = soltradesdk.TradeSellParams
+	SimpleBuyParams  = soltradesdk.SimpleBuyParams
+	SimpleSellParams = soltradesdk.SimpleSellParams
 	TradeResult      = soltradesdk.TradeResult
 	DurableNonceInfo = soltradesdk.DurableNonceInfo
 )
@@ -45,7 +52,18 @@ const (
 	SwqosTypeSoyas        = soltradesdk.SwqosTypeSoyas
 	SwqosTypeSpeedlanding = soltradesdk.SwqosTypeSpeedlanding
 	SwqosTypeHelius       = soltradesdk.SwqosTypeHelius
+	SwqosTypeSolami       = soltradesdk.SwqosTypeSolami
 	SwqosTypeDefault      = soltradesdk.SwqosTypeDefault
+
+	AccountPolicyAuto           = soltradesdk.AccountPolicyAuto
+	AccountPolicyHotPathMinimal = soltradesdk.AccountPolicyHotPathMinimal
+	AccountPolicyCreateMissing  = soltradesdk.AccountPolicyCreateMissing
+	AccountPolicyAssumePrepared = soltradesdk.AccountPolicyAssumePrepared
+	BuyAmountExactInput         = soltradesdk.BuyAmountExactInput
+	BuyAmountExactOutput        = soltradesdk.BuyAmountExactOutput
+	BuyAmountWithMaxInput       = soltradesdk.BuyAmountWithMaxInput
+	SellAmountExactInput        = soltradesdk.SellAmountExactInput
+	SellAmountExactOutput       = soltradesdk.SellAmountExactOutput
 
 	SwqosRegionNewYork    = soltradesdk.SwqosRegionNewYork
 	SwqosRegionFrankfurt  = soltradesdk.SwqosRegionFrankfurt
@@ -57,4 +75,17 @@ const (
 	SwqosRegionLondon     = soltradesdk.SwqosRegionLondon
 	SwqosRegionLosAngeles = soltradesdk.SwqosRegionLosAngeles
 	SwqosRegionDefault    = soltradesdk.SwqosRegionDefault
+)
+
+var (
+	BuyExactInput   = soltradesdk.BuyExactInput
+	BuyExactOutput  = soltradesdk.BuyExactOutput
+	BuyWithMaxInput = soltradesdk.BuyWithMaxInput
+	SellExactInput  = soltradesdk.SellExactInput
+	SellExactOutput = soltradesdk.SellExactOutput
+
+	NewSimpleBuyParams                  = soltradesdk.NewSimpleBuyParams
+	NewSimpleBuyParamsWithDurableNonce  = soltradesdk.NewSimpleBuyParamsWithDurableNonce
+	NewSimpleSellParams                 = soltradesdk.NewSimpleSellParams
+	NewSimpleSellParamsWithDurableNonce = soltradesdk.NewSimpleSellParamsWithDurableNonce
 )

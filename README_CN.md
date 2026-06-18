@@ -74,19 +74,23 @@
 
 本版本刷新 PumpFun V2 与 USDC quote 池处理逻辑，确保默认 RPC 提交通道会和 SWQoS 通道一起发出，并将 Raydium CPMM fixed-output 交易对齐到链上 `swap_base_out` 指令。交易执行必须由调用方传入 recent blockhash 或 durable nonce；热路径不会查询 RPC 获取 blockhash、账户或余额数据。
 
+## Rust v4.0.21 对齐
+
+本 SDK 现在按 Rust SDK `v4.0.21` 对齐高层交易 intent API 和 SWQoS provider 覆盖。新代码可以使用 `BuySimple` / `SellSimple`，并通过 `AccountPolicy`、`BuyAmount`、`SellAmount` 描述意图；内部会转换到现有 `Buy` / `Sell` 参数，不移除旧 API。根 `TradingClient` 仍明确其执行边界，不宣称自己会构建或提交交易。SWQoS 已包含 Rust 的 `Solami` 类型与默认配置（`beam.solami.dev:11000`，最小 tip `0.0001 SOL`）；真实 Solami 提交走主 QUIC client 路径，并需要和 Rust 相同的 base58 Solana keypair api token。配置显式 SWQoS 时仍会自动追加默认 RPC 通道。
+
 ## ✨ 项目特性
 
-1. **PumpFun 交易**: 统一 `buy`、`sell`、`buy_exact_quote_in` 流程，自动按 SOL 或 USDC quote 池选择旧版或 V2 链上指令
-2. **PumpSwap 交易**: 支持 PumpSwap 池的交易操作
-3. **Bonk 交易**: 支持 Bonk 的交易操作
-4. **Raydium CPMM 交易**: 支持 Raydium CPMM (Concentrated Pool Market Maker) 的交易操作
-5. **Raydium AMM V4 交易**: 支持 Raydium AMM V4 (Automated Market Maker) 的交易操作
-6. **Meteora DAMM V2 交易**: 支持 Meteora DAMM V2 (Dynamic AMM) 的交易操作
+1. **PumpFun 构建器**: 提供 legacy/V2 PumpFun SOL 与 USDC quote 池流程的指令构建器和参数
+2. **PumpSwap 构建器**: 提供 PumpSwap 池操作的指令构建器和参数
+3. **Bonk 构建器**: 提供 Bonk 路由的指令构建器和参数
+4. **Raydium CPMM 构建器**: 提供 Raydium CPMM fixed-input 和 fixed-output swap 的指令构建器和参数
+5. **Raydium AMM V4 构建器**: 提供 Raydium AMM V4 swap 的指令构建器和参数
+6. **Meteora DAMM V2 构建器**: 提供 Meteora DAMM V2 操作的指令构建器和参数
 7. **多种 MEV 保护**: 支持 Jito、Nextblock、ZeroSlot、Temporal、Bloxroute、FlashBlock、BlockRazor、Node1、Astralane 等服务
 8. **并发交易**: 所有已配置的 SWQoS 通道和默认 RPC 通道都会发出提交；首个成功只影响返回，较慢通道会继续提交
-9. **统一交易接口**: 使用统一的交易协议类型进行交易操作
-10. **中间件系统**: 支持自定义指令中间件，可在交易执行前对指令进行修改、添加或移除
-11. **共享基础设施**: 多钱包可共享同一套 RPC 与 SWQoS 客户端，降低资源占用
+9. **统一交易接口**: 使用统一的交易协议类型进行交易操作，并支持 Rust 对齐的 `BuySimple` / `SellSimple` intent 参数
+10. **中间件系统**: 在低层指令/执行器路径支持自定义指令中间件
+11. **可复用执行组件**: 通过 `pkg/trading`、`pkg/trading/core` 或 `pkg/hotpath` 构建并提交预构建交易
 12. **热路径 RPC 边界**: 交易执行使用调用方传入的 blockhash 或 durable nonce，不在热路径查询 blockhash、账户或余额
 
 ## 📦 安装
@@ -125,7 +129,9 @@ go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.2
 
 ### 📋 使用示例
 
-#### 1. 创建 TradingClient 实例
+高层 intent API 可参考 [Simple Trading](examples/simple_trading/main.go)，示例展示 `AccountPolicyAuto`、`BuyWithMaxInput` 以及到旧版 `TradeBuyParams` 的转换。
+
+#### 1. 创建根 TradingClient 实例
 
 您可以参考 [示例：创建 TradingClient 实例](examples/trading_client/main.go)。
 
@@ -138,55 +144,51 @@ import (
     "fmt"
     "log"
 
-    soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang"
-    "github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
-    "github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
+    soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+    "github.com/gagliardetto/solana-go"
 )
 
 func main() {
     ctx := context.Background()
 
     // 钱包
-    payer := /* 您的密钥对 */
+    wallet := solana.NewWallet()
+    payer := wallet.PrivateKey
 
     // RPC URL
     rpcURL := "https://mainnet.helius-rpc.com/?api-key=xxxxxx"
 
     // 可配置多个 SWQoS 服务
     swqosConfigs := []soltradesdk.SwqosConfig{
-        {Type: soltradesdk.SwqosTypeDefault, RPCUrl: rpcURL},
-        {Type: soltradesdk.SwqosTypeJito, UUID: "your_uuid", Region: soltradesdk.SwqosRegionFrankfurt},
-        {Type: soltradesdk.SwqosTypeBloxroute, APIToken: "your_api_token", Region: soltradesdk.SwqosRegionFrankfurt},
+        {Type: soltradesdk.SwqosTypeJito, APIKey: "your_uuid", Region: soltradesdk.SwqosRegionFrankfurt},
+        {Type: soltradesdk.SwqosTypeBloxroute, APIKey: "your_api_token", Region: soltradesdk.SwqosRegionFrankfurt},
         {Type: soltradesdk.SwqosTypeAstralane, APIKey: "your_api_key", Region: soltradesdk.SwqosRegionFrankfurt},
     }
 
-    // 创建 TradeConfig 实例
-    config := &soltradesdk.TradeConfig{
-        RPCUrl:      rpcURL,
-        SwqosConfigs: swqosConfigs,
+    config := soltradesdk.NewTradeConfig(rpcURL, swqosConfigs)
+
+    client, err := soltradesdk.NewTradingClient(ctx, &payer, config)
+    if err != nil {
+        log.Fatal(err)
     }
 
-    // 创建 TradingClient
-    client := trading.NewTradingClient(payer, config)
+    fmt.Println("wallet:", client.GetPayer())
 }
 ```
 
-**方法二：共享基础设施（多钱包）**
+**方法二：预构建交易执行器**
 
-对于多钱包场景，创建一次基础设施并在钱包间共享。
-参见 [示例：共享基础设施](examples/shared_infrastructure/main.go)。
+Go 根 `TradingClient` 只负责高层 simple 参数转换，不在根 facade 中构建或提交协议交易。已构建好的交易可通过 `pkg/trading.TradeExecutor`、`pkg/trading/core` 或 `pkg/hotpath` 提交。
 
 ```go
-// 创建一次基础设施（开销大）
-infraConfig := &common.InfrastructureConfig{
-    RPCUrl:      rpcURL,
-    SwqosConfigs: swqosConfigs,
-}
-infrastructure := trading.NewTradingInfrastructure(infraConfig)
+rpcClient := rpc.New(rpcURL)
+executor := trading.NewTradeExecutor(rpcClient, config, soltradesdk.NewGasFeeStrategy())
+executor.AddSwqosClient(swqos.NewDefaultClient(rpcURL))
 
-// 创建多个客户端共享同一基础设施（快速）
-client1 := trading.NewTradingClientFromInfrastructure(payer1, infrastructure)
-client2 := trading.NewTradingClientFromInfrastructure(payer2, infrastructure)
+result := executor.Execute(ctx, soltradesdk.TradeTypeBuy, signedTx, trading.DefaultExecuteOptions())
+if !result.Success {
+    log.Fatal(result.Error)
+}
 ```
 
 #### 2. 配置 Gas 费策略
@@ -201,27 +203,27 @@ gasStrategy.SetGlobalFeeStrategy(150000, 150000, 500000, 500000, 0.001, 0.001)
 #### 3. 构建交易参数
 
 ```go
-buyParams := &soltradesdk.TradeBuyParams{
-    DexType:              soltradesdk.DexTypePumpSwap,
-    InputTokenType:       soltradesdk.TradeTokenTypeWSOL,
-    Mint:                 mintPubkey,
-    InputTokenAmount:     buySolAmount,
-    SlippageBasisPoints:  500,
-    RecentBlockhash:      &recentBlockhash,
-    ExtensionParams:      &soltradesdk.DexParamEnum{Type: "PumpSwap", Params: pumpSwapParams},
-    WaitTransactionConfirmed: true,
-    CreateInputTokenAta:  true,
-    CloseInputTokenAta:   true,
-    CreateMintAta:        true,
-    GasFeeStrategy:       gasStrategy,
-    Simulate:             false,
-}
+simple := soltradesdk.NewSimpleBuyParams(
+    soltradesdk.DexTypePumpSwap,
+    soltradesdk.TradeTokenTypeWSOL,
+    mintPubkey,
+    soltradesdk.BuyWithMaxInput(buySolAmount),
+    pumpSwapParams,
+    recentBlockhash,
+    gasStrategy,
+).
+    SetSlippageBasisPoints(500).
+    SetAccountPolicy(soltradesdk.AccountPolicyAuto)
+buyParams := client.BuildBuyParamsFromSimple(simple)
 ```
 
-#### 4. 执行交易
+#### 4. 执行边界
 
 ```go
 result, err := client.Buy(ctx, buyParams)
+if errors.Is(err, soltradesdk.ErrTradingExecutionUnavailable) {
+    log.Fatal("根 TradingClient 只完成参数转换；真实提交请使用低层 executor")
+}
 if err != nil {
     log.Fatal(err)
 }
@@ -262,10 +264,10 @@ fmt.Printf("交易签名: %s\n", result.Signature)
 
 ### ⚙️ SWQoS 服务配置说明
 
-配置 SWQoS 服务时，请注意各服务的不同参数要求：
+配置 SWQoS 服务时，通过 `APIKey` 传入 provider 凭据：
 
-- **Jito**: 第一个参数是 UUID（如果没有 UUID，传空字符串 `""`）
-- **其他 MEV 服务**: 第一个参数是 API Token
+- **Jito**: `APIKey` 为 Jito UUID（不需要时传 `""`）
+- **其他 MEV 服务**: `APIKey` 为对应 provider 的 API token
 
 #### 自定义 URL 支持
 
@@ -275,16 +277,16 @@ fmt.Printf("交易签名: %s\n", result.Signature)
 // 使用自定义 URL
 jitoConfig := soltradesdk.SwqosConfig{
     Type:      soltradesdk.SwqosTypeJito,
-    UUID:      "your_uuid",
+    APIKey:    "your_uuid",
     Region:    soltradesdk.SwqosRegionFrankfurt,
     CustomURL: "https://custom-jito-endpoint.com",
 }
 
 // 使用默认区域端点
 bloxrouteConfig := soltradesdk.SwqosConfig{
-    Type:     soltradesdk.SwqosTypeBloxroute,
-    APIToken: "your_api_token",
-    Region:   soltradesdk.SwqosRegionNewYork,
+    Type:   soltradesdk.SwqosTypeBloxroute,
+    APIKey: "your_api_token",
+    Region: soltradesdk.SwqosRegionNewYork,
 }
 ```
 
@@ -344,7 +346,7 @@ if err != nil {
 PumpFun 和 PumpSwap 为符合条件的代币支持 **cashback**：部分交易费用可以返还给用户。SDK **必须知道**代币是否启用了 cashback，以便买/卖指令包含正确的账户。
 
 - **当参数来自 RPC 时**: 如果您使用 `PumpFunParams.FromMintByRPC` 或 `PumpSwapParams.FromPoolAddressByRPC`，SDK 会从链上读取 `IsCashbackCoin`——无需额外步骤。
-- **当参数来自事件/解析器时**: 如果您从交易事件构建参数（例如 [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk)），您**必须**将 cashback 标志传递给 SDK：
+- **当参数来自已解码事件时**: 如果您从已解码的交易事件构建参数（例如外部解析服务输出），您**必须**将 cashback 标志传递给 SDK：
   - **PumpFun**: 从解析的事件构建参数时设置 `IsCashbackCoin`。
   - **PumpSwap**: 手动构建参数时设置 `IsCashbackCoin` 字段。
 

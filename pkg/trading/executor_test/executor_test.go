@@ -1,6 +1,9 @@
 package trading_test
 
 import (
+	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
@@ -262,6 +265,58 @@ func TestTradeExecutor_DefaultOptions(t *testing.T) {
 
 	if !opts.ParallelSubmit {
 		t.Error("expected ParallelSubmit to be true by default")
+	}
+}
+
+func TestTradingFactoryExecutorsDoNotReturnFakeSuccess(t *testing.T) {
+	base := trading.NewTradeExecutor(nil, soltradesdk.NewTradeConfig("http://localhost:8899", nil), nil)
+	client := trading.NewTradingClient(trading.NewTradeExecutorFactory(base))
+	ctx := context.Background()
+
+	validPumpFunBuy := &trading.PumpFunBuyParams{}
+	validPumpFunSell := &trading.PumpFunSellParams{}
+	validPumpSwapBuy := &trading.PumpSwapBuyParams{}
+	validPumpSwapSell := &trading.PumpSwapSellParams{}
+
+	tests := []struct {
+		name      string
+		dex       soltradesdk.DexType
+		buyParam  interface{}
+		sellParam interface{}
+	}{
+		{name: "pumpfun", dex: soltradesdk.DexTypePumpFun, buyParam: validPumpFunBuy, sellParam: validPumpFunSell},
+		{name: "pumpswap", dex: soltradesdk.DexTypePumpSwap, buyParam: validPumpSwapBuy, sellParam: validPumpSwapSell},
+		{name: "bonk", dex: soltradesdk.DexTypeBonk, buyParam: struct{}{}, sellParam: struct{}{}},
+		{name: "raydium_cpmm", dex: soltradesdk.DexTypeRaydiumCpmm, buyParam: struct{}{}, sellParam: struct{}{}},
+		{name: "raydium_amm_v4", dex: soltradesdk.DexTypeRaydiumAmmV4, buyParam: struct{}{}, sellParam: struct{}{}},
+		{name: "meteora_damm_v2", dex: soltradesdk.DexTypeMeteoraDammV2, buyParam: struct{}{}, sellParam: struct{}{}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name+"/buy", func(t *testing.T) {
+			result, err := client.Buy(ctx, tc.dex, tc.buyParam)
+			if result != nil {
+				t.Fatalf("expected no fake success result, got %+v", result)
+			}
+			if !errors.Is(err, soltradesdk.ErrTradingExecutionUnavailable) {
+				t.Fatalf("expected ErrTradingExecutionUnavailable, got %v", err)
+			}
+			if !strings.Contains(err.Error(), "does not build or submit protocol trades") {
+				t.Fatalf("error should document execution boundary, got %v", err)
+			}
+		})
+		t.Run(tc.name+"/sell", func(t *testing.T) {
+			result, err := client.Sell(ctx, tc.dex, tc.sellParam)
+			if result != nil {
+				t.Fatalf("expected no fake success result, got %+v", result)
+			}
+			if !errors.Is(err, soltradesdk.ErrTradingExecutionUnavailable) {
+				t.Fatalf("expected ErrTradingExecutionUnavailable, got %v", err)
+			}
+			if !strings.Contains(err.Error(), "does not build or submit protocol trades") {
+				t.Fatalf("error should document execution boundary, got %v", err)
+			}
+		})
 	}
 }
 

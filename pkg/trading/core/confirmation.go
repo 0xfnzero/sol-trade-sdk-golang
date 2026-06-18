@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -320,7 +321,7 @@ func (m *ConfirmationMonitor) watchTransaction(watch *watchContext) {
 
 				// Check if transaction failed
 				if status.Err != nil {
-					watch.result.Err = fmt.Errorf("transaction failed: %v", status.Err)
+					watch.result.Err = m.transactionError(watch.ctx, watch.signature, status.Err)
 					return
 				}
 			}
@@ -329,6 +330,19 @@ func (m *ConfirmationMonitor) watchTransaction(watch *watchContext) {
 			m.notifyProgress(watch)
 		}
 	}
+}
+
+func (m *ConfirmationMonitor) transactionError(ctx context.Context, sig solana.Signature, statusErr interface{}) error {
+	var zero uint64
+	tx, err := m.rpcClient.GetTransaction(ctx, sig, &rpc.GetTransactionOpts{
+		Encoding:                       solana.EncodingBase64,
+		Commitment:                     rpc.CommitmentConfirmed,
+		MaxSupportedTransactionVersion: &zero,
+	})
+	if err != nil || tx == nil || tx.Meta == nil {
+		return soltradesdk.FormatParsedTransactionError(statusErr, nil)
+	}
+	return soltradesdk.FormatParsedTransactionError(tx.Meta.Err, tx.Meta.LogMessages)
 }
 
 // checkStatus checks the confirmation status of a transaction

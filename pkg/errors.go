@@ -33,9 +33,10 @@ var (
 
 // TradeError represents a trading error with details
 type TradeError struct {
-	Code    int
-	Message string
-	Cause   error
+	Code             int
+	Message          string
+	Cause            error
+	InstructionIndex *uint64
 }
 
 // Error implements the error interface

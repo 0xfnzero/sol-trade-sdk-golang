@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 	"github.com/gagliardetto/solana-go"
 )
 
@@ -590,6 +591,42 @@ func (c *SpeedlandingExtClient) SubmitTransaction(ctx context.Context, tx []byte
 	return &TransactionResult{Signature: sig, Success: true, Provider: "Speedlanding", LatencyMs: latency}, nil
 }
 
+// SolamiExtClient Solami extended SWQOS client (stats-tracking)
+type SolamiExtClient struct {
+	SwqosProviderBase
+	apiURL string
+}
+
+// NewSolamiExtClient creates new Solami extended client
+func NewSolamiExtClient(config *SwqosConfigExtended) *SolamiExtClient {
+	url := config.URL
+	if url == "" {
+		url = "beam.solami.dev:11000"
+	}
+	return &SolamiExtClient{
+		SwqosProviderBase: SwqosProviderBase{config: config},
+		apiURL:            url,
+	}
+}
+
+// SubmitTransaction submits transaction via Solami
+func (c *SolamiExtClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
+	c.RateLimitCheck()
+	start := time.Now()
+
+	client := NewSolamiClient(c.apiURL, c.config.APIKey)
+	sig, err := client.SendTransaction(ctx, TradeTypeBuy, tx, false)
+	latency := time.Since(start).Milliseconds()
+
+	if err != nil {
+		c.UpdateStats(false, latency, err.Error())
+		return nil, err
+	}
+
+	c.UpdateStats(true, latency, "")
+	return &TransactionResult{Signature: sig, Success: true, Provider: "Solami", LatencyMs: latency}, nil
+}
+
 // TritonClient Triton SWQOS client
 type TritonClient struct {
 	SwqosProviderBase
@@ -875,6 +912,9 @@ type SwqosProviderFactory struct{}
 
 // CreateProvider creates a provider based on type
 func (f *SwqosProviderFactory) CreateProvider(config *SwqosConfigExtended) (interface{}, error) {
+	if soltradesdk.IsSwqosTypeBlacklisted(config.Type) {
+		return nil, fmt.Errorf("SWQOS type is blacklisted by Rust v4.0.21 parity: %v", config.Type)
+	}
 	switch config.Type {
 	case SwqosTypeJito:
 		url := config.URL
@@ -922,6 +962,8 @@ func (f *SwqosProviderFactory) CreateProvider(config *SwqosConfigExtended) (inte
 		return NewSoyasExtClient(config), nil
 	case SwqosTypeSpeedlanding:
 		return NewSpeedlandingExtClient(config), nil
+	case SwqosTypeSolami:
+		return NewSolamiExtClient(config), nil
 	case SwqosTypeHelius:
 		url := config.URL
 		if url == "" {

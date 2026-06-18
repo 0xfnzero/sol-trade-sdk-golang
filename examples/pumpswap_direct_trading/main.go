@@ -24,6 +24,6 @@ func main() {
 	fmt.Printf("Sell params: dex=%s amount=%d\n", sellParams.DexType, sellParams.InputTokenAmount)
 
 	if exampleutil.RunLive() {
-		fmt.Println("Replace placeholder params with real on-chain/parser values before executing trades.")
+		fmt.Println("Replace placeholder params with real on-chain or decoded event values before executing trades.")
 	}
 }

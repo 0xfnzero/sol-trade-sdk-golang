@@ -57,9 +57,7 @@ func (e *PumpFunExecutor) ExecuteBuy(ctx context.Context, params interface{}) (*
 		return nil, fmt.Errorf("invalid PumpFun buy params: %T", params)
 	}
 
-	return &ExecuteResult{
-		Success: true,
-	}, nil
+	return nil, unavailableDexExecutorError(soltradesdk.DexTypePumpFun, "buy")
 }
 
 // ExecuteSell executes a sell on PumpFun
@@ -68,9 +66,7 @@ func (e *PumpFunExecutor) ExecuteSell(ctx context.Context, params interface{}) (
 		return nil, fmt.Errorf("invalid PumpFun sell params: %T", params)
 	}
 
-	return &ExecuteResult{
-		Success: true,
-	}, nil
+	return nil, unavailableDexExecutorError(soltradesdk.DexTypePumpFun, "sell")
 }
 
 // PumpSwapExecutor handles PumpSwap DEX trades
@@ -129,9 +125,7 @@ func (e *PumpSwapExecutor) ExecuteBuy(ctx context.Context, params interface{}) (
 		return nil, fmt.Errorf("invalid PumpSwap buy params: %T", params)
 	}
 
-	return &ExecuteResult{
-		Success: true,
-	}, nil
+	return nil, unavailableDexExecutorError(soltradesdk.DexTypePumpSwap, "buy")
 }
 
 // ExecuteSell executes a sell on PumpSwap
@@ -140,9 +134,7 @@ func (e *PumpSwapExecutor) ExecuteSell(ctx context.Context, params interface{}) 
 		return nil, fmt.Errorf("invalid PumpSwap sell params: %T", params)
 	}
 
-	return &ExecuteResult{
-		Success: true,
-	}, nil
+	return nil, unavailableDexExecutorError(soltradesdk.DexTypePumpSwap, "sell")
 }
 
 // BonkExecutor handles Bonk DEX trades
@@ -157,16 +149,12 @@ func NewBonkExecutor(base *TradeExecutor) *BonkExecutor {
 
 // ExecuteBuy executes a buy on Bonk
 func (e *BonkExecutor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return &ExecuteResult{
-		Success: true,
-	}, nil
+	return nil, unavailableDexExecutorError(soltradesdk.DexTypeBonk, "buy")
 }
 
 // ExecuteSell executes a sell on Bonk
 func (e *BonkExecutor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return &ExecuteResult{
-		Success: true,
-	}, nil
+	return nil, unavailableDexExecutorError(soltradesdk.DexTypeBonk, "sell")
 }
 
 // RaydiumCpmmExecutor handles Raydium CPMM DEX trades
@@ -181,16 +169,12 @@ func NewRaydiumCpmmExecutor(base *TradeExecutor) *RaydiumCpmmExecutor {
 
 // ExecuteBuy executes a buy on Raydium CPMM
 func (e *RaydiumCpmmExecutor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return &ExecuteResult{
-		Success: true,
-	}, nil
+	return nil, unavailableDexExecutorError(soltradesdk.DexTypeRaydiumCpmm, "buy")
 }
 
 // ExecuteSell executes a sell on Raydium CPMM
 func (e *RaydiumCpmmExecutor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return &ExecuteResult{
-		Success: true,
-	}, nil
+	return nil, unavailableDexExecutorError(soltradesdk.DexTypeRaydiumCpmm, "sell")
 }
 
 // RaydiumAmmV4Executor handles Raydium AMM V4 DEX trades
@@ -205,16 +189,12 @@ func NewRaydiumAmmV4Executor(base *TradeExecutor) *RaydiumAmmV4Executor {
 
 // ExecuteBuy executes a buy on Raydium AMM V4
 func (e *RaydiumAmmV4Executor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return &ExecuteResult{
-		Success: true,
-	}, nil
+	return nil, unavailableDexExecutorError(soltradesdk.DexTypeRaydiumAmmV4, "buy")
 }
 
 // ExecuteSell executes a sell on Raydium AMM V4
 func (e *RaydiumAmmV4Executor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return &ExecuteResult{
-		Success: true,
-	}, nil
+	return nil, unavailableDexExecutorError(soltradesdk.DexTypeRaydiumAmmV4, "sell")
 }
 
 // MeteoraDammV2Executor handles Meteora DAMM V2 DEX trades
@@ -229,16 +209,20 @@ func NewMeteoraDammV2Executor(base *TradeExecutor) *MeteoraDammV2Executor {
 
 // ExecuteBuy executes a buy on Meteora DAMM V2
 func (e *MeteoraDammV2Executor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return &ExecuteResult{
-		Success: true,
-	}, nil
+	return nil, unavailableDexExecutorError(soltradesdk.DexTypeMeteoraDammV2, "buy")
 }
 
 // ExecuteSell executes a sell on Meteora DAMM V2
 func (e *MeteoraDammV2Executor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return &ExecuteResult{
-		Success: true,
-	}, nil
+	return nil, unavailableDexExecutorError(soltradesdk.DexTypeMeteoraDammV2, "sell")
+}
+
+func unavailableDexExecutorError(dexType soltradesdk.DexType, operation string) error {
+	return soltradesdk.NewTradeError(
+		2001,
+		fmt.Sprintf("pkg/trading %s executor for %s does not build or submit protocol trades; build instructions with pkg/instruction and submit prebuilt transactions through TradeExecutor or pkg/trading/core", operation, dexType),
+		soltradesdk.ErrTradingExecutionUnavailable,
+	)
 }
 
 // TradeExecutorFactory creates trade executors for different DEX types

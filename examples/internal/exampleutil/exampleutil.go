@@ -70,7 +70,7 @@ func TradeConfig() *soltradesdk.TradeConfig {
 	return soltradesdk.NewTradeConfigBuilder(RPCURL()).
 		SwqosConfigs(DefaultSwqosConfigs()).
 		UseSeedOptimize(true).
-		SwqosCoresFromEnd(true).
+		SwqosCoresFromEnd(false).
 		MaxSwqosSubmitConcurrency(8).
 		Build()
 }
@@ -255,5 +255,5 @@ func ExampleSellParams(dexType soltradesdk.DexType) soltradesdk.TradeSellParams 
 }
 
 func DescribeDryRun(name string) string {
-	return name + " prepared with current SDK types. Set RUN_LIVE_EXAMPLES=1 only after replacing placeholders with real parser/RPC data."
+	return name + " prepared with current SDK types. Set RUN_LIVE_EXAMPLES=1 only after replacing placeholders with real RPC or decoded event data."
 }

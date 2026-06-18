@@ -3,6 +3,7 @@ package soltradesdk_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/cache"
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/pool"
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/swqos"
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/utils"
 	"github.com/gagliardetto/solana-go"
 )
@@ -290,6 +292,38 @@ func TestRootTradingClient_ReturnsExplicitExecutionError(t *testing.T) {
 	}
 }
 
+func TestRootTradingClient_SimpleHelpersExposeConversionWithoutClaimingExecution(t *testing.T) {
+	payer, err := solana.NewRandomPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := soltradesdk.NewTradingClient(
+		context.Background(),
+		&payer,
+		soltradesdk.NewTradeConfig("http://localhost:8899", nil),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	simple := soltradesdk.SimpleBuyParams{
+		DexType:       soltradesdk.DexTypePumpFun,
+		PayWith:       soltradesdk.TradeTokenTypeSOL,
+		Mint:          solana.NewWallet().PublicKey(),
+		Amount:        soltradesdk.BuyExactInput(123),
+		AccountPolicy: soltradesdk.AccountPolicyAuto,
+	}
+	low := client.BuildBuyParamsFromSimple(simple)
+	if low.InputTokenAmount != 123 || low.InputTokenType != soltradesdk.TradeTokenTypeSOL {
+		t.Fatalf("simple helper conversion mismatch: %+v", low)
+	}
+
+	_, err = client.BuySimple(context.Background(), simple)
+	if !errors.Is(err, soltradesdk.ErrTradingExecutionUnavailable) {
+		t.Fatalf("expected simple execution to keep root boundary, got %v", err)
+	}
+}
+
 func TestTradeConfigAddsDefaultRPCWhenSwqosConfigured(t *testing.T) {
 	config := soltradesdk.NewTradeConfig("https://x", []soltradesdk.SwqosConfig{
 		{Type: soltradesdk.SwqosTypeJito, Region: soltradesdk.SwqosRegionFrankfurt, APIKey: "uuid"},
@@ -306,10 +340,356 @@ func TestTradeConfigAddsDefaultRPCWhenSwqosConfigured(t *testing.T) {
 	}
 }
 
-func TestTradeConfigDoesNotAddDefaultRPCWhenNoSwqosConfigured(t *testing.T) {
+func TestTradeConfigAddsDefaultRPCWhenNoSwqosConfigured(t *testing.T) {
 	config := soltradesdk.NewTradeConfig("https://x", nil)
-	if len(config.SwqosConfigs) != 0 {
-		t.Fatalf("expected no swqos configs, got %d", len(config.SwqosConfigs))
+	if len(config.SwqosConfigs) != 1 {
+		t.Fatalf("expected default swqos config, got %d", len(config.SwqosConfigs))
+	}
+	if config.SwqosConfigs[0].Type != soltradesdk.SwqosTypeDefault {
+		t.Fatalf("expected default RPC route")
+	}
+}
+
+func TestTradeConfigFiltersNextBlockBlacklist(t *testing.T) {
+	config := soltradesdk.NewTradeConfig("https://x", []soltradesdk.SwqosConfig{
+		{Type: soltradesdk.SwqosTypeNextBlock, Region: soltradesdk.SwqosRegionFrankfurt, APIKey: "token"},
+	})
+	if len(config.SwqosConfigs) != 1 {
+		t.Fatalf("expected only fallback default route, got %d", len(config.SwqosConfigs))
+	}
+	if config.SwqosConfigs[0].Type != soltradesdk.SwqosTypeDefault {
+		t.Fatalf("expected NextBlock to be filtered and Default to remain")
+	}
+}
+
+func TestTradeConfigRustParityDefaults(t *testing.T) {
+	config := soltradesdk.NewTradeConfig("https://x", nil)
+	if !config.LogEnabled {
+		t.Fatalf("expected LogEnabled default true")
+	}
+	if config.CheckMinTip {
+		t.Fatalf("expected CheckMinTip default false")
+	}
+	if config.MEVProtection {
+		t.Fatalf("expected MEVProtection default false")
+	}
+	if !config.UseSeedOptimize {
+		t.Fatalf("expected UseSeedOptimize default true")
+	}
+	if !config.CreateWsolAtaOnStartup {
+		t.Fatalf("expected CreateWsolAtaOnStartup default true")
+	}
+	if config.SwqosCoresFromEnd {
+		t.Fatalf("expected SwqosCoresFromEnd default false")
+	}
+
+	built := soltradesdk.NewTradeConfigBuilder("https://x").Build()
+	if !built.CreateWsolAtaOnStartup || built.SwqosCoresFromEnd {
+		t.Fatalf("builder defaults are not Rust parity: %+v", built)
+	}
+}
+
+func TestRecommendedSenderThreadCoreIndicesUsesTwoThirdsCap(t *testing.T) {
+	got := soltradesdk.RecommendedSenderThreadCoreIndices(10, 6)
+	want := []int{2, 3, 4, 5}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d indices, got %d: %v", len(want), len(got), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("index %d: expected %d, got %d (%v)", i, want[i], got[i], got)
+		}
+	}
+
+	fromStart := soltradesdk.RecommendedSenderThreadCoreIndices(10, 6, 0)
+	wantFromStart := []int{0, 1, 2, 3}
+	for i := range wantFromStart {
+		if fromStart[i] != wantFromStart[i] {
+			t.Fatalf("from-start index %d: expected %d, got %d (%v)", i, wantFromStart[i], fromStart[i], fromStart)
+		}
+	}
+}
+
+func testHash(seed byte) solana.Hash {
+	data := make([]byte, 32)
+	for i := range data {
+		data[i] = seed
+	}
+	return solana.HashFromBytes(data)
+}
+
+func TestSimpleBuyParamsToTradeBuyParams(t *testing.T) {
+	recent := testHash(1)
+	nonceHash := testHash(2)
+	useMint := solana.NewWallet().PublicKey()
+
+	low := (soltradesdk.SimpleBuyParams{
+		DexType:             soltradesdk.DexTypePumpFun,
+		PayWith:             soltradesdk.TradeTokenTypeUSDC,
+		Mint:                useMint,
+		Amount:              soltradesdk.BuyWithMaxInput(10_000),
+		RecentBlockhash:     &recent,
+		AccountPolicy:       soltradesdk.AccountPolicyHotPathMinimal,
+		WaitForAllSubmits:   true,
+		DurableNonce:        &soltradesdk.DurableNonceInfo{NonceHash: nonceHash},
+		Simulate:            true,
+		SlippageBasisPoints: 250,
+	}).ToTradeBuyParams()
+
+	if low.InputTokenType != soltradesdk.TradeTokenTypeUSDC || low.Mint != useMint {
+		t.Fatalf("basic buy fields not preserved: %+v", low)
+	}
+	if low.InputTokenAmount != 10_000 {
+		t.Fatalf("expected input amount 10000, got %d", low.InputTokenAmount)
+	}
+	if low.UseExactSolAmount == nil || *low.UseExactSolAmount {
+		t.Fatalf("WithMaxInput should set UseExactSolAmount=false")
+	}
+	if low.CreateInputTokenATA || low.CreateMintATA || low.CloseInputTokenATA {
+		t.Fatalf("HotPathMinimal should disable ATA mutations: %+v", low)
+	}
+	if low.RecentBlockhash != nil || low.DurableNonce == nil {
+		t.Fatalf("durable nonce should clear recent blockhash: %+v", low)
+	}
+	if !low.WaitForAllSubmits || !low.Simulate || low.SlippageBasisPoints != 250 {
+		t.Fatalf("execution flags not preserved: %+v", low)
+	}
+}
+
+func TestSimpleParamConstructorsAndDefaults(t *testing.T) {
+	recent := testHash(1)
+	mint := solana.NewWallet().PublicKey()
+
+	buy := soltradesdk.NewSimpleBuyParams(
+		soltradesdk.DexTypePumpFun,
+		soltradesdk.TradeTokenTypeWSOL,
+		mint,
+		soltradesdk.BuyWithMaxInput(5_000),
+		struct{}{},
+		recent,
+		nil,
+	)
+	if buy.AccountPolicy != soltradesdk.AccountPolicyAuto {
+		t.Fatalf("expected AccountPolicyAuto, got %v", buy.AccountPolicy)
+	}
+	if buy.WaitTxConfirmed || buy.WaitForAllSubmits || buy.Simulate {
+		t.Fatalf("simple buy defaults should be false: %+v", buy)
+	}
+	if buy.RecentBlockhash == nil || *buy.RecentBlockhash != recent {
+		t.Fatalf("recent blockhash not preserved: %+v", buy.RecentBlockhash)
+	}
+
+	sell := soltradesdk.NewSimpleSellParams(
+		soltradesdk.DexTypePumpFun,
+		soltradesdk.TradeTokenTypeUSDC,
+		mint,
+		soltradesdk.SellExactInput(7_000),
+		struct{}{},
+		recent,
+		nil,
+	)
+	if sell.AccountPolicy != soltradesdk.AccountPolicyAuto {
+		t.Fatalf("expected AccountPolicyAuto, got %v", sell.AccountPolicy)
+	}
+	if sell.WaitTxConfirmed || sell.WaitForAllSubmits || sell.Simulate {
+		t.Fatalf("simple sell defaults should be false: %+v", sell)
+	}
+	if low := sell.ToTradeSellParams(); !low.WithTip {
+		t.Fatalf("simple sell should convert to WithTip=true by default")
+	}
+}
+
+func TestSimpleDurableNonceConstructorsClearRecentBlockhash(t *testing.T) {
+	nonce := soltradesdk.DurableNonceInfo{NonceHash: testHash(2)}
+	mint := solana.NewWallet().PublicKey()
+
+	buy := soltradesdk.NewSimpleBuyParamsWithDurableNonce(
+		soltradesdk.DexTypePumpFun,
+		soltradesdk.TradeTokenTypeSOL,
+		mint,
+		soltradesdk.BuyExactInput(1_000),
+		struct{}{},
+		nonce,
+		nil,
+	)
+	if buy.RecentBlockhash != nil || buy.DurableNonce == nil {
+		t.Fatalf("buy durable nonce constructor should clear recent blockhash: %+v", buy)
+	}
+
+	sell := soltradesdk.NewSimpleSellParamsWithDurableNonce(
+		soltradesdk.DexTypePumpFun,
+		soltradesdk.TradeTokenTypeSOL,
+		mint,
+		soltradesdk.SellExactOutput(500, 1_000),
+		struct{}{},
+		nonce,
+		nil,
+	)
+	if sell.RecentBlockhash != nil || sell.DurableNonce == nil {
+		t.Fatalf("sell durable nonce constructor should clear recent blockhash: %+v", sell)
+	}
+}
+
+func TestSimpleSettersReturnUpdatedCopies(t *testing.T) {
+	recent := testHash(1)
+	nonce := soltradesdk.DurableNonceInfo{NonceHash: testHash(2)}
+	mint := solana.NewWallet().PublicKey()
+
+	base := soltradesdk.NewSimpleBuyParams(
+		soltradesdk.DexTypePumpFun,
+		soltradesdk.TradeTokenTypeWSOL,
+		mint,
+		soltradesdk.BuyExactInput(1_000),
+		struct{}{},
+		recent,
+		nil,
+	)
+	buy := base.
+		SetSlippageBasisPoints(123).
+		SetAccountPolicy(soltradesdk.AccountPolicyCreateMissing).
+		SetDurableNonce(nonce).
+		SetWaitTxConfirmed(true).
+		SetWaitForAllSubmits(true).
+		SetSimulate(true).
+		SetGrpcRecvUs(456)
+
+	if base.RecentBlockhash == nil || *base.RecentBlockhash != recent {
+		t.Fatalf("base should remain unchanged: %+v", base)
+	}
+	if buy.RecentBlockhash != nil || buy.DurableNonce == nil {
+		t.Fatalf("durable nonce setter should clear recent blockhash: %+v", buy)
+	}
+	if buy.SlippageBasisPoints != 123 || buy.AccountPolicy != soltradesdk.AccountPolicyCreateMissing {
+		t.Fatalf("buy setters not preserved: %+v", buy)
+	}
+	if !buy.WaitTxConfirmed || !buy.WaitForAllSubmits || !buy.Simulate {
+		t.Fatalf("buy execution setters not preserved: %+v", buy)
+	}
+	if buy.GrpcRecvUs == nil || *buy.GrpcRecvUs != 456 {
+		t.Fatalf("buy grpc recv timestamp not preserved: %+v", buy.GrpcRecvUs)
+	}
+
+	sell := soltradesdk.NewSimpleSellParams(
+		soltradesdk.DexTypePumpFun,
+		soltradesdk.TradeTokenTypeSOL,
+		mint,
+		soltradesdk.SellExactInput(1_000),
+		struct{}{},
+		recent,
+		nil,
+	).
+		SetSlippageBasisPoints(321).
+		SetAccountPolicy(soltradesdk.AccountPolicyAssumePrepared).
+		SetWaitTxConfirmed(true).
+		SetWaitForAllSubmits(true).
+		SetSimulate(true).
+		SetWithTip(false).
+		SetGrpcRecvUs(654)
+	if sell.SlippageBasisPoints != 321 || sell.AccountPolicy != soltradesdk.AccountPolicyAssumePrepared {
+		t.Fatalf("sell setters not preserved: %+v", sell)
+	}
+	if !sell.WaitTxConfirmed || !sell.WaitForAllSubmits || !sell.Simulate {
+		t.Fatalf("sell execution setters not preserved: %+v", sell)
+	}
+	if sell.WithTip == nil || *sell.WithTip {
+		t.Fatalf("sell SetWithTip(false) not preserved: %+v", sell.WithTip)
+	}
+	if sell.GrpcRecvUs == nil || *sell.GrpcRecvUs != 654 {
+		t.Fatalf("sell grpc recv timestamp not preserved: %+v", sell.GrpcRecvUs)
+	}
+}
+
+func TestSimpleBuyExactOutputAndAutoPolicy(t *testing.T) {
+	low := (soltradesdk.SimpleBuyParams{
+		DexType:       soltradesdk.DexTypePumpFun,
+		PayWith:       soltradesdk.TradeTokenTypeSOL,
+		Mint:          solana.NewWallet().PublicKey(),
+		Amount:        soltradesdk.BuyExactOutput(42, 10_000),
+		AccountPolicy: soltradesdk.AccountPolicyAuto,
+	}).ToTradeBuyParams()
+
+	if low.InputTokenAmount != 10_000 {
+		t.Fatalf("expected max input amount, got %d", low.InputTokenAmount)
+	}
+	if low.FixedOutputTokenAmount == nil || *low.FixedOutputTokenAmount != 42 {
+		t.Fatalf("expected fixed output amount 42, got %v", low.FixedOutputTokenAmount)
+	}
+	if low.UseExactSolAmount == nil || !*low.UseExactSolAmount {
+		t.Fatalf("ExactOutput should set UseExactSolAmount=true")
+	}
+	if low.CreateInputTokenATA || !low.CreateMintATA || low.CloseInputTokenATA {
+		t.Fatalf("Auto buy should create only mint ATA: %+v", low)
+	}
+}
+
+func TestSimpleSellParamsToTradeSellParams(t *testing.T) {
+	low := (soltradesdk.SimpleSellParams{
+		DexType:       soltradesdk.DexTypePumpFun,
+		ReceiveAs:     soltradesdk.TradeTokenTypeUSDC,
+		Mint:          solana.NewWallet().PublicKey(),
+		Amount:        soltradesdk.SellExactOutput(7_000, 50_000),
+		AccountPolicy: soltradesdk.AccountPolicyAuto,
+	}).ToTradeSellParams()
+
+	if low.InputTokenAmount != 50_000 {
+		t.Fatalf("expected max input amount, got %d", low.InputTokenAmount)
+	}
+	if low.FixedOutputTokenAmount == nil || *low.FixedOutputTokenAmount != 7_000 {
+		t.Fatalf("expected fixed output amount 7000, got %v", low.FixedOutputTokenAmount)
+	}
+	if !low.WithTip {
+		t.Fatalf("SimpleSellParams should default WithTip=true")
+	}
+	if !low.CreateOutputTokenATA || low.CloseOutputTokenATA || low.CloseMintTokenATA {
+		t.Fatalf("Auto sell should create non-SOL output ATA only: %+v", low)
+	}
+
+	noTip := false
+	solLow := (soltradesdk.SimpleSellParams{
+		DexType:       soltradesdk.DexTypePumpFun,
+		ReceiveAs:     soltradesdk.TradeTokenTypeSOL,
+		Mint:          solana.NewWallet().PublicKey(),
+		Amount:        soltradesdk.SellExactInput(50_000),
+		AccountPolicy: soltradesdk.AccountPolicyAuto,
+		WithTip:       &noTip,
+	}).ToTradeSellParams()
+	if solLow.WithTip {
+		t.Fatalf("explicit WithTip=false should be preserved")
+	}
+	if solLow.CreateOutputTokenATA {
+		t.Fatalf("Auto sell should not create SOL output ATA")
+	}
+}
+
+func TestSolamiSwqosFactory(t *testing.T) {
+	var hasSolami bool
+	for _, typ := range swqos.GetAllSwqosTypes() {
+		if typ == soltradesdk.SwqosTypeSolami {
+			hasSolami = true
+			break
+		}
+	}
+	if !hasSolami {
+		t.Fatalf("expected Solami in SWQOS type list")
+	}
+
+	client, err := (&swqos.ClientFactory{}).CreateClient(
+		soltradesdk.SwqosConfig{Type: soltradesdk.SwqosTypeSolami, Region: soltradesdk.SwqosRegionTokyo},
+		"https://rpc.example",
+	)
+	if err != nil {
+		t.Fatalf("create Solami client: %v", err)
+	}
+	if client.GetSwqosType() != soltradesdk.SwqosTypeSolami {
+		t.Fatalf("expected Solami client type, got %v", client.GetSwqosType())
+	}
+	if client.MinTipSol() != swqos.MinTipSolami {
+		t.Fatalf("expected min tip %f, got %f", swqos.MinTipSolami, client.MinTipSol())
+	}
+
+	_, err = client.SendTransaction(context.Background(), soltradesdk.TradeTypeBuy, append([]byte{1}, make([]byte, 64)...), false)
+	if err == nil || !strings.Contains(err.Error(), "Solami api_token is required") {
+		t.Fatalf("expected Solami api_token error, got %v", err)
 	}
 }
 

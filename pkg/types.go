@@ -100,6 +100,7 @@ const (
 	SwqosTypeSoyas
 	SwqosTypeSpeedlanding
 	SwqosTypeHelius
+	SwqosTypeSolami
 	SwqosTypeDefault
 )
 
@@ -113,6 +114,11 @@ type SwqosConfig struct {
 	Transport     *SwqosTransport
 	AstralaneMode *AstralaneTransport
 	SwqosOnly     *bool
+}
+
+// IsSwqosTypeBlacklisted matches Rust v4.0.21 SWQOS_BLACKLIST.
+func IsSwqosTypeBlacklisted(swqosType SwqosType) bool {
+	return swqosType == SwqosTypeNextBlock
 }
 
 // SwqosClient is the shared SWQOS sender contract used by trading executors.
@@ -181,28 +187,31 @@ type TradeConfig struct {
 // NewTradeConfig creates a new TradeConfig
 func NewTradeConfig(rpcUrl string, swqosConfigs []SwqosConfig) *TradeConfig {
 	return &TradeConfig{
-		RPCUrl:            rpcUrl,
-		SwqosConfigs:      NormalizeSwqosConfigs(rpcUrl, swqosConfigs),
-		LogEnabled:        true,
-		UseSeedOptimize:   true,
-		SwqosCoresFromEnd: true,
+		RPCUrl:                 rpcUrl,
+		SwqosConfigs:           NormalizeSwqosConfigs(rpcUrl, swqosConfigs),
+		LogEnabled:             true,
+		UseSeedOptimize:        true,
+		CreateWsolAtaOnStartup: true,
+		SwqosCoresFromEnd:      false,
 	}
 }
 
-// NormalizeSwqosConfigs appends the default RPC route whenever explicit SWQOS
-// providers are configured, so RPC submit stays concurrent with SWQOS submit.
+// NormalizeSwqosConfigs appends the default RPC route and filters Rust-blacklisted providers.
 func NormalizeSwqosConfigs(rpcUrl string, configs []SwqosConfig) []SwqosConfig {
-	if len(configs) == 0 {
-		return configs
-	}
+	out := make([]SwqosConfig, 0, len(configs)+1)
+	hasDefault := false
 	for _, cfg := range configs {
 		if cfg.Type == SwqosTypeDefault {
-			return configs
+			hasDefault = true
 		}
+		if IsSwqosTypeBlacklisted(cfg.Type) {
+			continue
+		}
+		out = append(out, cfg)
 	}
-	out := make([]SwqosConfig, 0, len(configs)+1)
-	out = append(out, configs...)
-	out = append(out, SwqosConfig{Type: SwqosTypeDefault, Region: SwqosRegionDefault, CustomURL: rpcUrl})
+	if !hasDefault {
+		out = append(out, SwqosConfig{Type: SwqosTypeDefault, Region: SwqosRegionDefault, CustomURL: rpcUrl})
+	}
 	return out
 }
 
@@ -230,12 +239,13 @@ type TradeConfigBuilder struct {
 // NewTradeConfigBuilder creates a new TradeConfigBuilder
 func NewTradeConfigBuilder(rpcUrl string) *TradeConfigBuilder {
 	return &TradeConfigBuilder{
-		rpcUrl:            rpcUrl,
-		swqosConfigs:      []SwqosConfig{},
-		logEnabled:        true,
-		mevProtection:     false,
-		useSeedOptimize:   true,
-		swqosCoresFromEnd: true,
+		rpcUrl:                 rpcUrl,
+		swqosConfigs:           []SwqosConfig{},
+		logEnabled:             true,
+		mevProtection:          false,
+		useSeedOptimize:        true,
+		createWsolAtaOnStartup: true,
+		swqosCoresFromEnd:      false,
 	}
 }
 
@@ -301,20 +311,35 @@ func (b *TradeConfigBuilder) Build() *TradeConfig {
 }
 
 // RecommendedSenderThreadCoreIndices returns Rust-parity SWQOS sender core indices.
-func RecommendedSenderThreadCoreIndices(swqosCount int, availableCores ...int) []int {
+// By default it returns the capped last-N core range, matching Rust's helper for
+// TradeConfig.swqos_cores_from_end(true). Pass 0 as the optional second variadic
+// argument to select the first capped core range.
+func RecommendedSenderThreadCoreIndices(swqosCount int, args ...int) []int {
 	cores := runtime.NumCPU()
-	if len(availableCores) > 0 {
-		cores = availableCores[0]
+	if len(args) > 0 {
+		cores = args[0]
 	}
 	if swqosCount <= 0 || cores <= 0 {
 		return nil
 	}
+	fromEnd := len(args) <= 1 || args[1] != 0
 	count := swqosCount
+	coreCap := cores * 2 / 3
+	if coreCap < 1 {
+		coreCap = 1
+	}
+	if count > coreCap {
+		count = coreCap
+	}
 	if count > cores {
 		count = cores
 	}
 	out := make([]int, 0, count)
-	for i := cores - count; i < cores; i++ {
+	start := 0
+	if fromEnd {
+		start = cores - count
+	}
+	for i := start; i < start+count; i++ {
 		out = append(out, i)
 	}
 	return out
@@ -328,6 +353,84 @@ type DurableNonceInfo struct {
 	RecentBlockhash solana.Hash
 }
 
+// AccountPolicy describes how high-level simple trade requests manage token accounts.
+type AccountPolicy int
+
+const (
+	AccountPolicyAuto AccountPolicy = iota
+	AccountPolicyHotPathMinimal
+	AccountPolicyCreateMissing
+	AccountPolicyAssumePrepared
+)
+
+// BuyAmountKind identifies the high-level buy sizing intent.
+type BuyAmountKind int
+
+const (
+	BuyAmountExactInput BuyAmountKind = iota
+	BuyAmountExactOutput
+	BuyAmountWithMaxInput
+)
+
+// BuyAmount describes buy sizing intent before conversion to legacy params.
+type BuyAmount struct {
+	Kind           BuyAmountKind
+	Amount         uint64
+	OutputAmount   uint64
+	MaxInputAmount uint64
+}
+
+// BuyExactInput spends exactly amount input tokens.
+func BuyExactInput(amount uint64) BuyAmount {
+	return BuyAmount{Kind: BuyAmountExactInput, Amount: amount}
+}
+
+// BuyExactOutput requests outputAmount tokens and caps input at maxInputAmount.
+func BuyExactOutput(outputAmount, maxInputAmount uint64) BuyAmount {
+	return BuyAmount{
+		Kind:           BuyAmountExactOutput,
+		Amount:         maxInputAmount,
+		OutputAmount:   outputAmount,
+		MaxInputAmount: maxInputAmount,
+	}
+}
+
+// BuyWithMaxInput spends up to quoteAmount while allowing protocol-side output calculation.
+func BuyWithMaxInput(quoteAmount uint64) BuyAmount {
+	return BuyAmount{Kind: BuyAmountWithMaxInput, Amount: quoteAmount}
+}
+
+// SellAmountKind identifies the high-level sell sizing intent.
+type SellAmountKind int
+
+const (
+	SellAmountExactInput SellAmountKind = iota
+	SellAmountExactOutput
+)
+
+// SellAmount describes sell sizing intent before conversion to legacy params.
+type SellAmount struct {
+	Kind           SellAmountKind
+	Amount         uint64
+	OutputAmount   uint64
+	MaxInputAmount uint64
+}
+
+// SellExactInput sells exactly amount base tokens.
+func SellExactInput(amount uint64) SellAmount {
+	return SellAmount{Kind: SellAmountExactInput, Amount: amount}
+}
+
+// SellExactOutput requests outputAmount quote tokens and caps input at maxInputAmount.
+func SellExactOutput(outputAmount, maxInputAmount uint64) SellAmount {
+	return SellAmount{
+		Kind:           SellAmountExactOutput,
+		Amount:         maxInputAmount,
+		OutputAmount:   outputAmount,
+		MaxInputAmount: maxInputAmount,
+	}
+}
+
 // TradeBuyParams represents parameters for buy operation
 type TradeBuyParams struct {
 	DexType                   DexType
@@ -339,6 +442,7 @@ type TradeBuyParams struct {
 	ExtensionParams           interface{}
 	AddressLookupTableAccount *solana.PublicKey
 	WaitTxConfirmed           bool
+	WaitForAllSubmits         bool
 	CreateInputTokenATA       bool
 	CloseInputTokenATA        bool
 	CreateMintATA             bool
@@ -362,6 +466,7 @@ type TradeSellParams struct {
 	ExtensionParams           interface{}
 	AddressLookupTableAccount *solana.PublicKey
 	WaitTxConfirmed           bool
+	WaitForAllSubmits         bool
 	CreateOutputTokenATA      bool
 	CloseOutputTokenATA       bool
 	CloseMintTokenATA         bool
@@ -370,6 +475,337 @@ type TradeSellParams struct {
 	GasFeeStrategy            *GasFeeStrategy
 	Simulate                  bool
 	GrpcRecvUs                *int64
+}
+
+// SimpleBuyParams is the high-level buy API that describes intent instead of low-level ATA flags.
+type SimpleBuyParams struct {
+	DexType                   DexType
+	PayWith                   TradeTokenType
+	Mint                      solana.PublicKey
+	Amount                    BuyAmount
+	ExtensionParams           interface{}
+	RecentBlockhash           *solana.Hash
+	GasFeeStrategy            *GasFeeStrategy
+	SlippageBasisPoints       uint64
+	AccountPolicy             AccountPolicy
+	AddressLookupTableAccount *solana.PublicKey
+	WaitTxConfirmed           bool
+	WaitForAllSubmits         bool
+	DurableNonce              *DurableNonceInfo
+	Simulate                  bool
+	GrpcRecvUs                *int64
+}
+
+// SimpleSellParams is the high-level sell API that describes intent instead of low-level ATA flags.
+type SimpleSellParams struct {
+	DexType                   DexType
+	ReceiveAs                 TradeTokenType
+	Mint                      solana.PublicKey
+	Amount                    SellAmount
+	ExtensionParams           interface{}
+	RecentBlockhash           *solana.Hash
+	GasFeeStrategy            *GasFeeStrategy
+	SlippageBasisPoints       uint64
+	AccountPolicy             AccountPolicy
+	AddressLookupTableAccount *solana.PublicKey
+	WaitTxConfirmed           bool
+	WaitForAllSubmits         bool
+	DurableNonce              *DurableNonceInfo
+	Simulate                  bool
+	WithTip                   *bool
+	GrpcRecvUs                *int64
+}
+
+// NewSimpleBuyParams creates a simple buy request using a recent blockhash.
+func NewSimpleBuyParams(
+	dexType DexType,
+	payWith TradeTokenType,
+	mint solana.PublicKey,
+	amount BuyAmount,
+	extensionParams interface{},
+	recentBlockhash solana.Hash,
+	gasFeeStrategy *GasFeeStrategy,
+) SimpleBuyParams {
+	return SimpleBuyParams{
+		DexType:           dexType,
+		PayWith:           payWith,
+		Mint:              mint,
+		Amount:            amount,
+		ExtensionParams:   extensionParams,
+		RecentBlockhash:   &recentBlockhash,
+		GasFeeStrategy:    gasFeeStrategy,
+		AccountPolicy:     AccountPolicyAuto,
+		WaitTxConfirmed:   false,
+		WaitForAllSubmits: false,
+		Simulate:          false,
+	}
+}
+
+// NewSimpleBuyParamsWithDurableNonce creates a simple buy request using a durable nonce.
+func NewSimpleBuyParamsWithDurableNonce(
+	dexType DexType,
+	payWith TradeTokenType,
+	mint solana.PublicKey,
+	amount BuyAmount,
+	extensionParams interface{},
+	durableNonce DurableNonceInfo,
+	gasFeeStrategy *GasFeeStrategy,
+) SimpleBuyParams {
+	p := NewSimpleBuyParams(dexType, payWith, mint, amount, extensionParams, solana.Hash{}, gasFeeStrategy)
+	return p.SetDurableNonce(durableNonce)
+}
+
+// SetSlippageBasisPoints returns a copy with slippage in basis points.
+func (p SimpleBuyParams) SetSlippageBasisPoints(value uint64) SimpleBuyParams {
+	p.SlippageBasisPoints = value
+	return p
+}
+
+// SetAccountPolicy returns a copy with account lifecycle behavior.
+func (p SimpleBuyParams) SetAccountPolicy(value AccountPolicy) SimpleBuyParams {
+	p.AccountPolicy = value
+	return p
+}
+
+// SetAddressLookupTableAccount returns a copy with an address lookup table.
+func (p SimpleBuyParams) SetAddressLookupTableAccount(value solana.PublicKey) SimpleBuyParams {
+	p.AddressLookupTableAccount = &value
+	return p
+}
+
+// SetDurableNonce returns a copy using a durable nonce instead of a recent blockhash.
+func (p SimpleBuyParams) SetDurableNonce(value DurableNonceInfo) SimpleBuyParams {
+	p.DurableNonce = &value
+	p.RecentBlockhash = nil
+	return p
+}
+
+// SetWaitTxConfirmed returns a copy with confirmation waiting configured.
+func (p SimpleBuyParams) SetWaitTxConfirmed(value bool) SimpleBuyParams {
+	p.WaitTxConfirmed = value
+	return p
+}
+
+// SetWaitForAllSubmits returns a copy with fast-submit response collection configured.
+func (p SimpleBuyParams) SetWaitForAllSubmits(value bool) SimpleBuyParams {
+	p.WaitForAllSubmits = value
+	return p
+}
+
+// SetSimulate returns a copy configured for simulation instead of submission.
+func (p SimpleBuyParams) SetSimulate(value bool) SimpleBuyParams {
+	p.Simulate = value
+	return p
+}
+
+// SetGrpcRecvUs returns a copy with upstream receive timestamp metadata.
+func (p SimpleBuyParams) SetGrpcRecvUs(value int64) SimpleBuyParams {
+	p.GrpcRecvUs = &value
+	return p
+}
+
+// NewSimpleSellParams creates a simple sell request using a recent blockhash.
+func NewSimpleSellParams(
+	dexType DexType,
+	receiveAs TradeTokenType,
+	mint solana.PublicKey,
+	amount SellAmount,
+	extensionParams interface{},
+	recentBlockhash solana.Hash,
+	gasFeeStrategy *GasFeeStrategy,
+) SimpleSellParams {
+	return SimpleSellParams{
+		DexType:           dexType,
+		ReceiveAs:         receiveAs,
+		Mint:              mint,
+		Amount:            amount,
+		ExtensionParams:   extensionParams,
+		RecentBlockhash:   &recentBlockhash,
+		GasFeeStrategy:    gasFeeStrategy,
+		AccountPolicy:     AccountPolicyAuto,
+		WaitTxConfirmed:   false,
+		WaitForAllSubmits: false,
+		Simulate:          false,
+	}
+}
+
+// NewSimpleSellParamsWithDurableNonce creates a simple sell request using a durable nonce.
+func NewSimpleSellParamsWithDurableNonce(
+	dexType DexType,
+	receiveAs TradeTokenType,
+	mint solana.PublicKey,
+	amount SellAmount,
+	extensionParams interface{},
+	durableNonce DurableNonceInfo,
+	gasFeeStrategy *GasFeeStrategy,
+) SimpleSellParams {
+	p := NewSimpleSellParams(dexType, receiveAs, mint, amount, extensionParams, solana.Hash{}, gasFeeStrategy)
+	return p.SetDurableNonce(durableNonce)
+}
+
+// SetSlippageBasisPoints returns a copy with slippage in basis points.
+func (p SimpleSellParams) SetSlippageBasisPoints(value uint64) SimpleSellParams {
+	p.SlippageBasisPoints = value
+	return p
+}
+
+// SetAccountPolicy returns a copy with account lifecycle behavior.
+func (p SimpleSellParams) SetAccountPolicy(value AccountPolicy) SimpleSellParams {
+	p.AccountPolicy = value
+	return p
+}
+
+// SetAddressLookupTableAccount returns a copy with an address lookup table.
+func (p SimpleSellParams) SetAddressLookupTableAccount(value solana.PublicKey) SimpleSellParams {
+	p.AddressLookupTableAccount = &value
+	return p
+}
+
+// SetDurableNonce returns a copy using a durable nonce instead of a recent blockhash.
+func (p SimpleSellParams) SetDurableNonce(value DurableNonceInfo) SimpleSellParams {
+	p.DurableNonce = &value
+	p.RecentBlockhash = nil
+	return p
+}
+
+// SetWaitTxConfirmed returns a copy with confirmation waiting configured.
+func (p SimpleSellParams) SetWaitTxConfirmed(value bool) SimpleSellParams {
+	p.WaitTxConfirmed = value
+	return p
+}
+
+// SetWaitForAllSubmits returns a copy with fast-submit response collection configured.
+func (p SimpleSellParams) SetWaitForAllSubmits(value bool) SimpleSellParams {
+	p.WaitForAllSubmits = value
+	return p
+}
+
+// SetSimulate returns a copy configured for simulation instead of submission.
+func (p SimpleSellParams) SetSimulate(value bool) SimpleSellParams {
+	p.Simulate = value
+	return p
+}
+
+// SetWithTip returns a copy with relay tips enabled or disabled.
+func (p SimpleSellParams) SetWithTip(value bool) SimpleSellParams {
+	p.WithTip = &value
+	return p
+}
+
+// SetGrpcRecvUs returns a copy with upstream receive timestamp metadata.
+func (p SimpleSellParams) SetGrpcRecvUs(value int64) SimpleSellParams {
+	p.GrpcRecvUs = &value
+	return p
+}
+
+func buyAccountFlags(policy AccountPolicy) (createInput, createMint, closeInput bool) {
+	switch policy {
+	case AccountPolicyHotPathMinimal, AccountPolicyAssumePrepared:
+		return false, false, false
+	case AccountPolicyCreateMissing:
+		return true, true, false
+	default:
+		return false, true, false
+	}
+}
+
+func sellAccountFlags(policy AccountPolicy, receiveAs TradeTokenType) (createOutput, closeOutput, closeMint bool) {
+	switch policy {
+	case AccountPolicyHotPathMinimal, AccountPolicyAssumePrepared:
+		return false, false, false
+	case AccountPolicyCreateMissing:
+		return true, false, false
+	default:
+		return receiveAs != TradeTokenTypeSOL, false, false
+	}
+}
+
+// ToTradeBuyParams converts a high-level buy request to the legacy parameter surface.
+func (p SimpleBuyParams) ToTradeBuyParams() TradeBuyParams {
+	inputAmount := p.Amount.Amount
+	var fixedOutput *uint64
+	useExactSolAmount := true
+
+	switch p.Amount.Kind {
+	case BuyAmountExactOutput:
+		inputAmount = p.Amount.MaxInputAmount
+		output := p.Amount.OutputAmount
+		fixedOutput = &output
+	case BuyAmountWithMaxInput:
+		useExactSolAmount = false
+	}
+
+	createInput, createMint, closeInput := buyAccountFlags(p.AccountPolicy)
+	recentBlockhash := p.RecentBlockhash
+	if p.DurableNonce != nil {
+		recentBlockhash = nil
+	}
+
+	return TradeBuyParams{
+		DexType:                   p.DexType,
+		InputTokenType:            p.PayWith,
+		Mint:                      p.Mint,
+		InputTokenAmount:          inputAmount,
+		SlippageBasisPoints:       p.SlippageBasisPoints,
+		RecentBlockhash:           recentBlockhash,
+		ExtensionParams:           p.ExtensionParams,
+		AddressLookupTableAccount: p.AddressLookupTableAccount,
+		WaitTxConfirmed:           p.WaitTxConfirmed,
+		WaitForAllSubmits:         p.WaitForAllSubmits,
+		CreateInputTokenATA:       createInput,
+		CloseInputTokenATA:        closeInput,
+		CreateMintATA:             createMint,
+		DurableNonce:              p.DurableNonce,
+		FixedOutputTokenAmount:    fixedOutput,
+		GasFeeStrategy:            p.GasFeeStrategy,
+		Simulate:                  p.Simulate,
+		UseExactSolAmount:         &useExactSolAmount,
+		GrpcRecvUs:                p.GrpcRecvUs,
+	}
+}
+
+// ToTradeSellParams converts a high-level sell request to the legacy parameter surface.
+func (p SimpleSellParams) ToTradeSellParams() TradeSellParams {
+	inputAmount := p.Amount.Amount
+	var fixedOutput *uint64
+	if p.Amount.Kind == SellAmountExactOutput {
+		inputAmount = p.Amount.MaxInputAmount
+		output := p.Amount.OutputAmount
+		fixedOutput = &output
+	}
+
+	createOutput, closeOutput, closeMint := sellAccountFlags(p.AccountPolicy, p.ReceiveAs)
+	recentBlockhash := p.RecentBlockhash
+	if p.DurableNonce != nil {
+		recentBlockhash = nil
+	}
+
+	withTip := true
+	if p.WithTip != nil {
+		withTip = *p.WithTip
+	}
+
+	return TradeSellParams{
+		DexType:                   p.DexType,
+		OutputTokenType:           p.ReceiveAs,
+		Mint:                      p.Mint,
+		InputTokenAmount:          inputAmount,
+		SlippageBasisPoints:       p.SlippageBasisPoints,
+		RecentBlockhash:           recentBlockhash,
+		WithTip:                   withTip,
+		ExtensionParams:           p.ExtensionParams,
+		AddressLookupTableAccount: p.AddressLookupTableAccount,
+		WaitTxConfirmed:           p.WaitTxConfirmed,
+		WaitForAllSubmits:         p.WaitForAllSubmits,
+		CreateOutputTokenATA:      createOutput,
+		CloseOutputTokenATA:       closeOutput,
+		CloseMintTokenATA:         closeMint,
+		DurableNonce:              p.DurableNonce,
+		FixedOutputTokenAmount:    fixedOutput,
+		GasFeeStrategy:            p.GasFeeStrategy,
+		Simulate:                  p.Simulate,
+		GrpcRecvUs:                p.GrpcRecvUs,
+	}
 }
 
 // TradeResult represents the result of a trade operation
@@ -433,6 +869,30 @@ func (c *TradingClient) Buy(ctx context.Context, params TradeBuyParams) (*TradeR
 // Sell executes a sell order
 func (c *TradingClient) Sell(ctx context.Context, params TradeSellParams) (*TradeResult, error) {
 	return c.executeSell(ctx, params)
+}
+
+// BuildBuyParamsFromSimple converts a high-level buy request to the legacy parameter surface.
+func (c *TradingClient) BuildBuyParamsFromSimple(params SimpleBuyParams) TradeBuyParams {
+	return params.ToTradeBuyParams()
+}
+
+// BuildSellParamsFromSimple converts a high-level sell request to the legacy parameter surface.
+func (c *TradingClient) BuildSellParamsFromSimple(params SimpleSellParams) TradeSellParams {
+	return params.ToTradeSellParams()
+}
+
+// BuySimple converts a high-level buy request and then follows the root Buy boundary.
+// The root facade currently returns ErrTradingExecutionUnavailable for execution; use
+// BuildBuyParamsFromSimple when only parameter conversion is needed.
+func (c *TradingClient) BuySimple(ctx context.Context, params SimpleBuyParams) (*TradeResult, error) {
+	return c.Buy(ctx, c.BuildBuyParamsFromSimple(params))
+}
+
+// SellSimple converts a high-level sell request and then follows the root Sell boundary.
+// The root facade currently returns ErrTradingExecutionUnavailable for execution; use
+// BuildSellParamsFromSimple when only parameter conversion is needed.
+func (c *TradingClient) SellSimple(ctx context.Context, params SimpleSellParams) (*TradeResult, error) {
+	return c.Sell(ctx, c.BuildSellParamsFromSimple(params))
 }
 
 // SellByPercent executes a sell order for a percentage of tokens

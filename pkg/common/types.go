@@ -26,6 +26,7 @@ const (
 	SwqosTypeSoyas        = soltradesdk.SwqosTypeSoyas
 	SwqosTypeSpeedlanding = soltradesdk.SwqosTypeSpeedlanding
 	SwqosTypeHelius       = soltradesdk.SwqosTypeHelius
+	SwqosTypeSolami       = soltradesdk.SwqosTypeSolami
 	SwqosTypeDefault      = soltradesdk.SwqosTypeDefault
 
 	TradeTypeBuy  = soltradesdk.TradeTypeBuy
@@ -48,6 +49,7 @@ func GetAllSwqosTypes() []SwqosType {
 		SwqosTypeSoyas,
 		SwqosTypeSpeedlanding,
 		SwqosTypeHelius,
+		SwqosTypeSolami,
 		SwqosTypeDefault,
 	}
 }

@@ -18,12 +18,12 @@ func main() {
 	buyParams := exampleutil.ExampleBuyParams(soltradesdk.DexTypeBonk)
 	sellParams := exampleutil.ExampleSellParams(soltradesdk.DexTypeBonk)
 
-	fmt.Println(exampleutil.DescribeDryRun("Bonk copy-trading example using parser event reserves"))
+	fmt.Println(exampleutil.DescribeDryRun("Bonk copy-trading example using decoded event reserves"))
 	fmt.Println("Wallet:", client.GetPayer())
 	fmt.Printf("Buy params: dex=%s amount=%d\n", buyParams.DexType, buyParams.InputTokenAmount)
 	fmt.Printf("Sell params: dex=%s amount=%d\n", sellParams.DexType, sellParams.InputTokenAmount)
 
 	if exampleutil.RunLive() {
-		fmt.Println("Replace placeholder params with real on-chain/parser values before executing trades.")
+		fmt.Println("Replace placeholder params with real on-chain or decoded event values before executing trades.")
 	}
 }

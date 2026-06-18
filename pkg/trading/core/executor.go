@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )
@@ -442,7 +443,7 @@ func (e *AsyncTradeExecutor) waitForConfirmation(exec *executionContext) {
 
 			if status != nil {
 				if status.Err != nil {
-					e.updateStatus(exec, ExecutionStatusFailed, fmt.Errorf("transaction failed: %v", status.Err))
+					e.updateStatus(exec, ExecutionStatusFailed, e.transactionError(exec.ctx, exec.result.Signature, status.Err))
 					return
 				}
 
@@ -470,6 +471,19 @@ func (e *AsyncTradeExecutor) waitForConfirmation(exec *executionContext) {
 			}
 		}
 	}
+}
+
+func (e *AsyncTradeExecutor) transactionError(ctx context.Context, sig solana.Signature, statusErr interface{}) error {
+	var zero uint64
+	tx, err := e.rpcClient.GetTransaction(ctx, sig, &rpc.GetTransactionOpts{
+		Encoding:                       solana.EncodingBase64,
+		Commitment:                     rpc.CommitmentConfirmed,
+		MaxSupportedTransactionVersion: &zero,
+	})
+	if err != nil || tx == nil || tx.Meta == nil {
+		return soltradesdk.FormatParsedTransactionError(statusErr, nil)
+	}
+	return soltradesdk.FormatParsedTransactionError(tx.Meta.Err, tx.Meta.LogMessages)
 }
 
 // checkConfirmation checks the confirmation status of a transaction

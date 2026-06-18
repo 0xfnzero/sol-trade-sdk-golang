@@ -94,16 +94,33 @@ func (p *WorkerPool) SubmitWait(task Task) (interface{}, error) {
 // SubmitBatch submits multiple tasks and returns results
 func (p *WorkerPool) SubmitBatch(tasks []Task) []Result {
 	results := make([]Result, len(tasks))
+	type indexedResult struct {
+		index  int
+		result Result
+	}
+
+	submitted := 0
 	for i, task := range tasks {
-		if err := p.Submit(task); err != nil {
+		i, task := i, task
+		if err := p.Submit(func() (interface{}, error) {
+			value, err := task()
+			return indexedResult{
+				index:  i,
+				result: Result{Value: value, Error: err},
+			}, nil
+		}); err != nil {
 			results[i] = Result{Error: err}
 			continue
 		}
+		submitted++
 	}
-	for i := range results {
-		if results[i].Error == nil {
-			results[i] = <-p.resultChan
+	for i := 0; i < submitted; i++ {
+		completed := <-p.resultChan
+		indexed, ok := completed.Value.(indexedResult)
+		if !ok {
+			continue
 		}
+		results[indexed.index] = indexed.result
 	}
 	return results
 }

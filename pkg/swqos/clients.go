@@ -51,6 +51,7 @@ const (
 	SwqosTypeSoyas        = soltradesdk.SwqosTypeSoyas
 	SwqosTypeSpeedlanding = soltradesdk.SwqosTypeSpeedlanding
 	SwqosTypeHelius       = soltradesdk.SwqosTypeHelius
+	SwqosTypeSolami       = soltradesdk.SwqosTypeSolami
 	SwqosTypeDefault      = soltradesdk.SwqosTypeDefault
 
 	SwqosRegionNewYork    = soltradesdk.SwqosRegionNewYork
@@ -86,7 +87,8 @@ const (
 	MinTipSoyas        = 0.001
 	MinTipSpeedlanding = 0.001
 	MinTipHelius       = 0.000005 // SWQOS-only mode
-	MinTipDefault      = 0.0
+	MinTipSolami       = 0.0001
+	MinTipDefault      = 0.00001
 )
 
 // ===== Tip Accounts =====
@@ -244,6 +246,19 @@ var speedlandingTipAccounts = []string{
 	"speede8xCcUq2Tiv1efXeTuE3k9TDNq8TnGKaKSc6J4",
 }
 
+var solamiTipAccounts = []string{
+	"15qWd4huAkoxvhDsHMfpUn27TW1YBYMMJJ2jkAkbeam",
+	"9XuGciSwr5wb7dLTQm91JhuBTvj3GG8WjuRDc3obeam",
+	"kiQioJNyFG7pU36ELLsRKXkeT48kFbk3b6rSgrWbeam",
+	"kjmVhW1UzJrW2sU5bY5NtZ79jpvjSStsj37Pzmabeam",
+	"kREnjPWFpt4AHeY5pijPmyXaCrMnbatUQJo7d3Xbeam",
+	"praRZG6N6MdbsT4EFpKgZJWReZGXQhAMFcH68oCbeam",
+	"SqoKQKU5uwBxovq3R7yEBxFwptc4z7vwoghU3M9beam",
+	"sV72TY66T1RfmDSeHPPbwX6wwJ3bBv5hd4ehJ8tbeam",
+	"swf8MyEeLo7gtRUo27UuJj6naCASUrypU7dbteSbeam",
+	"uiuaQsxA47JybQAVN4FTfYuoEDkMiXV1r591Aewbeam",
+}
+
 var heliusTipAccounts = []string{
 	"4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
 	"D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ",
@@ -316,7 +331,7 @@ var bloxrouteEndpoints = map[SwqosRegion]string{
 	SwqosRegionFrankfurt:  "https://germany.solana.dex.blxrbdn.com",
 	SwqosRegionAmsterdam:  "https://amsterdam.solana.dex.blxrbdn.com",
 	SwqosRegionDublin:     "https://uk.solana.dex.blxrbdn.com",
-	SwqosRegionSLC:        "https://ny.solana.dex.blxrbdn.com",
+	SwqosRegionSLC:        "https://la.solana.dex.blxrbdn.com",
 	SwqosRegionTokyo:      "https://tokyo.solana.dex.blxrbdn.com",
 	SwqosRegionSingapore:  "https://tokyo.solana.dex.blxrbdn.com",
 	SwqosRegionLondon:     "https://uk.solana.dex.blxrbdn.com",
@@ -346,8 +361,8 @@ var flashBlockEndpoints = map[SwqosRegion]string{
 	SwqosRegionTokyo:      "http://tokyo.flashblock.trade",
 	SwqosRegionSingapore:  "http://singapore.flashblock.trade",
 	SwqosRegionLondon:     "http://london.flashblock.trade",
-	SwqosRegionLosAngeles: "http://ny.flashblock.trade",
-	SwqosRegionDefault:    "http://ny.flashblock.trade",
+	SwqosRegionLosAngeles: "http://slc.flashblock.trade",
+	SwqosRegionDefault:    "http://fra.flashblock.trade",
 }
 
 var blockRazorEndpoints = map[SwqosRegion]string{
@@ -368,12 +383,12 @@ var astralaneEndpoints = map[SwqosRegion]string{
 	SwqosRegionFrankfurt:  "http://fr.gateway.astralane.io/irisb",
 	SwqosRegionAmsterdam:  "http://ams.gateway.astralane.io/irisb",
 	SwqosRegionDublin:     "http://ams.gateway.astralane.io/irisb",
-	SwqosRegionSLC:        "http://ny.gateway.astralane.io/irisb",
+	SwqosRegionSLC:        "http://la.gateway.astralane.io/irisb",
 	SwqosRegionTokyo:      "http://jp.gateway.astralane.io/irisb",
-	SwqosRegionSingapore:  "http://lim.gateway.astralane.io/irisb",
+	SwqosRegionSingapore:  "http://sg.gateway.astralane.io/irisb",
 	SwqosRegionLondon:     "http://ams.gateway.astralane.io/irisb",
-	SwqosRegionLosAngeles: "http://lax.gateway.astralane.io/irisb",
-	SwqosRegionDefault:    "http://lim.gateway.astralane.io/irisb",
+	SwqosRegionLosAngeles: "http://la.gateway.astralane.io/irisb",
+	SwqosRegionDefault:    "https://edge.astralane.io/irisb",
 }
 
 var astralaneQuicHosts = map[SwqosRegion]string{
@@ -381,11 +396,11 @@ var astralaneQuicHosts = map[SwqosRegion]string{
 	SwqosRegionFrankfurt:  "fr.gateway.astralane.io",
 	SwqosRegionAmsterdam:  "ams.gateway.astralane.io",
 	SwqosRegionDublin:     "ams.gateway.astralane.io",
-	SwqosRegionSLC:        "ny.gateway.astralane.io",
+	SwqosRegionSLC:        "la.gateway.astralane.io",
 	SwqosRegionTokyo:      "jp.gateway.astralane.io",
-	SwqosRegionSingapore:  "lim.gateway.astralane.io",
+	SwqosRegionSingapore:  "sg.gateway.astralane.io",
 	SwqosRegionLondon:     "ams.gateway.astralane.io",
-	SwqosRegionLosAngeles: "lax.gateway.astralane.io",
+	SwqosRegionLosAngeles: "la.gateway.astralane.io",
 	SwqosRegionDefault:    "lim.gateway.astralane.io",
 }
 
@@ -413,6 +428,19 @@ var heliusEndpoints = map[SwqosRegion]string{
 	SwqosRegionLondon:     "http://lon-sender.helius-rpc.com/fast",
 	SwqosRegionLosAngeles: "http://slc-sender.helius-rpc.com/fast",
 	SwqosRegionDefault:    "https://sender.helius-rpc.com/fast",
+}
+
+var solamiEndpoints = map[SwqosRegion]string{
+	SwqosRegionNewYork:    "beam.solami.dev:11000",
+	SwqosRegionFrankfurt:  "beam.solami.dev:11000",
+	SwqosRegionAmsterdam:  "beam.solami.dev:11000",
+	SwqosRegionDublin:     "beam.solami.dev:11000",
+	SwqosRegionSLC:        "beam.solami.dev:11000",
+	SwqosRegionTokyo:      "beam.solami.dev:11000",
+	SwqosRegionSingapore:  "beam.solami.dev:11000",
+	SwqosRegionLondon:     "beam.solami.dev:11000",
+	SwqosRegionLosAngeles: "beam.solami.dev:11000",
+	SwqosRegionDefault:    "beam.solami.dev:11000",
 }
 
 // ===== Helper =====
@@ -1257,6 +1285,25 @@ func newSolanaTPUTLSConfig(serverName string) (*tls.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("generate ed25519 key: %w", err)
 	}
+	return newSolanaTPUTLSConfigFromKey(serverName, pub, priv)
+}
+
+func newSolanaTPUTLSConfigFromSolanaPrivateKey(serverName, apiKey string) (*tls.Config, error) {
+	if strings.TrimSpace(apiKey) == "" {
+		return nil, fmt.Errorf("Solami api_token is required and must be a base58-encoded Solana keypair")
+	}
+	privateKey, err := solana.PrivateKeyFromBase58(strings.TrimSpace(apiKey))
+	if err != nil {
+		return nil, fmt.Errorf("Solami api_token base58 decode failed: %w", err)
+	}
+	if len(privateKey) != ed25519.PrivateKeySize {
+		return nil, fmt.Errorf("Solami api_token must decode to %d bytes, got %d", ed25519.PrivateKeySize, len(privateKey))
+	}
+	pub := ed25519.PrivateKey(privateKey).Public().(ed25519.PublicKey)
+	return newSolanaTPUTLSConfigFromKey(serverName, pub, ed25519.PrivateKey(privateKey))
+}
+
+func newSolanaTPUTLSConfigFromKey(serverName string, pub ed25519.PublicKey, priv ed25519.PrivateKey) (*tls.Config, error) {
 	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 62))
 	if err != nil {
 		return nil, fmt.Errorf("generate serial: %w", err)
@@ -1304,6 +1351,10 @@ func sendViaQUIC(ctx context.Context, addr, serverName string, txBytes []byte) e
 	if err != nil {
 		return err
 	}
+	return sendViaQUICWithTLS(ctx, addr, tlsCfg, txBytes)
+}
+
+func sendViaQUICWithTLS(ctx context.Context, addr string, tlsCfg *tls.Config, txBytes []byte) error {
 	conn, err := quic.DialAddr(ctx, addr, tlsCfg, &quic.Config{
 		MaxIdleTimeout:  30 * time.Second,
 		KeepAlivePeriod: 25 * time.Second,
@@ -1320,6 +1371,15 @@ func sendViaQUIC(ctx context.Context, addr, serverName string, txBytes []byte) e
 		return fmt.Errorf("write QUIC stream: %w", err)
 	}
 	return stream.Close()
+}
+
+func signatureFromSerializedTransaction(txBytes []byte) (solana.Signature, error) {
+	if len(txBytes) < 65 || txBytes[0] != 1 {
+		return solana.Signature{}, fmt.Errorf("only single-signature versioned transactions are supported for SWQOS submit")
+	}
+	var sig solana.Signature
+	copy(sig[:], txBytes[1:65])
+	return sig, nil
 }
 
 func hostPortFromHTTP(endpoint string, port string) string {
@@ -1448,7 +1508,11 @@ func (c *Node1QuicClient) SendTransaction(ctx context.Context, tradeType TradeTy
 	if status != 200 {
 		return solana.Signature{}, &TradeError{Code: uint32(status), Message: fmt.Sprintf("Node1 QUIC submit failed: %s", msg)}
 	}
-	return solana.Signature{}, nil
+	signature, err := signatureFromSerializedTransaction(transaction)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 400, Message: err.Error()}
+	}
+	return signature, nil
 }
 
 func (c *Node1QuicClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
@@ -1544,7 +1608,11 @@ func (c *AstralaneQuicClient) SendTransaction(ctx context.Context, tradeType Tra
 	if err = stream.Close(); err != nil {
 		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Astralane QUIC close: %v", err)}
 	}
-	return solana.Signature{}, nil
+	signature, err := signatureFromSerializedTransaction(transaction)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 400, Message: err.Error()}
+	}
+	return signature, nil
 }
 
 func (c *AstralaneQuicClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
@@ -1579,7 +1647,11 @@ func (c *SoyasClient) SendTransaction(ctx context.Context, tradeType TradeType, 
 	if err := sendViaQUIC(ctx, c.endpoint, c.serverName, transaction); err != nil {
 		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Soyas QUIC: %v", err)}
 	}
-	return solana.Signature{}, nil
+	signature, err := signatureFromSerializedTransaction(transaction)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 400, Message: err.Error()}
+	}
+	return signature, nil
 }
 
 func (c *SoyasClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
@@ -1637,7 +1709,11 @@ func (c *SpeedlandingClient) SendTransaction(ctx context.Context, tradeType Trad
 	if err := sendViaQUIC(ctx, c.endpoint, c.serverName, transaction); err != nil {
 		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Speedlanding QUIC: %v", err)}
 	}
-	return solana.Signature{}, nil
+	signature, err := signatureFromSerializedTransaction(transaction)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 400, Message: err.Error()}
+	}
+	return signature, nil
 }
 
 func (c *SpeedlandingClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
@@ -1655,6 +1731,52 @@ func (c *SpeedlandingClient) SendTransactions(ctx context.Context, tradeType Tra
 func (c *SpeedlandingClient) GetTipAccount() string   { return randomTipAccount(speedlandingTipAccounts) }
 func (c *SpeedlandingClient) GetSwqosType() SwqosType { return SwqosTypeSpeedlanding }
 func (c *SpeedlandingClient) MinTipSol() float64      { return MinTipSpeedlanding }
+
+// ===== Solami Client =====
+
+// SolamiClient submits transactions via QUIC (Solana TPU ALPN "solana-tpu").
+// Rust v4.0.21 uses endpoint beam.solami.dev:11000 and SNI "solami-beam".
+type SolamiClient struct {
+	endpoint   string
+	serverName string
+	apiKey     string
+}
+
+// NewSolamiClient creates a new Solami QUIC client.
+func NewSolamiClient(endpoint, apiKey string) *SolamiClient {
+	return &SolamiClient{endpoint: endpoint, serverName: "solami-beam", apiKey: apiKey}
+}
+
+func (c *SolamiClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	tlsCfg, err := newSolanaTPUTLSConfigFromSolanaPrivateKey(c.serverName, c.apiKey)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 400, Message: err.Error()}
+	}
+	if err := sendViaQUICWithTLS(ctx, c.endpoint, tlsCfg, transaction); err != nil {
+		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Solami QUIC: %v", err)}
+	}
+	signature, err := signatureFromSerializedTransaction(transaction)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 400, Message: err.Error()}
+	}
+	return signature, nil
+}
+
+func (c *SolamiClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	sigs := make([]solana.Signature, 0, len(transactions))
+	for _, tx := range transactions {
+		sig, err := c.SendTransaction(ctx, tradeType, tx, waitConfirmation)
+		if err != nil {
+			return sigs, err
+		}
+		sigs = append(sigs, sig)
+	}
+	return sigs, nil
+}
+
+func (c *SolamiClient) GetTipAccount() string   { return randomTipAccount(solamiTipAccounts) }
+func (c *SolamiClient) GetSwqosType() SwqosType { return SwqosTypeSolami }
+func (c *SolamiClient) MinTipSol() float64      { return MinTipSolami }
 
 // ===== Helius Client =====
 
@@ -1801,7 +1923,7 @@ func GetAllSwqosTypes() []SwqosType {
 		SwqosTypeJito, SwqosTypeNextBlock, SwqosTypeZeroSlot, SwqosTypeTemporal,
 		SwqosTypeBloxroute, SwqosTypeNode1, SwqosTypeFlashBlock, SwqosTypeBlockRazor,
 		SwqosTypeAstralane, SwqosTypeStellium, SwqosTypeLightspeed, SwqosTypeSoyas,
-		SwqosTypeSpeedlanding, SwqosTypeHelius, SwqosTypeDefault,
+		SwqosTypeSpeedlanding, SwqosTypeHelius, SwqosTypeSolami, SwqosTypeDefault,
 	}
 }
 
@@ -1812,6 +1934,9 @@ type ClientFactory struct{}
 
 // CreateClient creates a SWQOS client from config
 func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL string) (SwqosClient, error) {
+	if soltradesdk.IsSwqosTypeBlacklisted(config.Type) {
+		return nil, fmt.Errorf("SWQOS type is blacklisted by Rust v4.0.21 parity: %v", config.Type)
+	}
 	switch config.Type {
 	case SwqosTypeJito:
 		endpoint, ok := jitoEndpoints[config.Region]
@@ -1965,6 +2090,16 @@ func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL stri
 			endpoint = config.CustomURL
 		}
 		return NewSpeedlandingClient(endpoint, config.APIKey), nil
+
+	case SwqosTypeSolami:
+		endpoint, ok := solamiEndpoints[config.Region]
+		if !ok {
+			endpoint = solamiEndpoints[SwqosRegionDefault]
+		}
+		if config.CustomURL != "" {
+			endpoint = config.CustomURL
+		}
+		return NewSolamiClient(endpoint, config.APIKey), nil
 
 	case SwqosTypeHelius:
 		endpoint, ok := heliusEndpoints[config.Region]
