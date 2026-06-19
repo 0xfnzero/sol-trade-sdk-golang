@@ -68,6 +68,17 @@ This SDK is available in multiple languages:
 | **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | Async/await native support |
 | **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | Concurrent-safe with goroutine support |
 
+## What This SDK Is For
+
+`sol-trade-sdk-golang` brings the FnZero Solana trading SDK to Go. It is built for Go trading services, copy-trading systems, sniper bots, backend workers, and DEX integrations that need typed builders, reusable execution components, and Rust SDK behavior parity.
+
+| Area | Coverage |
+|------|----------|
+| DEX protocols | PumpFun, PumpSwap, Bonk, Meteora DAMM v2, Raydium AMM v4, Raydium CPMM |
+| Submit lanes | Default Solana RPC plus Jito, Nextblock, ZeroSlot, Temporal, Bloxroute, FlashBlock, BlockRazor, Node1, Astralane, Solami, and other SWQoS providers |
+| Trading workflows | `BuySimple` / `SellSimple`, legacy buy/sell params, copy trading, sniper trading, address lookup tables, durable nonce, middleware, prebuilt transaction execution |
+| Runtime | Go 1.24+, backend services, workers, and latency-sensitive bot infrastructure |
+
 ## 🔖 Current Release
 
 **Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.2`

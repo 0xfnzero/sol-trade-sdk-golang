@@ -68,6 +68,17 @@
 | **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | 原生 async/await 支持 |
 | **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | 并发安全，goroutine 支持 |
 
+## 这个 SDK 适合什么场景
+
+`sol-trade-sdk-golang` 将 FnZero Solana 交易 SDK 带到 Go 生态，适合 Go 交易服务、跟单系统、狙击机器人、后端 worker 和 DEX 集成场景，提供强类型构建器、可复用执行组件，并保持 Rust SDK 行为对齐。
+
+| 方向 | 覆盖范围 |
+|------|----------|
+| DEX 协议 | PumpFun、PumpSwap、Bonk、Meteora DAMM v2、Raydium AMM v4、Raydium CPMM |
+| 提交通道 | 默认 Solana RPC，以及 Jito、Nextblock、ZeroSlot、Temporal、Bloxroute、FlashBlock、BlockRazor、Node1、Astralane、Solami 等 SWQoS 服务 |
+| 交易流程 | `BuySimple` / `SellSimple`、旧版 buy/sell 参数、跟单交易、狙击交易、地址查找表、durable nonce、中间件、预构建交易执行 |
+| 运行环境 | Go 1.24+、后端服务、worker 和低延迟 Bot 基础设施 |
+
 ## 🔖 当前版本
 
 **Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.2`
