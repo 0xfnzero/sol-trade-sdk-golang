@@ -81,7 +81,7 @@ This SDK is available in multiple languages:
 
 ## 🔖 Current Release
 
-**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.2`
+**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.3`
 
 This release refreshes PumpFun V2 and USDC quote-pool handling, keeps the default RPC submit lane active alongside SWQoS lanes, and aligns Raydium CPMM fixed-output swaps with the on-chain `swap_base_out` instruction. Trade execution requires a caller-supplied recent blockhash or durable nonce; hot-path execution does not query RPC for blockhash, account, or balance data.
 
@@ -119,7 +119,7 @@ Add the dependency to your `go.mod`:
 
 ```go
 // Add to your go.mod
-require github.com/0xfnzero/sol-trade-sdk-golang v0.1.2
+require github.com/0xfnzero/sol-trade-sdk-golang v0.1.3
 
 replace github.com/0xfnzero/sol-trade-sdk-golang => ./sol-trade-sdk-golang
 ```
@@ -133,7 +133,7 @@ go mod tidy
 ### Use Go Modules
 
 ```bash
-go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.2
+go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.3
 ```
 
 ## 🛠️ Usage Examples
