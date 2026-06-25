@@ -75,7 +75,7 @@
 | 方向 | 覆盖范围 |
 |------|----------|
 | DEX 协议 | PumpFun、PumpSwap、Bonk、Meteora DAMM v2、Raydium AMM v4、Raydium CPMM |
-| 提交通道 | 默认 Solana RPC，以及 Jito、Nextblock、ZeroSlot、Temporal、Bloxroute、FlashBlock、BlockRazor、Node1、Astralane、Solami 等 SWQoS 服务 |
+| 提交通道 | 默认 Solana RPC，以及 Jito、ZeroSlot、Temporal、Bloxroute、FlashBlock、BlockRazor、Node1、Astralane、Stellium、Lightspeed、Soyas、Speedlanding、Helius、Solami；NextBlock 默认仍按 Rust 黑名单跳过 |
 | 交易流程 | `BuySimple` / `SellSimple`、旧版 buy/sell 参数、跟单交易、狙击交易、地址查找表、durable nonce、中间件、预构建交易执行 |
 | 运行环境 | Go 1.24+、后端服务、worker 和低延迟 Bot 基础设施 |
 
@@ -87,7 +87,7 @@
 
 ## Rust v4.0.21 对齐
 
-本 SDK 现在按 Rust SDK `v4.0.21` 对齐高层交易 intent API 和 SWQoS provider 覆盖。新代码可以使用 `BuySimple` / `SellSimple`，并通过 `AccountPolicy`、`BuyAmount`、`SellAmount` 描述意图；内部会转换到现有 `Buy` / `Sell` 参数，不移除旧 API。根 `TradingClient` 仍明确其执行边界，不宣称自己会构建或提交交易。SWQoS 已包含 Rust 的 `Solami` 类型与默认配置（`beam.solami.dev:11000`，最小 tip `0.0001 SOL`）；真实 Solami 提交走主 QUIC client 路径，并需要和 Rust 相同的 base58 Solana keypair api token。配置显式 SWQoS 时仍会自动追加默认 RPC 通道。
+本 SDK 现在按 Rust SDK `v4.0.21` 对齐高层交易 intent API 和 SWQoS provider 覆盖。新代码可以使用 `BuySimple` / `SellSimple`，并通过 `AccountPolicy`、`BuyAmount`、`SellAmount` 描述意图；内部会转换到现有 `Buy` / `Sell` 参数，不移除旧 API。根 `TradingClient` 仍明确其执行边界，不宣称自己会构建或提交交易。SWQoS 已包含 Rust 的 `Solami` 类型与默认配置（`beam.solami.dev:11000`，最小 tip `0.0001 SOL`）；真实 Solami 提交走主 QUIC client 路径，并需要和 Rust 相同的 base58 Solana keypair api token。配置显式 SWQoS 时仍会自动追加默认 RPC 通道。NextBlock 仍按 Rust parity 黑名单过滤，除非 Rust 后续改变该行为。`Triton`、`QuickNode`、`Syndica`、`Figment`、`Alchemy` 等历史 extended provider 类仅为源码兼容保留，不属于 Rust `v4.0.21` 交易 provider 对齐范围。
 
 ## ✨ 项目特性
 
@@ -97,7 +97,7 @@
 4. **Raydium CPMM 构建器**: 提供 Raydium CPMM fixed-input 和 fixed-output swap 的指令构建器和参数
 5. **Raydium AMM V4 构建器**: 提供 Raydium AMM V4 swap 的指令构建器和参数
 6. **Meteora DAMM V2 构建器**: 提供 Meteora DAMM V2 操作的指令构建器和参数
-7. **多种 MEV 保护**: 支持 Jito、Nextblock、ZeroSlot、Temporal、Bloxroute、FlashBlock、BlockRazor、Node1、Astralane 等服务
+7. **多种 MEV 保护**: 支持 Rust v4.0.21 SWQoS 集合，包括 Jito、ZeroSlot、Temporal、Bloxroute、FlashBlock、BlockRazor、Node1、Astralane、Stellium、Lightspeed、Soyas、Speedlanding、Helius、Solami 和默认 RPC
 8. **并发交易**: 所有已配置的 SWQoS 通道和默认 RPC 通道都会发出提交；首个成功只影响返回，较慢通道会继续提交
 9. **统一交易接口**: 使用统一的交易协议类型进行交易操作，并支持 Rust 对齐的 `BuySimple` / `SellSimple` intent 参数
 10. **中间件系统**: 在低层指令/执行器路径支持自定义指令中间件

@@ -75,7 +75,7 @@ This SDK is available in multiple languages:
 | Area | Coverage |
 |------|----------|
 | DEX protocols | PumpFun, PumpSwap, Bonk, Meteora DAMM v2, Raydium AMM v4, Raydium CPMM |
-| Submit lanes | Default Solana RPC plus Jito, Nextblock, ZeroSlot, Temporal, Bloxroute, FlashBlock, BlockRazor, Node1, Astralane, Solami, and other SWQoS providers |
+| Submit lanes | Default Solana RPC plus Jito, ZeroSlot, Temporal, Bloxroute, FlashBlock, BlockRazor, Node1, Astralane, Stellium, Lightspeed, Soyas, Speedlanding, Helius, and Solami; NextBlock remains Rust-blacklisted by default |
 | Trading workflows | `BuySimple` / `SellSimple`, legacy buy/sell params, copy trading, sniper trading, address lookup tables, durable nonce, middleware, prebuilt transaction execution |
 | Runtime | Go 1.24+, backend services, workers, and latency-sensitive bot infrastructure |
 
@@ -87,7 +87,7 @@ This release refreshes PumpFun V2 and USDC quote-pool handling, keeps the defaul
 
 ## Rust v4.0.21 Parity
 
-This SDK now tracks the Rust SDK `v4.0.21` public behavior for high-level trade intent APIs and SWQoS provider coverage. New code can use `BuySimple` / `SellSimple` with `AccountPolicy`, `BuyAmount`, and `SellAmount`; these convert to the existing `Buy` / `Sell` params without removing the legacy API. The root `TradingClient` still documents its execution boundary and does not claim to build or submit trades by itself. SWQoS coverage includes the Rust `Solami` type and defaults (`beam.solami.dev:11000`, min tip `0.0001 SOL`); live Solami submit uses the main QUIC client path and requires the same base58 Solana keypair api token model as Rust. Explicit SWQoS routes still keep the default RPC lane appended.
+This SDK now tracks the Rust SDK `v4.0.21` public behavior for high-level trade intent APIs and SWQoS provider coverage. New code can use `BuySimple` / `SellSimple` with `AccountPolicy`, `BuyAmount`, and `SellAmount`; these convert to the existing `Buy` / `Sell` params without removing the legacy API. The root `TradingClient` still documents its execution boundary and does not claim to build or submit trades by itself. SWQoS coverage includes the Rust `Solami` type and defaults (`beam.solami.dev:11000`, min tip `0.0001 SOL`); live Solami submit uses the main QUIC client path and requires the same base58 Solana keypair api token model as Rust. Explicit SWQoS routes still keep the default RPC lane appended. NextBlock is still filtered by the Rust parity blacklist unless Rust changes that behavior. Legacy extended provider classes such as `Triton`, `QuickNode`, `Syndica`, `Figment`, and `Alchemy` are kept only for source compatibility and are not part of Rust `v4.0.21` trading provider parity.
 
 ## ✨ Features
 
@@ -97,7 +97,7 @@ This SDK now tracks the Rust SDK `v4.0.21` public behavior for high-level trade 
 4. **Raydium CPMM Builders**: Instruction builders and params for Raydium CPMM fixed-input and fixed-output swaps
 5. **Raydium AMM V4 Builders**: Instruction builders and params for Raydium AMM V4 swaps
 6. **Meteora DAMM V2 Builders**: Instruction builders and params for Meteora DAMM V2 operations
-7. **Multiple MEV Protection**: Support for Jito, Nextblock, ZeroSlot, Temporal, Bloxroute, FlashBlock, BlockRazor, Node1, Astralane and other services
+7. **Multiple MEV Protection**: Support for the Rust v4.0.21 SWQoS set, including Jito, ZeroSlot, Temporal, Bloxroute, FlashBlock, BlockRazor, Node1, Astralane, Stellium, Lightspeed, Soyas, Speedlanding, Helius, Solami, and Default RPC
 8. **Concurrent Trading**: Submit through every configured SWQoS provider plus the default RPC lane; the first accepted result can return early while slower routes continue submitting
 9. **Unified Trading Interface**: Use unified trading protocol types for trading operations, including Rust-parity `BuySimple` / `SellSimple` intent params
 10. **Middleware System**: Support for custom instruction middleware in lower-level instruction/executor paths

@@ -1,6 +1,7 @@
 package swqos
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/ed25519"
@@ -430,6 +431,19 @@ var heliusEndpoints = map[SwqosRegion]string{
 	SwqosRegionDefault:    "https://sender.helius-rpc.com/fast",
 }
 
+var speedlandingEndpoints = map[SwqosRegion]string{
+	SwqosRegionNewYork:    "nyc.speedlanding.trade:17778",
+	SwqosRegionFrankfurt:  "fra.speedlanding.trade:17778",
+	SwqosRegionAmsterdam:  "ams.speedlanding.trade:17778",
+	SwqosRegionDublin:     "ams.speedlanding.trade:17778",
+	SwqosRegionSLC:        "nyc.speedlanding.trade:17778",
+	SwqosRegionTokyo:      "tyo.speedlanding.trade:17778",
+	SwqosRegionSingapore:  "sgp.speedlanding.trade:17778",
+	SwqosRegionLondon:     "ams.speedlanding.trade:17778",
+	SwqosRegionLosAngeles: "nyc.speedlanding.trade:17778",
+	SwqosRegionDefault:    "fra.speedlanding.trade:17778",
+}
+
 var solamiEndpoints = map[SwqosRegion]string{
 	SwqosRegionNewYork:    "beam.solami.dev:11000",
 	SwqosRegionFrankfurt:  "beam.solami.dev:11000",
@@ -506,7 +520,75 @@ func parseSignatureFromResult(body []byte) (solana.Signature, error) {
 	if result.Error.Message != "" {
 		return solana.Signature{}, &TradeError{Code: 500, Message: result.Error.Message}
 	}
-	return solana.SignatureFromBase58(result.Result)
+	return signatureFromRequiredBase58(result.Result)
+}
+
+func signatureFromRequiredBase58(value string) (solana.Signature, error) {
+	if strings.TrimSpace(value) == "" {
+		return solana.Signature{}, &TradeError{Code: 500, Message: "missing transaction signature in submit response"}
+	}
+	return solana.SignatureFromBase58(value)
+}
+
+func parseSubmitSignature(body []byte, fallback []byte) (solana.Signature, error) {
+	text := strings.TrimSpace(string(body))
+	if text == "" && fallback != nil {
+		return signatureFromSerializedTransaction(fallback)
+	}
+
+	var result struct {
+		Result    string `json:"result"`
+		Signature string `json:"signature"`
+		Error     any    `json:"error"`
+		Success   bool   `json:"success"`
+	}
+	if err := json.Unmarshal(body, &result); err == nil {
+		if result.Error != nil {
+			return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("%v", result.Error)}
+		}
+		if result.Signature != "" {
+			return solana.SignatureFromBase58(result.Signature)
+		}
+		if result.Result != "" {
+			return solana.SignatureFromBase58(result.Result)
+		}
+		if result.Success && fallback != nil {
+			return signatureFromSerializedTransaction(fallback)
+		}
+	}
+
+	if text != "" {
+		return solana.SignatureFromBase58(text)
+	}
+	if fallback != nil {
+		return signatureFromSerializedTransaction(fallback)
+	}
+	return solana.Signature{}, &TradeError{Code: 500, Message: "missing transaction signature in submit response"}
+}
+
+func checkHTTPStatus(resp *http.Response, body []byte) error {
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return nil
+	}
+	message := strings.TrimSpace(string(body))
+	if message == "" {
+		message = resp.Status
+	}
+	return &TradeError{Code: uint32(resp.StatusCode), Message: fmt.Sprintf("HTTP error: %s", message)}
+}
+
+func serverNameFromEndpoint(endpoint string) string {
+	host := endpoint
+	if i := strings.LastIndex(endpoint, ":"); i >= 0 {
+		host = endpoint[:i]
+	}
+	if host == "" {
+		return ""
+	}
+	if parsed := net.ParseIP(host); parsed != nil {
+		return ""
+	}
+	return host
 }
 
 // ===== Jito Client =====
@@ -562,6 +644,9 @@ func (c *JitoClient) SendTransaction(ctx context.Context, tradeType TradeType, t
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
 	return parseSignatureFromResult(body)
 }
 
@@ -605,6 +690,9 @@ func (c *JitoClient) SendTransactions(ctx context.Context, tradeType TradeType, 
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return nil, err
+	}
 	sig, err := parseSignatureFromResult(body)
 	if err != nil {
 		return nil, err
@@ -656,6 +744,9 @@ func (c *NextBlockClient) SendTransaction(ctx context.Context, tradeType TradeTy
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
 
 	var result struct {
 		Signature string `json:"signature"`
@@ -667,7 +758,7 @@ func (c *NextBlockClient) SendTransaction(ctx context.Context, tradeType TradeTy
 	if result.Error != "" {
 		return solana.Signature{}, &TradeError{Code: 500, Message: result.Error}
 	}
-	return solana.SignatureFromBase58(result.Signature)
+	return signatureFromRequiredBase58(result.Signature)
 }
 
 func (c *NextBlockClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
@@ -728,6 +819,9 @@ func (c *ZeroSlotClient) SendTransaction(ctx context.Context, tradeType TradeTyp
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
 	return parseSignatureFromResult(body)
 }
 
@@ -789,6 +883,9 @@ func (c *TemporalClient) SendTransaction(ctx context.Context, tradeType TradeTyp
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
 	return parseSignatureFromResult(body)
 }
 
@@ -847,6 +944,9 @@ func (c *BloxrouteClient) SendTransaction(ctx context.Context, tradeType TradeTy
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
 
 	var result struct {
 		Signature string `json:"signature"`
@@ -858,7 +958,7 @@ func (c *BloxrouteClient) SendTransaction(ctx context.Context, tradeType TradeTy
 	if result.Reason != "" {
 		return solana.Signature{}, &TradeError{Code: 500, Message: result.Reason}
 	}
-	return solana.SignatureFromBase58(result.Signature)
+	return signatureFromRequiredBase58(result.Signature)
 }
 
 func (c *BloxrouteClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
@@ -924,6 +1024,9 @@ func (c *Node1Client) SendTransaction(ctx context.Context, tradeType TradeType, 
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
 	return parseSignatureFromResult(body)
 }
 
@@ -982,6 +1085,9 @@ func (c *FlashBlockClient) SendTransaction(ctx context.Context, tradeType TradeT
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
 
 	var result struct {
 		Signature string `json:"signature"`
@@ -993,7 +1099,7 @@ func (c *FlashBlockClient) SendTransaction(ctx context.Context, tradeType TradeT
 	if result.Error != "" {
 		return solana.Signature{}, &TradeError{Code: 500, Message: result.Error}
 	}
-	return solana.SignatureFromBase58(result.Signature)
+	return signatureFromRequiredBase58(result.Signature)
 }
 
 func (c *FlashBlockClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
@@ -1053,20 +1159,10 @@ func (c *BlockRazorClient) SendTransaction(ctx context.Context, tradeType TradeT
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-
-	var result struct {
-		Signature string `json:"signature"`
-		Error     string `json:"error"`
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
 	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		// Try parsing as plain signature string
-		sig := strings.TrimSpace(string(body))
-		return solana.SignatureFromBase58(sig)
-	}
-	if result.Error != "" {
-		return solana.Signature{}, &TradeError{Code: 500, Message: result.Error}
-	}
-	return solana.SignatureFromBase58(result.Signature)
+	return parseSubmitSignature(body, transaction)
 }
 
 func (c *BlockRazorClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
@@ -1099,27 +1195,24 @@ func NewAstralaneClient(endpoint, authToken string) *AstralaneClient {
 }
 
 func (c *AstralaneClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
-	encoded := base64.StdEncoding.EncodeToString(transaction)
+	params := url.Values{}
+	if c.authToken != "" {
+		params.Set("api-key", c.authToken)
+	}
+	params.Set("method", "sendTransaction")
 
-	// Use JSON-RPC format as fallback (native Astralane uses bincode over HTTP/QUIC)
-	payload := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      1,
-		"method":  "sendTransaction",
-		"params": []interface{}{
-			encoded,
-			map[string]interface{}{"encoding": "base64"},
-		},
+	endpoint := c.endpoint
+	if strings.Contains(endpoint, "?") {
+		endpoint += "&" + params.Encode()
+	} else {
+		endpoint += "?" + params.Encode()
 	}
 
-	jsonData, _ := json.Marshal(payload)
-	url := fmt.Sprintf("%s?api-key=%s&method=sendTransaction", c.endpoint, c.authToken)
-
-	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(jsonData)))
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(transaction))
 	if err != nil {
 		return solana.Signature{}, err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/octet-stream")
 
 	resp, err := getHTTPClient().Do(req)
 	if err != nil {
@@ -1128,7 +1221,10 @@ func (c *AstralaneClient) SendTransaction(ctx context.Context, tradeType TradeTy
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	return parseSignatureFromResult(body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
+	return parseSubmitSignature(body, transaction)
 }
 
 func (c *AstralaneClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
@@ -1192,6 +1288,9 @@ func (c *StelliumClient) SendTransaction(ctx context.Context, tradeType TradeTyp
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
 	return parseSignatureFromResult(body)
 }
 
@@ -1257,6 +1356,9 @@ func (c *LightspeedClient) SendTransaction(ctx context.Context, tradeType TradeT
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
 	return parseSignatureFromResult(body)
 }
 
@@ -1673,36 +1775,15 @@ func (c *SoyasClient) MinTipSol() float64      { return MinTipSoyas }
 // ===== Speedlanding Client =====
 
 // SpeedlandingClient submits transactions via QUIC (Solana TPU ALPN "solana-tpu").
-// SNI is derived from the endpoint hostname (e.g. "nyc.speedlanding.trade").
+// SNI is fixed to "speed-landing" to match the Rust SDK.
 type SpeedlandingClient struct {
 	endpoint   string // host:port e.g. nyc.speedlanding.trade:17778
 	serverName string // TLS SNI derived from endpoint host
 }
 
-// serverNameFromEndpoint extracts the hostname for TLS SNI, falling back to
-// "speed-landing" for bare IPs (matches Rust SDK behavior).
-func serverNameFromEndpoint(endpoint string) string {
-	host := endpoint
-	if i := strings.LastIndex(endpoint, ":"); i >= 0 {
-		host = endpoint[:i]
-	}
-	// If host is an IP address (only digits and dots) use fallback
-	isIP := true
-	for _, ch := range host {
-		if ch != '.' && (ch < '0' || ch > '9') {
-			isIP = false
-			break
-		}
-	}
-	if isIP || host == "" {
-		return "speed-landing"
-	}
-	return host
-}
-
 // NewSpeedlandingClient creates a new Speedlanding QUIC client.
 func NewSpeedlandingClient(endpoint, _ string) *SpeedlandingClient {
-	return &SpeedlandingClient{endpoint: endpoint, serverName: serverNameFromEndpoint(endpoint)}
+	return &SpeedlandingClient{endpoint: endpoint, serverName: "speed-landing"}
 }
 
 func (c *SpeedlandingClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
@@ -1832,6 +1913,9 @@ func (c *HeliusClient) SendTransaction(ctx context.Context, tradeType TradeType,
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
 	return parseSignatureFromResult(body)
 }
 
@@ -1896,6 +1980,9 @@ func (c *DefaultClient) SendTransaction(ctx context.Context, tradeType TradeType
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
 	return parseSignatureFromResult(body)
 }
 
@@ -2084,8 +2171,10 @@ func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL stri
 		return NewSoyasClient(endpoint, config.APIKey), nil
 
 	case SwqosTypeSpeedlanding:
-		// Speedlanding uses QUIC; endpoint is host:port
-		endpoint := "fra.speedlanding.trade:17778"
+		endpoint, ok := speedlandingEndpoints[config.Region]
+		if !ok {
+			endpoint = speedlandingEndpoints[SwqosRegionDefault]
+		}
 		if config.CustomURL != "" {
 			endpoint = config.CustomURL
 		}

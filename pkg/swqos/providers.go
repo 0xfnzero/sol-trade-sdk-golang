@@ -49,6 +49,9 @@ type SwqosConfigExtended struct {
 	Enabled               bool
 	PriorityFeeMultiplier float64
 	MevProtection         MevProtectionLevel
+	Transport             *soltradesdk.SwqosTransport
+	AstralaneMode         *soltradesdk.AstralaneTransport
+	SwqosOnly             *bool
 	CustomHeaders         map[string]string
 	RateLimitRPS          int
 }
@@ -62,7 +65,7 @@ func DefaultSwqosConfigExtended(swqosType SwqosType) *SwqosConfigExtended {
 		MaxRetries:            3,
 		Enabled:               true,
 		PriorityFeeMultiplier: 1.0,
-		MevProtection:         MevProtectionEnhanced,
+		MevProtection:         MevProtectionNone,
 		CustomHeaders:         make(map[string]string),
 		RateLimitRPS:          100,
 	}
@@ -133,6 +136,91 @@ func (p *SwqosProviderBase) RateLimitCheck() {
 	}
 
 	atomic.StoreInt64(&p.lastRequest, time.Now().UnixNano())
+}
+
+type senderBackedExtClient struct {
+	SwqosProviderBase
+	sender SwqosClient
+}
+
+func newSenderBackedExtClient(config *SwqosConfigExtended, rpcURL string) (*senderBackedExtClient, error) {
+	factory := &ClientFactory{}
+	sender, err := factory.CreateClient(soltradesdk.SwqosConfig{
+		Type:          config.Type,
+		Region:        config.Region,
+		CustomURL:     config.URL,
+		APIKey:        config.APIKey,
+		MEVProtection: config.MevProtection != MevProtectionNone,
+		Transport:     config.Transport,
+		AstralaneMode: config.AstralaneMode,
+		SwqosOnly:     config.SwqosOnly,
+	}, rpcURL)
+	if err != nil {
+		return nil, err
+	}
+	return &senderBackedExtClient{
+		SwqosProviderBase: SwqosProviderBase{config: config},
+		sender:            sender,
+	}, nil
+}
+
+func swqosTypeName(swqosType SwqosType) string {
+	switch swqosType {
+	case SwqosTypeJito:
+		return "Jito"
+	case SwqosTypeNextBlock:
+		return "NextBlock"
+	case SwqosTypeZeroSlot:
+		return "ZeroSlot"
+	case SwqosTypeTemporal:
+		return "Temporal"
+	case SwqosTypeBloxroute:
+		return "Bloxroute"
+	case SwqosTypeNode1:
+		return "Node1"
+	case SwqosTypeFlashBlock:
+		return "FlashBlock"
+	case SwqosTypeBlockRazor:
+		return "BlockRazor"
+	case SwqosTypeAstralane:
+		return "Astralane"
+	case SwqosTypeStellium:
+		return "Stellium"
+	case SwqosTypeLightspeed:
+		return "Lightspeed"
+	case SwqosTypeSoyas:
+		return "Soyas"
+	case SwqosTypeSpeedlanding:
+		return "Speedlanding"
+	case SwqosTypeHelius:
+		return "Helius"
+	case SwqosTypeSolami:
+		return "Solami"
+	case SwqosTypeDefault:
+		return "Default"
+	default:
+		return fmt.Sprintf("SwqosType(%d)", swqosType)
+	}
+}
+
+func (c *senderBackedExtClient) SubmitTransaction(ctx context.Context, tx []byte, tip uint64) (*TransactionResult, error) {
+	c.RateLimitCheck()
+	start := time.Now()
+
+	sig, err := c.sender.SendTransaction(ctx, TradeTypeBuy, tx, false)
+	latency := time.Since(start).Milliseconds()
+	if err != nil {
+		c.UpdateStats(false, latency, err.Error())
+		return nil, err
+	}
+
+	c.UpdateStats(true, latency, "")
+	return &TransactionResult{
+		Signature: sig,
+		Success:   true,
+		Provider:  swqosTypeName(c.config.Type),
+		LatencyMs: latency,
+	}, nil
 }
 
 // ===== Additional Provider Implementations =====
@@ -265,7 +353,7 @@ type BlockRazorExtClient struct {
 func NewBlockRazorExtClient(config *SwqosConfigExtended) *BlockRazorExtClient {
 	url := config.URL
 	if url == "" {
-		url = "https://api.blockrazor.io"
+		url = blockRazorEndpoints[SwqosRegionDefault]
 	}
 	return &BlockRazorExtClient{
 		SwqosProviderBase: SwqosProviderBase{config: config},
@@ -278,35 +366,14 @@ func (c *BlockRazorExtClient) SubmitTransaction(ctx context.Context, tx []byte, 
 	c.RateLimitCheck()
 	start := time.Now()
 
-	encoded := base64.StdEncoding.EncodeToString(tx)
-	payload := map[string]interface{}{"transaction": encoded}
-	jsonData, _ := json.Marshal(payload)
-
-	req, _ := http.NewRequestWithContext(ctx, "POST", c.apiURL+"/api/v1/submit", strings.NewReader(string(jsonData)))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := getHTTPClient().Do(req)
+	client := NewBlockRazorClient(c.apiURL, c.config.APIKey, c.config.MevProtection != MevProtectionNone)
+	sig, err := client.SendTransaction(ctx, TradeTypeBuy, tx, false)
 	latency := time.Since(start).Milliseconds()
-
 	if err != nil {
 		c.UpdateStats(false, latency, err.Error())
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	var result struct {
-		Signature string `json:"signature"`
-		Error     string `json:"error"`
-	}
-	json.Unmarshal(body, &result)
-
-	if result.Error != "" {
-		c.UpdateStats(false, latency, result.Error)
-		return &TransactionResult{Success: false, Provider: "BlockRazor", LatencyMs: latency, Error: result.Error}, nil
-	}
-
-	sig, _ := solana.SignatureFromBase58(result.Signature)
 	c.UpdateStats(true, latency, "")
 	return &TransactionResult{Signature: sig, Success: true, Provider: "BlockRazor", LatencyMs: latency}, nil
 }
@@ -321,7 +388,7 @@ type AstralaneExtClient struct {
 func NewAstralaneExtClient(config *SwqosConfigExtended) *AstralaneExtClient {
 	url := config.URL
 	if url == "" {
-		url = "https://api.astralane.io"
+		url = astralaneEndpoints[SwqosRegionDefault]
 	}
 	return &AstralaneExtClient{
 		SwqosProviderBase: SwqosProviderBase{config: config},
@@ -334,35 +401,14 @@ func (c *AstralaneExtClient) SubmitTransaction(ctx context.Context, tx []byte, t
 	c.RateLimitCheck()
 	start := time.Now()
 
-	encoded := base64.StdEncoding.EncodeToString(tx)
-	payload := map[string]interface{}{"transaction": encoded}
-	jsonData, _ := json.Marshal(payload)
-
-	req, _ := http.NewRequestWithContext(ctx, "POST", c.apiURL+"/api/v1/submit", strings.NewReader(string(jsonData)))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := getHTTPClient().Do(req)
+	client := NewAstralaneClient(c.apiURL, c.config.APIKey)
+	sig, err := client.SendTransaction(ctx, TradeTypeBuy, tx, false)
 	latency := time.Since(start).Milliseconds()
-
 	if err != nil {
 		c.UpdateStats(false, latency, err.Error())
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	var result struct {
-		Signature string `json:"signature"`
-		Error     string `json:"error"`
-	}
-	json.Unmarshal(body, &result)
-
-	if result.Error != "" {
-		c.UpdateStats(false, latency, result.Error)
-		return &TransactionResult{Success: false, Provider: "Astralane", LatencyMs: latency, Error: result.Error}, nil
-	}
-
-	sig, _ := solana.SignatureFromBase58(result.Signature)
 	c.UpdateStats(true, latency, "")
 	return &TransactionResult{Signature: sig, Success: true, Provider: "Astralane", LatencyMs: latency}, nil
 }
@@ -545,7 +591,7 @@ type SpeedlandingExtClient struct {
 func NewSpeedlandingExtClient(config *SwqosConfigExtended) *SpeedlandingExtClient {
 	url := config.URL
 	if url == "" {
-		url = "https://api.speedlanding.io"
+		url = "fra.speedlanding.trade:17778"
 	}
 	return &SpeedlandingExtClient{
 		SwqosProviderBase: SwqosProviderBase{config: config},
@@ -558,35 +604,14 @@ func (c *SpeedlandingExtClient) SubmitTransaction(ctx context.Context, tx []byte
 	c.RateLimitCheck()
 	start := time.Now()
 
-	encoded := base64.StdEncoding.EncodeToString(tx)
-	payload := map[string]interface{}{"transaction": encoded}
-	jsonData, _ := json.Marshal(payload)
-
-	req, _ := http.NewRequestWithContext(ctx, "POST", c.apiURL+"/api/v1/submit", strings.NewReader(string(jsonData)))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := getHTTPClient().Do(req)
+	client := NewSpeedlandingClient(c.apiURL, c.config.APIKey)
+	sig, err := client.SendTransaction(ctx, TradeTypeBuy, tx, false)
 	latency := time.Since(start).Milliseconds()
-
 	if err != nil {
 		c.UpdateStats(false, latency, err.Error())
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	var result struct {
-		Signature string `json:"signature"`
-		Error     string `json:"error"`
-	}
-	json.Unmarshal(body, &result)
-
-	if result.Error != "" {
-		c.UpdateStats(false, latency, result.Error)
-		return &TransactionResult{Success: false, Provider: "Speedlanding", LatencyMs: latency, Error: result.Error}, nil
-	}
-
-	sig, _ := solana.SignatureFromBase58(result.Signature)
 	c.UpdateStats(true, latency, "")
 	return &TransactionResult{Signature: sig, Success: true, Provider: "Speedlanding", LatencyMs: latency}, nil
 }
@@ -917,59 +942,35 @@ func (f *SwqosProviderFactory) CreateProvider(config *SwqosConfigExtended) (inte
 	}
 	switch config.Type {
 	case SwqosTypeJito:
-		url := config.URL
-		if url == "" {
-			url = jitoEndpoints[SwqosRegionDefault]
-		}
-		return NewJitoClient(url, config.APIKey), nil
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeBloxroute:
-		url := config.URL
-		if url == "" {
-			url = bloxrouteEndpoints[SwqosRegionDefault]
-		}
-		return NewBloxrouteClient(url, config.APIKey), nil
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeZeroSlot:
-		url := config.URL
-		if url == "" {
-			url = zeroSlotEndpoints[SwqosRegionDefault]
-		}
-		return NewZeroSlotClient(url, config.APIKey), nil
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeNextBlock:
 		return NewNextBlockExtClient(config), nil
 	case SwqosTypeTemporal:
-		url := config.URL
-		if url == "" {
-			url = temporalEndpoints[SwqosRegionDefault]
-		}
-		return NewTemporalClient(url, config.APIKey), nil
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeNode1:
-		return NewNode1ExtClient(config), nil
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeFlashBlock:
-		url := config.URL
-		if url == "" {
-			url = flashBlockEndpoints[SwqosRegionDefault]
-		}
-		return NewFlashBlockClient(url, config.APIKey), nil
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeBlockRazor:
 		return NewBlockRazorExtClient(config), nil
 	case SwqosTypeAstralane:
 		return NewAstralaneExtClient(config), nil
 	case SwqosTypeStellium:
-		return NewStelliumExtClient(config), nil
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeLightspeed:
-		return NewLightspeedExtClient(config), nil
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeSoyas:
-		return NewSoyasExtClient(config), nil
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeSpeedlanding:
 		return NewSpeedlandingExtClient(config), nil
 	case SwqosTypeSolami:
 		return NewSolamiExtClient(config), nil
 	case SwqosTypeHelius:
-		url := config.URL
-		if url == "" {
-			url = heliusEndpoints[SwqosRegionDefault]
-		}
-		return NewHeliusClient(url, config.APIKey, false), nil
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeDefault:
 		return NewDefaultClient(""), nil
 	default:
