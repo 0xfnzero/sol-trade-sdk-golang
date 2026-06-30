@@ -234,6 +234,24 @@ const (
 	PumpSwapCoinCreatorFeeBasisPoints uint64 = 5  // 0.05% (was 10)
 )
 
+type PumpSwapFeeBasisPoints struct {
+	LPFeeBasisPoints          uint64
+	ProtocolFeeBasisPoints    uint64
+	CoinCreatorFeeBasisPoints uint64
+}
+
+func LegacyPumpSwapFeeBasisPoints(hasCoinCreator bool) PumpSwapFeeBasisPoints {
+	coinCreatorFee := uint64(0)
+	if hasCoinCreator {
+		coinCreatorFee = PumpSwapCoinCreatorFeeBasisPoints
+	}
+	return PumpSwapFeeBasisPoints{
+		LPFeeBasisPoints:          PumpSwapLPFeeBasisPoints,
+		ProtocolFeeBasisPoints:    PumpSwapProtocolFeeBasisPoints,
+		CoinCreatorFeeBasisPoints: coinCreatorFee,
+	}
+}
+
 // BuyBaseInputResult contains results for buying base tokens with base amount input
 type BuyBaseInputResult struct {
 	InternalQuoteAmount uint64
@@ -270,6 +288,17 @@ func BuyBaseInputInternal(
 	quoteReserve uint64,
 	hasCoinCreator bool,
 ) (*BuyBaseInputResult, error) {
+	fees := LegacyPumpSwapFeeBasisPoints(hasCoinCreator)
+	return BuyBaseInputInternalWithFees(base, slippageBasisPoints, baseReserve, quoteReserve, fees)
+}
+
+func BuyBaseInputInternalWithFees(
+	base uint64,
+	slippageBasisPoints uint64,
+	baseReserve uint64,
+	quoteReserve uint64,
+	feeBasisPoints PumpSwapFeeBasisPoints,
+) (*BuyBaseInputResult, error) {
 	if baseReserve == 0 || quoteReserve == 0 {
 		return nil, ErrInvalidReserves
 	}
@@ -291,12 +320,9 @@ func BuyBaseInputInternal(
 		quoteAmountIn++
 	}
 
-	lpFee, _ := ComputeFee(quoteAmountIn, PumpSwapLPFeeBasisPoints)
-	protocolFee, _ := ComputeFee(quoteAmountIn, PumpSwapProtocolFeeBasisPoints)
-	coinCreatorFee := uint64(0)
-	if hasCoinCreator {
-		coinCreatorFee, _ = ComputeFee(quoteAmountIn, PumpSwapCoinCreatorFeeBasisPoints)
-	}
+	lpFee, _ := ComputeFee(quoteAmountIn, feeBasisPoints.LPFeeBasisPoints)
+	protocolFee, _ := ComputeFee(quoteAmountIn, feeBasisPoints.ProtocolFeeBasisPoints)
+	coinCreatorFee, _ := ComputeFee(quoteAmountIn, feeBasisPoints.CoinCreatorFeeBasisPoints)
 
 	totalQuote := quoteAmountIn + lpFee + protocolFee + coinCreatorFee
 	maxQuote, _ := CalculateWithSlippageBuy(totalQuote, slippageBasisPoints)
@@ -316,23 +342,42 @@ func BuyQuoteInputInternal(
 	quoteReserve uint64,
 	hasCoinCreator bool,
 ) (*BuyQuoteInputResult, error) {
+	fees := LegacyPumpSwapFeeBasisPoints(hasCoinCreator)
+	return BuyQuoteInputInternalWithFees(quote, slippageBasisPoints, baseReserve, quoteReserve, fees)
+}
+
+func BuyQuoteInputInternalWithFees(
+	quote uint64,
+	slippageBasisPoints uint64,
+	baseReserve uint64,
+	quoteReserve uint64,
+	feeBasisPoints PumpSwapFeeBasisPoints,
+) (*BuyQuoteInputResult, error) {
 	if baseReserve == 0 || quoteReserve == 0 {
 		return nil, ErrInvalidReserves
 	}
 
-	totalFeeBps := PumpSwapLPFeeBasisPoints + PumpSwapProtocolFeeBasisPoints
-	if hasCoinCreator {
-		totalFeeBps += PumpSwapCoinCreatorFeeBasisPoints
-	}
+	totalFeeBps := feeBasisPoints.LPFeeBasisPoints + feeBasisPoints.ProtocolFeeBasisPoints + feeBasisPoints.CoinCreatorFeeBasisPoints
 	denominator := 10000 + totalFeeBps
 
 	// Use 128-bit arithmetic
 	effectiveQuote := div128(mul128(quote, 10000), uint64(denominator))
+	lpFee, _ := ComputeFee(effectiveQuote, feeBasisPoints.LPFeeBasisPoints)
+	protocolFee, _ := ComputeFee(effectiveQuote, feeBasisPoints.ProtocolFeeBasisPoints)
+	coinCreatorFee, _ := ComputeFee(effectiveQuote, feeBasisPoints.CoinCreatorFeeBasisPoints)
+	totalWithFees := effectiveQuote + lpFee + protocolFee + coinCreatorFee
+	if totalWithFees > quote {
+		effectiveQuote -= totalWithFees - quote
+	}
+	inputAmount := uint64(0)
+	if effectiveQuote > 0 {
+		inputAmount = effectiveQuote - 1
+	}
 
 	// numerator = baseReserve * effectiveQuote
-	numerator := mul128(baseReserve, effectiveQuote)
+	numerator := mul128(baseReserve, inputAmount)
 	// denominatorEffective = quoteReserve + effectiveQuote
-	denominatorEffective := quoteReserve + effectiveQuote
+	denominatorEffective := quoteReserve + inputAmount
 
 	if denominatorEffective == 0 {
 		return nil, ErrPoolDepleted
@@ -356,6 +401,17 @@ func SellBaseInputInternal(
 	quoteReserve uint64,
 	hasCoinCreator bool,
 ) (*SellBaseInputResult, error) {
+	fees := LegacyPumpSwapFeeBasisPoints(hasCoinCreator)
+	return SellBaseInputInternalWithFees(base, slippageBasisPoints, baseReserve, quoteReserve, fees)
+}
+
+func SellBaseInputInternalWithFees(
+	base uint64,
+	slippageBasisPoints uint64,
+	baseReserve uint64,
+	quoteReserve uint64,
+	feeBasisPoints PumpSwapFeeBasisPoints,
+) (*SellBaseInputResult, error) {
 	if baseReserve == 0 || quoteReserve == 0 {
 		return nil, ErrInvalidReserves
 	}
@@ -368,12 +424,9 @@ func SellBaseInputInternal(
 	}
 	quoteAmountOutUint := div128(numerator, denominator)
 
-	lpFee, _ := ComputeFee(quoteAmountOutUint, PumpSwapLPFeeBasisPoints)
-	protocolFee, _ := ComputeFee(quoteAmountOutUint, PumpSwapProtocolFeeBasisPoints)
-	coinCreatorFee := uint64(0)
-	if hasCoinCreator {
-		coinCreatorFee, _ = ComputeFee(quoteAmountOutUint, PumpSwapCoinCreatorFeeBasisPoints)
-	}
+	lpFee, _ := ComputeFee(quoteAmountOutUint, feeBasisPoints.LPFeeBasisPoints)
+	protocolFee, _ := ComputeFee(quoteAmountOutUint, feeBasisPoints.ProtocolFeeBasisPoints)
+	coinCreatorFee, _ := ComputeFee(quoteAmountOutUint, feeBasisPoints.CoinCreatorFeeBasisPoints)
 
 	totalFees := lpFee + protocolFee + coinCreatorFee
 	if totalFees > quoteAmountOutUint {
@@ -397,6 +450,17 @@ func SellQuoteInputInternal(
 	quoteReserve uint64,
 	hasCoinCreator bool,
 ) (*SellQuoteInputResult, error) {
+	fees := LegacyPumpSwapFeeBasisPoints(hasCoinCreator)
+	return SellQuoteInputInternalWithFees(quote, slippageBasisPoints, baseReserve, quoteReserve, fees)
+}
+
+func SellQuoteInputInternalWithFees(
+	quote uint64,
+	slippageBasisPoints uint64,
+	baseReserve uint64,
+	quoteReserve uint64,
+	feeBasisPoints PumpSwapFeeBasisPoints,
+) (*SellQuoteInputResult, error) {
 	if baseReserve == 0 || quoteReserve == 0 {
 		return nil, ErrInvalidReserves
 	}
@@ -404,12 +468,12 @@ func SellQuoteInputInternal(
 		return nil, ErrInsufficientReserves
 	}
 
-	coinCreatorFee := uint64(0)
-	if hasCoinCreator {
-		coinCreatorFee = PumpSwapCoinCreatorFeeBasisPoints
-	}
-
-	rawQuote := calculateQuoteAmountOut(quote, PumpSwapLPFeeBasisPoints, PumpSwapProtocolFeeBasisPoints, coinCreatorFee)
+	rawQuote := calculateQuoteAmountOut(
+		quote,
+		feeBasisPoints.LPFeeBasisPoints,
+		feeBasisPoints.ProtocolFeeBasisPoints,
+		feeBasisPoints.CoinCreatorFeeBasisPoints,
+	)
 
 	if rawQuote >= quoteReserve {
 		return nil, ErrInvalidInputCalc

@@ -109,3 +109,42 @@ func TestNewPumpSwapParamsFromParserTradeUsesCreatorVaultAccounts(t *testing.T) 
 		t.Fatalf("authority = %s", p.CoinCreatorVaultAuth)
 	}
 }
+
+func TestNewPumpSwapParamsFromParserTradeUsesFeeBasisPoints(t *testing.T) {
+	creator := solana.NewWallet().PublicKey()
+	p, err := NewPumpSwapParamsFromParserTrade(PumpSwapParserTradeEvent{
+		Pool:                      solana.NewWallet().PublicKey().String(),
+		BaseMint:                  solana.NewWallet().PublicKey().String(),
+		QuoteMint:                 constants.USDC_TOKEN_ACCOUNT.String(),
+		PoolBaseTokenAccount:      solana.NewWallet().PublicKey().String(),
+		PoolQuoteTokenAccount:     solana.NewWallet().PublicKey().String(),
+		PoolBaseTokenReserves:     10,
+		PoolQuoteTokenReserves:    20,
+		CoinCreatorVaultATA:       solana.NewWallet().PublicKey().String(),
+		CoinCreatorVaultAuthority: solana.NewWallet().PublicKey().String(),
+		BaseTokenProgram:          constants.TOKEN_PROGRAM.String(),
+		QuoteTokenProgram:         constants.TOKEN_PROGRAM.String(),
+		CoinCreator:               creator.String(),
+		CashbackFeeBasisPoints:    4,
+		LPFeeBasisPoints:          20,
+		ProtocolFeeBasisPoints:    5,
+		CoinCreatorFeeBasisPoints: 75,
+	})
+	if err != nil {
+		t.Fatalf("NewPumpSwapParamsFromParserTrade error: %v", err)
+	}
+	if !p.CoinCreator.Equals(creator) || !p.CoinCreatorKnown {
+		t.Fatalf("coin creator not mapped")
+	}
+	if p.CashbackFeeBasisPoints != 4 {
+		t.Fatalf("cashback fee bps = %d", p.CashbackFeeBasisPoints)
+	}
+	if p.FeeBasisPoints == nil {
+		t.Fatal("fee basis points not mapped")
+	}
+	if p.FeeBasisPoints.LPFeeBasisPoints != 20 ||
+		p.FeeBasisPoints.ProtocolFeeBasisPoints != 5 ||
+		p.FeeBasisPoints.CoinCreatorFeeBasisPoints != 75 {
+		t.Fatalf("fee bps = %+v", *p.FeeBasisPoints)
+	}
+}

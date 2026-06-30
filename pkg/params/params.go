@@ -3,6 +3,7 @@ package params
 import (
 	"fmt"
 
+	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
 	"github.com/gagliardetto/solana-go"
 )
@@ -209,6 +210,12 @@ type PumpSwapParams struct {
 	QuoteTokenProgram      solana.PublicKey
 	IsMayhemMode           bool
 	IsCashbackCoin         bool
+	PoolCreator            solana.PublicKey
+	CoinCreator            solana.PublicKey
+	CoinCreatorKnown       bool
+	CashbackFeeBasisPoints uint64
+	FeeBasisPoints         *calc.PumpSwapFeeBasisPoints
+	BaseMintSupply         *uint64
 }
 
 // NewPumpSwapParams creates new PumpSwap params
@@ -237,6 +244,26 @@ func NewPumpSwapParams(
 	}
 }
 
+func (p *PumpSwapParams) WithCoinCreator(coinCreator solana.PublicKey) *PumpSwapParams {
+	p.CoinCreator = coinCreator
+	p.CoinCreatorKnown = true
+	return p
+}
+
+func (p *PumpSwapParams) WithFeeBasisPoints(lp, protocol, coinCreator uint64) *PumpSwapParams {
+	p.FeeBasisPoints = &calc.PumpSwapFeeBasisPoints{
+		LPFeeBasisPoints:          lp,
+		ProtocolFeeBasisPoints:    protocol,
+		CoinCreatorFeeBasisPoints: coinCreator,
+	}
+	return p
+}
+
+func (p *PumpSwapParams) WithCashbackFeeBasisPoints(cashback uint64) *PumpSwapParams {
+	p.CashbackFeeBasisPoints = cashback
+	return p
+}
+
 type PumpSwapParserTradeEvent struct {
 	Pool                      string
 	BaseMint                  string
@@ -249,6 +276,12 @@ type PumpSwapParserTradeEvent struct {
 	CoinCreatorVaultAuthority string
 	BaseTokenProgram          string
 	QuoteTokenProgram         string
+	PoolCreator               string
+	CoinCreator               string
+	CashbackFeeBasisPoints    uint64
+	LPFeeBasisPoints          uint64
+	ProtocolFeeBasisPoints    uint64
+	CoinCreatorFeeBasisPoints uint64
 	IsMayhemMode              bool
 	IsCashbackCoin            bool
 }
@@ -290,7 +323,15 @@ func NewPumpSwapParamsFromParserTrade(event PumpSwapParserTradeEvent) (*PumpSwap
 	if err != nil {
 		return nil, fmt.Errorf("quote_token_program: %w", err)
 	}
-	return NewPumpSwapParams(
+	poolCreator, err := parserPubkey(event.PoolCreator)
+	if err != nil {
+		return nil, fmt.Errorf("pool_creator: %w", err)
+	}
+	coinCreator, err := parserPubkey(event.CoinCreator)
+	if err != nil {
+		return nil, fmt.Errorf("coin_creator: %w", err)
+	}
+	params := NewPumpSwapParams(
 		pool,
 		baseMint,
 		quoteMint,
@@ -304,7 +345,18 @@ func NewPumpSwapParamsFromParserTrade(event PumpSwapParserTradeEvent) (*PumpSwap
 		quoteTokenProgram,
 		event.IsMayhemMode,
 		event.IsCashbackCoin,
-	), nil
+	)
+	params.PoolCreator = poolCreator
+	params.WithCoinCreator(coinCreator)
+	params.CashbackFeeBasisPoints = event.CashbackFeeBasisPoints
+	if event.LPFeeBasisPoints != 0 || event.ProtocolFeeBasisPoints != 0 || event.CoinCreatorFeeBasisPoints != 0 {
+		params.WithFeeBasisPoints(
+			event.LPFeeBasisPoints,
+			event.ProtocolFeeBasisPoints,
+			event.CoinCreatorFeeBasisPoints,
+		)
+	}
+	return params, nil
 }
 
 func parserPubkey(value string) (solana.PublicKey, error) {

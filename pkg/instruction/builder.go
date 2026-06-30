@@ -356,6 +356,12 @@ func toPumpSwapParams(p *params.PumpSwapParams) *PumpSwapParams {
 		QuoteTokenProgram:         p.QuoteTokenProgram,
 		IsMayhemMode:              p.IsMayhemMode,
 		IsCashbackCoin:            p.IsCashbackCoin,
+		PoolCreator:               p.PoolCreator,
+		CoinCreator:               p.CoinCreator,
+		CoinCreatorKnown:          p.CoinCreatorKnown,
+		CashbackFeeBasisPoints:    p.CashbackFeeBasisPoints,
+		FeeBasisPoints:            p.FeeBasisPoints,
+		BaseMintSupply:            p.BaseMintSupply,
 	}
 }
 

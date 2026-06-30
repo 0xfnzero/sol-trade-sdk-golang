@@ -4,14 +4,17 @@
 package instruction
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/programs/token"
+	solanarpc "github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
@@ -79,6 +82,9 @@ const (
 	PUMPSWAP_LP_FEE_BASIS_POINTS           uint64 = 25
 	PUMPSWAP_PROTOCOL_FEE_BASIS_POINTS     uint64 = 5
 	PUMPSWAP_COIN_CREATOR_FEE_BASIS_POINTS uint64 = 5
+	pumpSwapSPLMintSupplyOffset                   = 36
+	pumpSwapSPLMintSupplyLen                      = 8
+	pumpSwapFeeTierLen                            = 16 + 8*3
 )
 
 // ===== PDA Derivation Functions - 100% from Rust =====
@@ -87,6 +93,11 @@ const (
 func GetMayhemFeeRecipientRandom() solana.PublicKey {
 	n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(MAYHEM_FEE_RECIPIENTS))))
 	return MAYHEM_FEE_RECIPIENTS[n.Int64()]
+}
+
+// GetProtocolFeeRecipientRandom returns the static fallback recipient. Rust may use cached GlobalConfig when warmed.
+func GetProtocolFeeRecipientRandom() solana.PublicKey {
+	return FEE_RECIPIENT
 }
 
 // GetProtocolExtraFeeRecipientRandom returns a random protocol extra fee recipient (PumpSwap Apr 2026).
@@ -134,6 +145,12 @@ func GetCoinCreatorVaultAuthority(coinCreator solana.PublicKey) solana.PublicKey
 	return pda
 }
 
+// GetCoinCreatorVaultAta returns the coin creator vault ATA for the quote mint.
+func GetCoinCreatorVaultAta(coinCreator, quoteMint solana.PublicKey) solana.PublicKey {
+	authority := GetCoinCreatorVaultAuthority(coinCreator)
+	return GetAssociatedTokenAddress(authority, quoteMint, constants.TOKEN_PROGRAM)
+}
+
 // GetPumpSwapUserVolumeAccumulatorPDA returns the user volume accumulator PDA for PumpSwap.
 func GetPumpSwapUserVolumeAccumulatorPDA(user solana.PublicKey) solana.PublicKey {
 	pda, _, _ := solana.FindProgramAddress(
@@ -172,6 +189,12 @@ type PumpSwapParams struct {
 	QuoteTokenProgram         solana.PublicKey
 	IsMayhemMode              bool
 	IsCashbackCoin            bool
+	PoolCreator               solana.PublicKey
+	CoinCreator               solana.PublicKey
+	CoinCreatorKnown          bool
+	CashbackFeeBasisPoints    uint64
+	FeeBasisPoints            *calc.PumpSwapFeeBasisPoints
+	BaseMintSupply            *uint64
 }
 
 // BuildBuyParams contains parameters for building buy instructions
@@ -224,11 +247,33 @@ func HandleWsol(owner solana.PublicKey, amount uint64) []solana.Instruction {
 	return instructions
 }
 
+// HandleWsolForMint mirrors Rust push_create_or_wrap_user_token_account.
+func HandleWsolForMint(owner, mint, tokenProgram solana.PublicKey, amount uint64) []solana.Instruction {
+	if mint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
+		return HandleWsol(owner, amount)
+	}
+	return []solana.Instruction{CreateAssociatedTokenAccountIdempotent(owner, owner, mint, tokenProgram)}
+}
+
 // CloseWsol closes WSOL ATA and reclaims rent
 func CloseWsol(owner solana.PublicKey) solana.Instruction {
 	wsolAta := GetAssociatedTokenAddress(owner, constants.WSOL_TOKEN_ACCOUNT, constants.TOKEN_PROGRAM)
 	return token.NewCloseAccountInstruction(
 		wsolAta,
+		owner,
+		owner,
+		[]solana.PublicKey{},
+	).Build()
+}
+
+// CloseWsolForMint mirrors Rust push_close_wsol_if_needed.
+func CloseWsolForMint(owner, mint, tokenProgram solana.PublicKey) solana.Instruction {
+	if !mint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
+		return nil
+	}
+	ata := GetAssociatedTokenAddress(owner, mint, tokenProgram)
+	return token.NewCloseAccountInstruction(
+		ata,
 		owner,
 		owner,
 		[]solana.PublicKey{},
@@ -256,6 +301,32 @@ func CreateAssociatedTokenAccountIdempotent(payer, owner, mint, tokenProgram sol
 
 // ===== Instruction Builders - 100% from Rust =====
 
+func effectivePumpSwapFeeBasisPoints(pp *PumpSwapParams) calc.PumpSwapFeeBasisPoints {
+	hasCoinCreator := false
+	if !pp.CoinCreatorKnown {
+		hasCoinCreator = !pp.CoinCreatorVaultAuthority.Equals(DEFAULT_COIN_CREATOR_VAULT_AUTH)
+	} else {
+		hasCoinCreator = !pp.CoinCreator.IsZero()
+	}
+
+	fees := calc.LegacyPumpSwapFeeBasisPoints(hasCoinCreator)
+	if pp.FeeBasisPoints != nil {
+		fees = *pp.FeeBasisPoints
+		if !hasCoinCreator {
+			fees.CoinCreatorFeeBasisPoints = 0
+		}
+	}
+	fees.CoinCreatorFeeBasisPoints += pp.CashbackFeeBasisPoints
+	return fees
+}
+
+func shouldAddPoolV2(pp *PumpSwapParams) bool {
+	if !pp.CoinCreatorKnown {
+		return true
+	}
+	return !pp.CoinCreator.IsZero()
+}
+
 // BuildBuyInstructions builds buy instructions for PumpSwap
 // 100% port from Rust: src/instruction/pumpswap.rs build_buy_instructions
 func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) {
@@ -273,21 +344,30 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 	}
 
 	quoteIsWsolOrUsdc := pp.QuoteMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.QuoteMint.Equals(constants.USDC_TOKEN_ACCOUNT)
+	inputStableMint := pp.QuoteMint
+	inputStableTokenProgram := pp.QuoteTokenProgram
+	outputTradeMint := pp.BaseMint
+	outputTradeTokenProgram := pp.BaseTokenProgram
+	if !quoteIsWsolOrUsdc {
+		inputStableMint = pp.BaseMint
+		inputStableTokenProgram = pp.BaseTokenProgram
+		outputTradeMint = pp.QuoteMint
+		outputTradeTokenProgram = pp.QuoteTokenProgram
+	}
 
-	// Determine if has coin creator
-	hasCoinCreator := !pp.CoinCreatorVaultAuthority.Equals(DEFAULT_COIN_CREATOR_VAULT_AUTH)
+	feeBasisPoints := effectivePumpSwapFeeBasisPoints(pp)
 
 	// Calculate trade amounts
 	var tokenAmount uint64
 	var solAmount uint64
 
 	if quoteIsWsolOrUsdc {
-		result, err := calc.BuyQuoteInputInternal(
+		result, err := calc.BuyQuoteInputInternalWithFees(
 			params.InputAmount,
 			params.SlippageBasisPoints,
 			pp.PoolBaseTokenReserves,
 			pp.PoolQuoteTokenReserves,
-			hasCoinCreator,
+			feeBasisPoints,
 		)
 		if err != nil {
 			return nil, err
@@ -295,7 +375,18 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 		tokenAmount = result.Base
 		solAmount = result.MaxQuote
 	} else {
-		return nil, ErrInvalidConfiguration
+		result, err := calc.SellBaseInputInternalWithFees(
+			params.InputAmount,
+			params.SlippageBasisPoints,
+			pp.PoolBaseTokenReserves,
+			pp.PoolQuoteTokenReserves,
+			feeBasisPoints,
+		)
+		if err != nil {
+			return nil, err
+		}
+		tokenAmount = result.MinQuote
+		solAmount = params.InputAmount
 	}
 
 	// Override token amount if fixed output is specified
@@ -312,7 +403,7 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 	if pp.IsMayhemMode {
 		feeRecipient = GetMayhemFeeRecipientRandom()
 	} else {
-		feeRecipient = FEE_RECIPIENT
+		feeRecipient = GetProtocolFeeRecipientRandom()
 	}
 	feeRecipientAta := GetAssociatedTokenAddress(feeRecipient, pp.QuoteMint, constants.TOKEN_PROGRAM)
 
@@ -322,18 +413,18 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 	// Handle WSOL wrapping if needed
 	// CRITICAL FIX: Use input_amount when useExactQuoteAmount=true (buy_exact_quote_in mode)
 	// to avoid "insufficient funds" when buying MAX
-	if params.CreateInputMintAta && quoteIsWsolOrUsdc {
+	if params.CreateInputMintAta {
 		wrapAmount := params.InputAmount
 		if !params.UseExactQuoteAmount {
 			wrapAmount = solAmount
 		}
-		instructions = append(instructions, HandleWsol(params.Payer, wrapAmount)...)
+		instructions = append(instructions, HandleWsolForMint(params.Payer, inputStableMint, inputStableTokenProgram, wrapAmount)...)
 	}
 
 	// Create output token ATA if needed
 	if params.CreateOutputMintAta {
 		instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
-			params.Payer, params.Payer, pp.BaseMint, pp.BaseTokenProgram,
+			params.Payer, params.Payer, outputTradeMint, outputTradeTokenProgram,
 		))
 	}
 
@@ -385,11 +476,12 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 		})
 	}
 
-	// Add pool v2 PDA
-	poolV2 := GetPoolV2PDA(pp.BaseMint)
-	accounts = append(accounts, solana.AccountMeta{
-		PublicKey: poolV2, IsSigner: false, IsWritable: false,
-	})
+	if shouldAddPoolV2(pp) {
+		poolV2 := GetPoolV2PDA(pp.BaseMint)
+		accounts = append(accounts, solana.AccountMeta{
+			PublicKey: poolV2, IsSigner: false, IsWritable: false,
+		})
+	}
 	protocolExtra := GetProtocolExtraFeeRecipientRandom()
 	accounts = append(accounts, solana.AccountMeta{
 		PublicKey: protocolExtra, IsSigner: false, IsWritable: false,
@@ -400,34 +492,36 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 
 	// Build instruction data
 	var data []byte
-	if params.UseExactQuoteAmount {
-		// buy_exact_quote_in(spendable_quote_in, min_base_amount_out, track_volume)
-		minBaseAmountOut, _ := calc.CalculateWithSlippageSell(tokenAmount, params.SlippageBasisPoints)
-		data = make([]byte, 26)
-		copy(data[0:8], PUMPSWAP_BUY_EXACT_QUOTE_IN_DISCRIMINATOR)
-		binary.LittleEndian.PutUint64(data[8:16], params.InputAmount)
-		binary.LittleEndian.PutUint64(data[16:24], minBaseAmountOut)
-		// track_volume
-		if pp.IsCashbackCoin {
-			data[24] = 1
-			data[25] = 1
-		} else {
-			data[24] = 1
-			data[25] = 0
-		}
-	} else {
-		// buy(token_amount, max_quote, track_volume)
-		data = make([]byte, 26)
+	trackVolume := byte(0)
+	if pp.IsCashbackCoin {
+		trackVolume = 1
+	}
+	if params.FixedOutputAmount != nil {
+		data = make([]byte, 25)
 		copy(data[0:8], PUMPSWAP_BUY_DISCRIMINATOR)
 		binary.LittleEndian.PutUint64(data[8:16], tokenAmount)
 		binary.LittleEndian.PutUint64(data[16:24], solAmount)
-		if pp.IsCashbackCoin {
-			data[24] = 1
-			data[25] = 1
-		} else {
-			data[24] = 1
-			data[25] = 0
-		}
+		data[24] = trackVolume
+	} else if quoteIsWsolOrUsdc && params.UseExactQuoteAmount {
+		// buy_exact_quote_in(spendable_quote_in, min_base_amount_out, track_volume)
+		minBaseAmountOut, _ := calc.CalculateWithSlippageSell(tokenAmount, params.SlippageBasisPoints)
+		data = make([]byte, 25)
+		copy(data[0:8], PUMPSWAP_BUY_EXACT_QUOTE_IN_DISCRIMINATOR)
+		binary.LittleEndian.PutUint64(data[8:16], params.InputAmount)
+		binary.LittleEndian.PutUint64(data[16:24], minBaseAmountOut)
+		data[24] = trackVolume
+	} else if quoteIsWsolOrUsdc {
+		// buy(token_amount, max_quote, track_volume)
+		data = make([]byte, 25)
+		copy(data[0:8], PUMPSWAP_BUY_DISCRIMINATOR)
+		binary.LittleEndian.PutUint64(data[8:16], tokenAmount)
+		binary.LittleEndian.PutUint64(data[16:24], solAmount)
+		data[24] = trackVolume
+	} else {
+		data = make([]byte, 24)
+		copy(data[0:8], PUMPSWAP_SELL_DISCRIMINATOR)
+		binary.LittleEndian.PutUint64(data[8:16], solAmount)
+		binary.LittleEndian.PutUint64(data[16:24], tokenAmount)
 	}
 
 	instructions = append(instructions, newInstruction(PUMPSWAP_PROGRAM, accounts, data))
@@ -457,26 +551,44 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	}
 
 	quoteIsWsolOrUsdc := pp.QuoteMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.QuoteMint.Equals(constants.USDC_TOKEN_ACCOUNT)
+	outputStableMint := pp.QuoteMint
+	outputStableTokenProgram := pp.QuoteTokenProgram
+	if !quoteIsWsolOrUsdc {
+		outputStableMint = pp.BaseMint
+		outputStableTokenProgram = pp.BaseTokenProgram
+	}
 
-	// Determine if has coin creator
-	hasCoinCreator := !pp.CoinCreatorVaultAuthority.Equals(DEFAULT_COIN_CREATOR_VAULT_AUTH)
+	feeBasisPoints := effectivePumpSwapFeeBasisPoints(pp)
 
 	// Calculate trade amounts
 	tokenAmount := params.InputAmount
 	var solAmount uint64
 
 	if quoteIsWsolOrUsdc {
-		result, err := calc.SellBaseInputInternal(
+		result, err := calc.SellBaseInputInternalWithFees(
 			params.InputAmount,
 			params.SlippageBasisPoints,
 			pp.PoolBaseTokenReserves,
 			pp.PoolQuoteTokenReserves,
-			hasCoinCreator,
+			feeBasisPoints,
 		)
 		if err != nil {
 			return nil, err
 		}
 		solAmount = result.MinQuote
+	} else {
+		result, err := calc.BuyQuoteInputInternalWithFees(
+			params.InputAmount,
+			params.SlippageBasisPoints,
+			pp.PoolBaseTokenReserves,
+			pp.PoolQuoteTokenReserves,
+			feeBasisPoints,
+		)
+		if err != nil {
+			return nil, err
+		}
+		tokenAmount = result.MaxQuote
+		solAmount = result.Base
 	}
 
 	// Override sol amount if fixed output is specified
@@ -493,7 +605,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	if pp.IsMayhemMode {
 		feeRecipient = GetMayhemFeeRecipientRandom()
 	} else {
-		feeRecipient = FEE_RECIPIENT
+		feeRecipient = GetProtocolFeeRecipientRandom()
 	}
 	feeRecipientAta := GetAssociatedTokenAddress(feeRecipient, pp.QuoteMint, constants.TOKEN_PROGRAM)
 
@@ -501,9 +613,9 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	instructions := make([]solana.Instruction, 0, 3)
 
 	// Create WSOL/USDC ATA if needed for receiving
-	if params.CreateOutputMintAta && quoteIsWsolOrUsdc {
+	if params.CreateOutputMintAta {
 		instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
-			params.Payer, params.Payer, pp.QuoteMint, pp.QuoteTokenProgram,
+			params.Payer, params.Payer, outputStableMint, outputStableTokenProgram,
 		))
 	}
 
@@ -557,11 +669,12 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 		)
 	}
 
-	// Add pool v2 PDA
-	poolV2 := GetPoolV2PDA(pp.BaseMint)
-	accounts = append(accounts, solana.AccountMeta{
-		PublicKey: poolV2, IsSigner: false, IsWritable: false,
-	})
+	if shouldAddPoolV2(pp) {
+		poolV2 := GetPoolV2PDA(pp.BaseMint)
+		accounts = append(accounts, solana.AccountMeta{
+			PublicKey: poolV2, IsSigner: false, IsWritable: false,
+		})
+	}
 	protocolExtra := GetProtocolExtraFeeRecipientRandom()
 	accounts = append(accounts, solana.AccountMeta{
 		PublicKey: protocolExtra, IsSigner: false, IsWritable: false,
@@ -577,7 +690,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 		binary.LittleEndian.PutUint64(data[8:16], tokenAmount)
 		binary.LittleEndian.PutUint64(data[16:24], solAmount)
 	} else {
-		copy(data[0:8], PUMPSWAP_SELL_DISCRIMINATOR)
+		copy(data[0:8], PUMPSWAP_BUY_DISCRIMINATOR)
 		binary.LittleEndian.PutUint64(data[8:16], solAmount)
 		binary.LittleEndian.PutUint64(data[16:24], tokenAmount)
 	}
@@ -585,19 +698,29 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	instructions = append(instructions, newInstruction(PUMPSWAP_PROGRAM, accounts, data))
 
 	// Close WSOL ATA if requested
-	if params.CloseOutputMintAta && quoteIsWsolOrUsdc {
-		instructions = append(instructions, CloseWsol(params.Payer))
+	if params.CloseOutputMintAta {
+		if closeIx := CloseWsolForMint(params.Payer, outputStableMint, outputStableTokenProgram); closeIx != nil {
+			instructions = append(instructions, closeIx)
+		}
 	}
 
 	// Close base token account if requested
 	if params.CloseInputMintAta {
-		closeIx := token.NewCloseAccountInstruction(
-			userBaseTokenAccount,
-			params.Payer,
-			params.Payer,
-			[]solana.PublicKey{},
-		).Build()
-		instructions = append(instructions, closeIx)
+		inputAccount := userBaseTokenAccount
+		inputProgram := pp.BaseTokenProgram
+		if !quoteIsWsolOrUsdc {
+			inputAccount = userQuoteTokenAccount
+			inputProgram = pp.QuoteTokenProgram
+		}
+		instructions = append(instructions, newInstruction(
+			inputProgram,
+			[]solana.AccountMeta{
+				{PublicKey: inputAccount, IsSigner: false, IsWritable: true},
+				{PublicKey: params.Payer, IsSigner: false, IsWritable: true},
+				{PublicKey: params.Payer, IsSigner: true, IsWritable: false},
+			},
+			[]byte{9},
+		))
 	}
 
 	return instructions, nil
@@ -643,6 +766,17 @@ type PumpSwapPool struct {
 	CoinCreator           solana.PublicKey
 	IsMayhemMode          bool
 	IsCashbackCoin        bool
+}
+
+type PumpSwapFeeTier struct {
+	MarketCapLamportsThreshold *big.Int
+	Fees                       calc.PumpSwapFeeBasisPoints
+}
+
+type PumpSwapFeeConfig struct {
+	FlatFees       calc.PumpSwapFeeBasisPoints
+	FeeTiers       []PumpSwapFeeTier
+	StableFeeTiers []PumpSwapFeeTier
 }
 
 // DecodePool decodes a PumpSwap pool from account data
@@ -705,6 +839,153 @@ func DecodePool(data []byte) *PumpSwapPool {
 	return pool
 }
 
+func DecodeMintSupply(data []byte) (uint64, bool) {
+	end := pumpSwapSPLMintSupplyOffset + pumpSwapSPLMintSupplyLen
+	if len(data) < end {
+		return 0, false
+	}
+	return binary.LittleEndian.Uint64(data[pumpSwapSPLMintSupplyOffset:end]), true
+}
+
+func decodePumpSwapFees(data []byte, offset int) (calc.PumpSwapFeeBasisPoints, bool) {
+	if len(data) < offset+24 {
+		return calc.PumpSwapFeeBasisPoints{}, false
+	}
+	return calc.PumpSwapFeeBasisPoints{
+		LPFeeBasisPoints:          binary.LittleEndian.Uint64(data[offset : offset+8]),
+		ProtocolFeeBasisPoints:    binary.LittleEndian.Uint64(data[offset+8 : offset+16]),
+		CoinCreatorFeeBasisPoints: binary.LittleEndian.Uint64(data[offset+16 : offset+24]),
+	}, true
+}
+
+func decodePumpSwapFeeTiers(data []byte, offset int) ([]PumpSwapFeeTier, int, bool) {
+	if len(data) < offset+4 {
+		return nil, offset, false
+	}
+	count := int(binary.LittleEndian.Uint32(data[offset : offset+4]))
+	offset += 4
+	byteLen := count * pumpSwapFeeTierLen
+	if len(data) < offset+byteLen {
+		return nil, offset, false
+	}
+	tiers := make([]PumpSwapFeeTier, 0, count)
+	for i := 0; i < count; i++ {
+		lo := binary.LittleEndian.Uint64(data[offset : offset+8])
+		hi := binary.LittleEndian.Uint64(data[offset+8 : offset+16])
+		threshold := new(big.Int).SetUint64(hi)
+		threshold.Lsh(threshold, 64)
+		threshold.Add(threshold, new(big.Int).SetUint64(lo))
+		offset += 16
+		fees, ok := decodePumpSwapFees(data, offset)
+		if !ok {
+			return nil, offset, false
+		}
+		offset += 24
+		tiers = append(tiers, PumpSwapFeeTier{
+			MarketCapLamportsThreshold: threshold,
+			Fees:                       fees,
+		})
+	}
+	return tiers, offset, true
+}
+
+func DecodeFeeConfig(data []byte) *PumpSwapFeeConfig {
+	offset := 8  // discriminator
+	offset++     // bump
+	offset += 32 // admin
+	flatFees, ok := decodePumpSwapFees(data, offset)
+	if !ok {
+		return nil
+	}
+	offset += 24
+
+	feeTiers, next, ok := decodePumpSwapFeeTiers(data, offset)
+	if !ok {
+		return nil
+	}
+	offset = next
+	stableFeeTiers, _, ok := decodePumpSwapFeeTiers(data, offset)
+	if !ok {
+		return nil
+	}
+	return &PumpSwapFeeConfig{
+		FlatFees:       flatFees,
+		FeeTiers:       feeTiers,
+		StableFeeTiers: stableFeeTiers,
+	}
+}
+
+func FetchFeeConfig(fetcher PoolFetcher) (*PumpSwapFeeConfig, error) {
+	data, err := fetcher.GetAccountInfo(FEE_CONFIG)
+	if err != nil {
+		return nil, err
+	}
+	config := DecodeFeeConfig(data)
+	if config == nil {
+		return nil, fmt.Errorf("failed to decode PumpSwap fee config")
+	}
+	return config, nil
+}
+
+func IsCanonicalPumpPool(baseMint, poolCreator solana.PublicKey) bool {
+	return GetPumpPoolAuthorityPDA(baseMint).Equals(poolCreator)
+}
+
+func PoolMarketCapLamports(baseMintSupply, baseReserve, quoteReserve uint64) (*big.Int, bool) {
+	if baseReserve == 0 {
+		return nil, false
+	}
+	value := new(big.Int).SetUint64(quoteReserve)
+	value.Mul(value, new(big.Int).SetUint64(baseMintSupply))
+	value.Div(value, new(big.Int).SetUint64(baseReserve))
+	return value, true
+}
+
+func CalculateFeeTier(feeTiers []PumpSwapFeeTier, marketCapLamports *big.Int) (*calc.PumpSwapFeeBasisPoints, bool) {
+	if len(feeTiers) == 0 || marketCapLamports == nil {
+		return nil, false
+	}
+	first := feeTiers[0]
+	if marketCapLamports.Cmp(first.MarketCapLamportsThreshold) < 0 {
+		fees := first.Fees
+		return &fees, true
+	}
+	for i := len(feeTiers) - 1; i >= 0; i-- {
+		tier := feeTiers[i]
+		if marketCapLamports.Cmp(tier.MarketCapLamportsThreshold) >= 0 {
+			fees := tier.Fees
+			return &fees, true
+		}
+	}
+	fees := first.Fees
+	return &fees, true
+}
+
+func ComputePumpSwapFeeBasisPoints(
+	feeConfig *PumpSwapFeeConfig,
+	poolCreator, baseMint solana.PublicKey,
+	baseMintSupply *uint64,
+	baseReserve, quoteReserve uint64,
+) calc.PumpSwapFeeBasisPoints {
+	if feeConfig == nil {
+		return calc.LegacyPumpSwapFeeBasisPoints(true)
+	}
+	if !IsCanonicalPumpPool(baseMint, poolCreator) {
+		return feeConfig.FlatFees
+	}
+	if baseMintSupply == nil {
+		return calc.LegacyPumpSwapFeeBasisPoints(true)
+	}
+	marketCap, ok := PoolMarketCapLamports(*baseMintSupply, baseReserve, quoteReserve)
+	if !ok {
+		return calc.LegacyPumpSwapFeeBasisPoints(true)
+	}
+	if fees, ok := CalculateFeeTier(feeConfig.FeeTiers, marketCap); ok {
+		return *fees
+	}
+	return feeConfig.FlatFees
+}
+
 // GetFeeConfigPDA returns the fee config PDA
 // Seeds: ["fee_config", PUMPSWAP_PROGRAM], owner: FEE_PROGRAM
 func GetFeeConfigPDA() solana.PublicKey {
@@ -743,6 +1024,38 @@ type PoolFetcher interface {
 	GetTokenAccountBalance(pubkey solana.PublicKey) (uint64, error)
 }
 
+type RPCPoolFetcher struct {
+	ctx    context.Context
+	client *solanarpc.Client
+}
+
+func NewRPCPoolFetcher(ctx context.Context, client *solanarpc.Client) *RPCPoolFetcher {
+	return &RPCPoolFetcher{ctx: ctx, client: client}
+}
+
+func (f *RPCPoolFetcher) GetAccountInfo(pubkey solana.PublicKey) ([]byte, error) {
+	account, err := f.client.GetAccountInfo(f.ctx, pubkey)
+	if err != nil {
+		return nil, err
+	}
+	data := account.GetBinary()
+	if data == nil {
+		return nil, fmt.Errorf("account %s not found or empty", pubkey)
+	}
+	return data, nil
+}
+
+func (f *RPCPoolFetcher) GetTokenAccountBalance(pubkey solana.PublicKey) (uint64, error) {
+	balance, err := f.client.GetTokenAccountBalance(f.ctx, pubkey, solanarpc.CommitmentConfirmed)
+	if err != nil {
+		return 0, err
+	}
+	if balance == nil || balance.Value == nil {
+		return 0, fmt.Errorf("token account %s balance not found", pubkey)
+	}
+	return strconv.ParseUint(balance.Value.Amount, 10, 64)
+}
+
 // FetchPool fetches a PumpSwap pool from RPC.
 // 100% from Rust: src/instruction/utils/pumpswap.rs fetch_pool
 func FetchPool(fetcher PoolFetcher, poolAddress solana.PublicKey) (*PumpSwapPool, error) {
@@ -774,6 +1087,100 @@ func GetTokenBalances(fetcher PoolFetcher, pool *PumpSwapPool) (baseBalance uint
 	return baseBalance, quoteBalance, nil
 }
 
+func NewPumpSwapParamsFromPoolData(
+	fetcher PoolFetcher,
+	poolAddress solana.PublicKey,
+	pool *PumpSwapPool,
+	feeBasisPoints *calc.PumpSwapFeeBasisPoints,
+) (*PumpSwapParams, error) {
+	baseBalance, quoteBalance, err := GetTokenBalances(fetcher, pool)
+	if err != nil {
+		return nil, err
+	}
+
+	baseTokenProgramAta := GetAssociatedTokenAddress(poolAddress, pool.BaseMint, constants.TOKEN_PROGRAM)
+	quoteTokenProgramAta := GetAssociatedTokenAddress(poolAddress, pool.QuoteMint, constants.TOKEN_PROGRAM)
+	baseTokenProgram := constants.TOKEN_PROGRAM
+	if !pool.PoolBaseTokenAccount.Equals(baseTokenProgramAta) {
+		baseTokenProgram = constants.TOKEN_PROGRAM_2022
+	}
+	quoteTokenProgram := constants.TOKEN_PROGRAM
+	if !pool.PoolQuoteTokenAccount.Equals(quoteTokenProgramAta) {
+		quoteTokenProgram = constants.TOKEN_PROGRAM_2022
+	}
+
+	var baseMintSupply *uint64
+	if mintData, err := fetcher.GetAccountInfo(pool.BaseMint); err == nil {
+		if supply, ok := DecodeMintSupply(mintData); ok {
+			baseMintSupply = &supply
+		}
+	}
+
+	effectiveFees := calc.LegacyPumpSwapFeeBasisPoints(true)
+	if feeBasisPoints != nil {
+		effectiveFees = *feeBasisPoints
+	} else {
+		feeConfig, _ := FetchFeeConfig(fetcher)
+		effectiveFees = ComputePumpSwapFeeBasisPoints(
+			feeConfig,
+			pool.Creator,
+			pool.BaseMint,
+			baseMintSupply,
+			baseBalance,
+			quoteBalance,
+		)
+	}
+	if pool.CoinCreator.IsZero() {
+		effectiveFees.CoinCreatorFeeBasisPoints = 0
+	}
+
+	return &PumpSwapParams{
+		Pool:                      poolAddress,
+		BaseMint:                  pool.BaseMint,
+		QuoteMint:                 pool.QuoteMint,
+		PoolBaseTokenAccount:      pool.PoolBaseTokenAccount,
+		PoolQuoteTokenAccount:     pool.PoolQuoteTokenAccount,
+		PoolBaseTokenReserves:     baseBalance,
+		PoolQuoteTokenReserves:    quoteBalance,
+		CoinCreatorVaultAta:       GetCoinCreatorVaultAta(pool.CoinCreator, pool.QuoteMint),
+		CoinCreatorVaultAuthority: GetCoinCreatorVaultAuthority(pool.CoinCreator),
+		BaseTokenProgram:          baseTokenProgram,
+		QuoteTokenProgram:         quoteTokenProgram,
+		IsMayhemMode:              pool.IsMayhemMode,
+		IsCashbackCoin:            pool.IsCashbackCoin,
+		PoolCreator:               pool.Creator,
+		CoinCreator:               pool.CoinCreator,
+		CoinCreatorKnown:          true,
+		FeeBasisPoints:            &effectiveFees,
+		BaseMintSupply:            baseMintSupply,
+	}, nil
+}
+
+func NewPumpSwapParamsFromPoolAddress(
+	fetcher PoolFetcher,
+	poolAddress solana.PublicKey,
+	feeBasisPoints *calc.PumpSwapFeeBasisPoints,
+) (*PumpSwapParams, error) {
+	pool, err := FetchPool(fetcher, poolAddress)
+	if err != nil {
+		return nil, err
+	}
+	return NewPumpSwapParamsFromPoolData(fetcher, poolAddress, pool, feeBasisPoints)
+}
+
+func NewPumpSwapParamsFromPoolAddressByRPC(
+	ctx context.Context,
+	client *solanarpc.Client,
+	poolAddress solana.PublicKey,
+	feeBasisPoints *calc.PumpSwapFeeBasisPoints,
+) (*PumpSwapParams, error) {
+	return NewPumpSwapParamsFromPoolAddress(
+		NewRPCPoolFetcher(ctx, client),
+		poolAddress,
+		feeBasisPoints,
+	)
+}
+
 // FindByMint finds a PumpSwap pool by mint with RPC lookup.
 // 100% from Rust: src/instruction/utils/pumpswap.rs find_by_mint
 func FindByMint(fetcher PoolFetcher, mint solana.PublicKey) (*PumpSwapPool, solana.PublicKey, error) {
@@ -798,6 +1205,31 @@ func FindByMint(fetcher PoolFetcher, mint solana.PublicKey) (*PumpSwapPool, sola
 	}
 
 	return nil, solana.PublicKey{}, fmt.Errorf("no pool found for mint %s", mint)
+}
+
+func NewPumpSwapParamsFromMint(
+	fetcher PoolFetcher,
+	mint solana.PublicKey,
+	feeBasisPoints *calc.PumpSwapFeeBasisPoints,
+) (*PumpSwapParams, error) {
+	pool, poolAddress, err := FindByMint(fetcher, mint)
+	if err != nil {
+		return nil, err
+	}
+	return NewPumpSwapParamsFromPoolData(fetcher, poolAddress, pool, feeBasisPoints)
+}
+
+func NewPumpSwapParamsFromMintByRPC(
+	ctx context.Context,
+	client *solanarpc.Client,
+	mint solana.PublicKey,
+	feeBasisPoints *calc.PumpSwapFeeBasisPoints,
+) (*PumpSwapParams, error) {
+	return NewPumpSwapParamsFromMint(
+		NewRPCPoolFetcher(ctx, client),
+		mint,
+		feeBasisPoints,
+	)
 }
 
 // ===== Pool Size Constants - from Rust: src/instruction/utils/pumpswap.rs =====
