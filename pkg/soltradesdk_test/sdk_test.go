@@ -286,9 +286,35 @@ func TestRootTradingClient_ReturnsExplicitExecutionError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = client.Buy(context.Background(), soltradesdk.TradeBuyParams{})
+	_, err = client.Buy(context.Background(), soltradesdk.TradeBuyParams{InputTokenAmount: 1})
 	if !errors.Is(err, soltradesdk.ErrTradingExecutionUnavailable) {
 		t.Fatalf("expected explicit unavailable error, got %v", err)
+	}
+}
+
+func TestRootTradingClient_RejectsUnsafeTradeBoundaries(t *testing.T) {
+	payer, err := solana.NewRandomPrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := soltradesdk.NewTradingClient(
+		context.Background(),
+		&payer,
+		soltradesdk.NewTradeConfig("http://localhost:8899", nil),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = client.Buy(context.Background(), soltradesdk.TradeBuyParams{}); !errors.Is(err, soltradesdk.ErrInvalidAmount) {
+		t.Fatalf("expected zero input rejection, got %v", err)
+	}
+	zero := uint64(0)
+	if _, err = client.Buy(context.Background(), soltradesdk.TradeBuyParams{InputTokenAmount: 1, FixedOutputTokenAmount: &zero}); !errors.Is(err, soltradesdk.ErrInvalidAmount) {
+		t.Fatalf("expected zero fixed output rejection, got %v", err)
+	}
+	if _, err = client.Sell(context.Background(), soltradesdk.TradeSellParams{InputTokenAmount: 1, SlippageBasisPoints: 10_000}); !errors.Is(err, soltradesdk.ErrInvalidSlippage) {
+		t.Fatalf("expected 100%% slippage rejection, got %v", err)
 	}
 }
 

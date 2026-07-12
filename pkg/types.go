@@ -863,12 +863,31 @@ func (c *TradingClient) GetPayer() solana.PublicKey {
 
 // Buy executes a buy order
 func (c *TradingClient) Buy(ctx context.Context, params TradeBuyParams) (*TradeResult, error) {
+	if err := validateTradeBoundary(params.InputTokenAmount, params.SlippageBasisPoints, params.FixedOutputTokenAmount); err != nil {
+		return nil, err
+	}
 	return c.executeTrade(ctx, TradeTypeBuy, params)
 }
 
 // Sell executes a sell order
 func (c *TradingClient) Sell(ctx context.Context, params TradeSellParams) (*TradeResult, error) {
+	if err := validateTradeBoundary(params.InputTokenAmount, params.SlippageBasisPoints, params.FixedOutputTokenAmount); err != nil {
+		return nil, err
+	}
 	return c.executeSell(ctx, params)
+}
+
+func validateTradeBoundary(inputAmount, slippage uint64, fixedOutput *uint64) error {
+	if inputAmount == 0 {
+		return ErrInvalidAmount
+	}
+	if slippage >= 10_000 {
+		return ErrInvalidSlippage
+	}
+	if fixedOutput != nil && *fixedOutput == 0 {
+		return ErrInvalidAmount
+	}
+	return nil
 }
 
 // BuildBuyParamsFromSimple converts a high-level buy request to the legacy parameter surface.

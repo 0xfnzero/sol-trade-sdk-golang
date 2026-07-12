@@ -390,7 +390,7 @@ func ValidateAmount(amount uint64, name string, allowZero bool) error {
 
 // ValidateSlippage validates slippage in basis points
 func ValidateSlippage(slippageBasisPoints uint64) error {
-	if slippageBasisPoints > 10000 {
+	if slippageBasisPoints >= 10000 {
 		return ErrInvalidSlippage
 	}
 	return nil

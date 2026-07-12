@@ -1,6 +1,6 @@
 # Sol Trade SDK Go Examples
 
-Examples are updated for the current Go SDK API. They run in dry-run mode by default so they do not send mainnet transactions accidentally.
+Examples are updated for the current Go SDK API. Protocol examples use synthetic accounts and do not submit transactions.
 
 ## Run
 
@@ -8,13 +8,16 @@ Examples are updated for the current Go SDK API. They run in dry-run mode by def
 go run ./examples/trading_client
 ```
 
-Set `RUN_LIVE_EXAMPLES=1` only after replacing placeholder params with real RPC or decoded event data and funding the signer.
+Start bot integration from [low_latency_bot](low_latency_bot/main.go) and read [LOW_LATENCY_BOT.md](LOW_LATENCY_BOT.md). `PRIVATE_KEY` is a base58-encoded 64-byte secret key.
+
+Important: the root `pkg.TradingClient` is a facade and intentionally returns `ErrTradingExecutionUnavailable`. Implement the template's `TradeExecutor` adapter with protocol instruction builders plus a configured prebuilt-transaction executor. The examples do not claim that the root facade or protocol factory submits trades.
 
 ## Coverage
 
 | Area | Example |
 | --- | --- |
 | Trading client and low-latency config | [trading_client](trading_client/main.go) |
+| Parser + streamer guarded bot workflow | [low_latency_bot](low_latency_bot/main.go) |
 | Shared config across wallets | [shared_infrastructure](shared_infrastructure/main.go) |
 | PumpFun v2 fee recipient and cashback | [pumpfun_sniper_trading](pumpfun_sniper_trading/main.go), [pumpfun_copy_trading](pumpfun_copy_trading/main.go) |
 | PumpSwap cashback-aware params | [pumpswap_trading](pumpswap_trading/main.go), [pumpswap_direct_trading](pumpswap_direct_trading/main.go) |

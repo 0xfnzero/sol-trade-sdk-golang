@@ -2,7 +2,11 @@ package exampleutil
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
+	"strings"
+	"time"
 
 	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
@@ -76,8 +80,58 @@ func TradeConfig() *soltradesdk.TradeConfig {
 }
 
 func NewClient(ctx context.Context) (*soltradesdk.TradingClient, error) {
+	if RunLive() {
+		payer, err := LoadPayerFromEnv("PRIVATE_KEY")
+		if err != nil {
+			return nil, err
+		}
+		return soltradesdk.NewTradingClient(ctx, &payer, TradeConfig())
+	}
 	wallet := solana.NewWallet()
 	return soltradesdk.NewTradingClient(ctx, &wallet.PrivateKey, TradeConfig())
+}
+
+func LoadPayerFromEnv(name string) (solana.PrivateKey, error) {
+	encoded := strings.TrimSpace(os.Getenv(name))
+	if encoded == "" {
+		return nil, fmt.Errorf("%s is required for live trading", name)
+	}
+	payer, err := solana.PrivateKeyFromBase58(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("invalid %s: %w", name, err)
+	}
+	if len(payer) != 64 {
+		return nil, fmt.Errorf("invalid %s: decoded private key has %d bytes, expected 64", name, len(payer))
+	}
+	return payer, nil
+}
+
+func IsEventFresh(receivedAt time.Time, maxAge time.Duration, now time.Time) bool {
+	return maxAge > 0 && !receivedAt.After(now) && now.Sub(receivedAt) <= maxAge
+}
+
+func MatchesTarget(actual solana.PublicKey, expected *solana.PublicKey) bool {
+	return expected == nil || actual.Equals(*expected)
+}
+
+func CheckedPositionDelta(before, after uint64) (uint64, error) {
+	if after <= before {
+		return 0, fmt.Errorf("buy produced no positive token balance delta: before=%d after=%d", before, after)
+	}
+	return after - before, nil
+}
+
+func ValidateTradeIntent(inputAmount, slippage uint64, fixedOutput *uint64) error {
+	if inputAmount == 0 {
+		return errors.New("input amount must be positive")
+	}
+	if slippage >= 10_000 {
+		return errors.New("slippage must be less than 10000 basis points")
+	}
+	if fixedOutput != nil && *fixedOutput == 0 {
+		return errors.New("fixed output amount must be positive when provided")
+	}
+	return nil
 }
 
 func LowLatencyGasStrategy() *soltradesdk.GasFeeStrategy {
@@ -217,10 +271,6 @@ func ExampleBuyParams(dexType soltradesdk.DexType) soltradesdk.TradeBuyParams {
 		GasFeeStrategy:      LowLatencyGasStrategy(),
 		GrpcRecvUs:          &grpcRecvUs,
 	}
-	if dexType == soltradesdk.DexTypeMeteoraDammV2 {
-		fixedOutput := uint64(90_000)
-		params.FixedOutputTokenAmount = &fixedOutput
-	}
 	return params
 }
 
@@ -247,13 +297,9 @@ func ExampleSellParams(dexType soltradesdk.DexType) soltradesdk.TradeSellParams 
 		GasFeeStrategy:       LowLatencyGasStrategy(),
 		GrpcRecvUs:           &grpcRecvUs,
 	}
-	if dexType == soltradesdk.DexTypeMeteoraDammV2 {
-		fixedOutput := uint64(45_000)
-		params.FixedOutputTokenAmount = &fixedOutput
-	}
 	return params
 }
 
 func DescribeDryRun(name string) string {
-	return name + " prepared with current SDK types. Set RUN_LIVE_EXAMPLES=1 only after replacing placeholders with real RPC or decoded event data."
+	return name + " prepared with current SDK types. Placeholder accounts are not submitted; see low_latency_bot for the guarded workflow."
 }

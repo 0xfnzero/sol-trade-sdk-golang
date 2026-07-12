@@ -7,6 +7,8 @@ var (
 	ErrInvalidPrivateKey = errors.New("invalid private key")
 	// ErrInvalidAmount is returned when amount is zero or negative
 	ErrInvalidAmount = errors.New("amount cannot be zero or negative")
+	// ErrInvalidSlippage is returned when slippage is 100% or greater.
+	ErrInvalidSlippage = errors.New("slippage must be less than 10000 basis points")
 	// ErrInvalidPercentage is returned when percentage is out of range
 	ErrInvalidPercentage = errors.New("percentage must be between 1 and 100")
 	// ErrMissingBlockhash is returned when blockhash is required but not provided
