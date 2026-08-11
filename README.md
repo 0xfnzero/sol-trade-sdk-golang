@@ -181,6 +181,8 @@ func main() {
 }
 ```
 
+Temporal uses HTTP/3 QUIC first and Binary Batch HTTP as its default fallback. BlockRazor uses gRPC `SendBinaryTransaction` first and JSON HTTP as fallback. Astralane uses persistent QUIC first and Binary HTTP as fallback. Explicit transport settings force one protocol; a custom URL without a transport remains an explicit HTTP route.
+
 **Method 2: Prebuilt transaction executor**
 
 The root `TradingClient` converts high-level simple params but intentionally does not build or submit protocol trades in Go. Submit already-built transactions with `pkg/trading.TradeExecutor`, `pkg/trading/core`, or `pkg/hotpath`.

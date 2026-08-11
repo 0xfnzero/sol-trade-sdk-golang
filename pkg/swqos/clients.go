@@ -12,8 +12,10 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -29,6 +31,15 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+
+	blockrazorpb "github.com/0xfnzero/sol-trade-sdk-golang/pkg/swqos/blockrazorpb"
 )
 
 // ===== Type aliases (avoid duplicate definitions with pkg/types.go) =====
@@ -367,16 +378,29 @@ var flashBlockEndpoints = map[SwqosRegion]string{
 }
 
 var blockRazorEndpoints = map[SwqosRegion]string{
-	SwqosRegionNewYork:    "http://newyork.solana.blockrazor.xyz:443/v2/sendTransaction",
-	SwqosRegionFrankfurt:  "http://frankfurt.solana.blockrazor.xyz:443/v2/sendTransaction",
-	SwqosRegionAmsterdam:  "http://amsterdam.solana.blockrazor.xyz:443/v2/sendTransaction",
-	SwqosRegionDublin:     "http://london.solana.blockrazor.xyz:443/v2/sendTransaction",
-	SwqosRegionSLC:        "http://newyork.solana.blockrazor.xyz:443/v2/sendTransaction",
-	SwqosRegionTokyo:      "http://tokyo.solana.blockrazor.xyz:443/v2/sendTransaction",
-	SwqosRegionSingapore:  "http://tokyo.solana.blockrazor.xyz:443/v2/sendTransaction",
-	SwqosRegionLondon:     "http://london.solana.blockrazor.xyz:443/v2/sendTransaction",
-	SwqosRegionLosAngeles: "http://newyork.solana.blockrazor.xyz:443/v2/sendTransaction",
-	SwqosRegionDefault:    "http://frankfurt.solana.blockrazor.xyz:443/v2/sendTransaction",
+	SwqosRegionNewYork:    "http://newyork.solana.blockrazor.xyz:443/sendTransaction",
+	SwqosRegionFrankfurt:  "http://frankfurt.solana.blockrazor.xyz:443/sendTransaction",
+	SwqosRegionAmsterdam:  "http://amsterdam.solana.blockrazor.xyz:443/sendTransaction",
+	SwqosRegionDublin:     "http://london.solana.blockrazor.xyz:443/sendTransaction",
+	SwqosRegionSLC:        "http://newyork.solana.blockrazor.xyz:443/sendTransaction",
+	SwqosRegionTokyo:      "http://tokyo.solana.blockrazor.xyz:443/sendTransaction",
+	SwqosRegionSingapore:  "http://singapore.solana.blockrazor.xyz:443/sendTransaction",
+	SwqosRegionLondon:     "http://london.solana.blockrazor.xyz:443/sendTransaction",
+	SwqosRegionLosAngeles: "http://losangeles.solana.blockrazor.xyz:443/sendTransaction",
+	SwqosRegionDefault:    "http://frankfurt.solana.blockrazor.xyz:443/sendTransaction",
+}
+
+var blockRazorGRPCEndpoints = map[SwqosRegion]string{
+	SwqosRegionNewYork:    "newyork.solana-grpc.blockrazor.xyz:80",
+	SwqosRegionFrankfurt:  "frankfurt.solana-grpc.blockrazor.xyz:80",
+	SwqosRegionAmsterdam:  "amsterdam.solana-grpc.blockrazor.xyz:80",
+	SwqosRegionDublin:     "london.solana-grpc.blockrazor.xyz:80",
+	SwqosRegionSLC:        "newyork.solana-grpc.blockrazor.xyz:80",
+	SwqosRegionTokyo:      "tokyo.solana-grpc.blockrazor.xyz:80",
+	SwqosRegionSingapore:  "singapore.solana-grpc.blockrazor.xyz:80",
+	SwqosRegionLondon:     "london.solana-grpc.blockrazor.xyz:80",
+	SwqosRegionLosAngeles: "losangeles.solana-grpc.blockrazor.xyz:80",
+	SwqosRegionDefault:    "frankfurt.solana-grpc.blockrazor.xyz:80",
 }
 
 var astralaneEndpoints = map[SwqosRegion]string{
@@ -473,6 +497,50 @@ type SwqosClient interface {
 	GetSwqosType() SwqosType
 	MinTipSol() float64
 }
+
+type fallbackSwqosClient struct {
+	primary  SwqosClient
+	fallback SwqosClient
+}
+
+func newFallbackSwqosClient(primary, fallback SwqosClient) SwqosClient {
+	return &fallbackSwqosClient{primary: primary, fallback: fallback}
+}
+
+func shouldFallbackTransport(err error) bool {
+	if err == nil {
+		return false
+	}
+	var tradeErr *TradeError
+	if errors.As(err, &tradeErr) {
+		return tradeErr.Code >= 500 || tradeErr.Code == 408 || tradeErr.Code == 425
+	}
+	if code := status.Code(err); code != codes.OK && code != codes.Unknown {
+		return code == codes.Unavailable || code == codes.DeadlineExceeded || code == codes.Internal
+	}
+	var netErr net.Error
+	return errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr)
+}
+
+func (c *fallbackSwqosClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	sig, err := c.primary.SendTransaction(ctx, tradeType, transaction, waitConfirmation)
+	if err == nil || !shouldFallbackTransport(err) {
+		return sig, err
+	}
+	return c.fallback.SendTransaction(ctx, tradeType, transaction, waitConfirmation)
+}
+
+func (c *fallbackSwqosClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	sigs, err := c.primary.SendTransactions(ctx, tradeType, transactions, waitConfirmation)
+	if err == nil || !shouldFallbackTransport(err) {
+		return sigs, err
+	}
+	return c.fallback.SendTransactions(ctx, tradeType, transactions, waitConfirmation)
+}
+
+func (c *fallbackSwqosClient) GetTipAccount() string   { return c.primary.GetTipAccount() }
+func (c *fallbackSwqosClient) GetSwqosType() SwqosType { return c.primary.GetSwqosType() }
+func (c *fallbackSwqosClient) MinTipSol() float64      { return c.primary.MinTipSol() }
 
 // TradeError represents a trade error
 type TradeError struct {
@@ -843,7 +911,94 @@ func (c *ZeroSlotClient) MinTipSol() float64      { return MinTipZeroSlot }
 
 // ===== Temporal Client =====
 
-// TemporalClient represents a Temporal SWQOS client
+const (
+	temporalMaxBatchSize = 16
+	temporalMinTxSize    = 66
+	temporalMaxTxSize    = 1232
+)
+
+func encodeTemporalBatch(transactions [][]byte) ([]byte, error) {
+	if len(transactions) == 0 {
+		return nil, &TradeError{Code: 400, Message: "Temporal batch cannot be empty"}
+	}
+	if len(transactions) > temporalMaxBatchSize {
+		return nil, &TradeError{Code: 400, Message: fmt.Sprintf("Temporal batch has %d transactions; maximum is %d", len(transactions), temporalMaxBatchSize)}
+	}
+
+	size := 0
+	for _, tx := range transactions {
+		if len(tx) < temporalMinTxSize || len(tx) > temporalMaxTxSize {
+			return nil, &TradeError{Code: 400, Message: fmt.Sprintf("Temporal transaction size %d is outside %d..%d bytes", len(tx), temporalMinTxSize, temporalMaxTxSize)}
+		}
+		size += 2 + len(tx)
+	}
+	body := make([]byte, 0, size)
+	for _, tx := range transactions {
+		prefix := make([]byte, 2)
+		binary.BigEndian.PutUint16(prefix, uint16(len(tx)))
+		body = append(body, prefix...)
+		body = append(body, tx...)
+	}
+	return body, nil
+}
+
+func temporalBatchURL(endpoint, authToken string, forceTLS bool) (string, error) {
+	base := strings.TrimRight(endpoint, "/")
+	if !strings.Contains(base, "://") {
+		base = "http://" + base
+	}
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Hostname() == "" {
+		return "", &TradeError{Code: 400, Message: fmt.Sprintf("invalid Temporal endpoint: %s", endpoint)}
+	}
+	if forceTLS {
+		parsed.Scheme = "https"
+	}
+	parsed.Path = "/api/sendBatch"
+	query := parsed.Query()
+	if authToken != "" {
+		query.Set("c", authToken)
+	}
+	parsed.RawQuery = query.Encode()
+	return parsed.String(), nil
+}
+
+func submitTemporalBatch(ctx context.Context, client *http.Client, endpoint, authToken string, forceTLS bool, transactions [][]byte) ([]solana.Signature, error) {
+	body, err := encodeTemporalBatch(transactions)
+	if err != nil {
+		return nil, err
+	}
+	requestURL, err := temporalBatchURL(endpoint, authToken, forceTLS)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	responseBody, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, responseBody); err != nil {
+		return nil, err
+	}
+
+	signatures := make([]solana.Signature, 0, len(transactions))
+	for _, tx := range transactions {
+		sig, err := signatureFromSerializedTransaction(tx)
+		if err != nil {
+			return signatures, err
+		}
+		signatures = append(signatures, sig)
+	}
+	return signatures, nil
+}
+
+// TemporalClient submits compact binary batches over a warm HTTP connection.
 type TemporalClient struct {
 	endpoint  string
 	authToken string
@@ -855,55 +1010,91 @@ func NewTemporalClient(endpoint, authToken string) *TemporalClient {
 }
 
 func (c *TemporalClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
-	encoded := base64.StdEncoding.EncodeToString(transaction)
-
-	payload := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      1,
-		"method":  "sendTransaction",
-		"params": []interface{}{
-			encoded,
-			map[string]interface{}{"encoding": "base64"},
-		},
-	}
-
-	jsonData, _ := json.Marshal(payload)
-	url := c.endpoint + "/?c=" + c.authToken
-
-	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(jsonData)))
+	sigs, err := submitTemporalBatch(ctx, getHTTPClient(), c.endpoint, c.authToken, false, [][]byte{transaction})
 	if err != nil {
 		return solana.Signature{}, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := getHTTPClient().Do(req)
-	if err != nil {
-		return solana.Signature{}, err
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	if err := checkHTTPStatus(resp, body); err != nil {
-		return solana.Signature{}, err
-	}
-	return parseSignatureFromResult(body)
+	return sigs[0], nil
 }
 
 func (c *TemporalClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
-	sigs := make([]solana.Signature, 0, len(transactions))
-	for _, tx := range transactions {
-		sig, err := c.SendTransaction(ctx, tradeType, tx, waitConfirmation)
-		if err != nil {
-			return sigs, err
-		}
-		sigs = append(sigs, sig)
+	if len(transactions) == 0 {
+		return []solana.Signature{}, nil
 	}
-	return sigs, nil
+	all := make([]solana.Signature, 0, len(transactions))
+	for start := 0; start < len(transactions); start += temporalMaxBatchSize {
+		end := min(start+temporalMaxBatchSize, len(transactions))
+		sigs, err := submitTemporalBatch(ctx, getHTTPClient(), c.endpoint, c.authToken, false, transactions[start:end])
+		if err != nil {
+			return all, err
+		}
+		all = append(all, sigs...)
+	}
+	return all, nil
 }
 
 func (c *TemporalClient) GetTipAccount() string   { return randomTipAccount(temporalTipAccounts) }
 func (c *TemporalClient) GetSwqosType() SwqosType { return SwqosTypeTemporal }
 func (c *TemporalClient) MinTipSol() float64      { return MinTipTemporal }
+
+// TemporalQuicClient uses Temporal's HTTP/3 endpoint and official batch wire format.
+type TemporalQuicClient struct {
+	endpoint  string
+	authToken string
+	client    *http.Client
+}
+
+func NewTemporalQuicClient(endpoint, authToken string) (*TemporalQuicClient, error) {
+	requestURL, err := temporalBatchURL(endpoint, authToken, true)
+	if err != nil {
+		return nil, err
+	}
+	parsed, _ := url.Parse(requestURL)
+	transport := &http3.Transport{
+		TLSClientConfig: &tls.Config{
+			ServerName: parsed.Hostname(),
+			MinVersion: tls.VersionTLS13,
+			NextProtos: []string{http3.NextProtoH3},
+		},
+		QUICConfig: &quic.Config{
+			KeepAlivePeriod: 15 * time.Second,
+			MaxIdleTimeout:  120 * time.Second,
+		},
+	}
+	return &TemporalQuicClient{
+		endpoint:  endpoint,
+		authToken: authToken,
+		client:    &http.Client{Transport: transport, Timeout: 3 * time.Second},
+	}, nil
+}
+
+func (c *TemporalQuicClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	sigs, err := submitTemporalBatch(ctx, c.client, c.endpoint, c.authToken, true, [][]byte{transaction})
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	return sigs[0], nil
+}
+
+func (c *TemporalQuicClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	if len(transactions) == 0 {
+		return []solana.Signature{}, nil
+	}
+	all := make([]solana.Signature, 0, len(transactions))
+	for start := 0; start < len(transactions); start += temporalMaxBatchSize {
+		end := min(start+temporalMaxBatchSize, len(transactions))
+		sigs, err := submitTemporalBatch(ctx, c.client, c.endpoint, c.authToken, true, transactions[start:end])
+		if err != nil {
+			return all, err
+		}
+		all = append(all, sigs...)
+	}
+	return all, nil
+}
+
+func (c *TemporalQuicClient) GetTipAccount() string   { return randomTipAccount(temporalTipAccounts) }
+func (c *TemporalQuicClient) GetSwqosType() SwqosType { return SwqosTypeTemporal }
+func (c *TemporalQuicClient) MinTipSol() float64      { return MinTipTemporal }
 
 // ===== Bloxroute Client =====
 
@@ -1120,7 +1311,7 @@ func (c *FlashBlockClient) MinTipSol() float64      { return MinTipFlashBlock }
 
 // ===== BlockRazor Client =====
 
-// BlockRazorClient represents a BlockRazor SWQOS client
+// BlockRazorClient submits the official JSON request over HTTP.
 type BlockRazorClient struct {
 	endpoint      string
 	authToken     string
@@ -1137,20 +1328,28 @@ func NewBlockRazorClient(endpoint, authToken string, mevProtection bool) *BlockR
 }
 
 func (c *BlockRazorClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
-	encoded := base64.StdEncoding.EncodeToString(transaction)
-
 	mode := "fast"
 	if c.mevProtection {
 		mode = "sandwichMitigation"
 	}
-
-	url := fmt.Sprintf("%s?auth=%s&mode=%s", c.endpoint, c.authToken, mode)
-
-	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(encoded))
+	payload := map[string]interface{}{
+		"transaction":      base64.StdEncoding.EncodeToString(transaction),
+		"mode":             mode,
+		"safeWindow":       3,
+		"revertProtection": false,
+	}
+	requestBody, err := json.Marshal(payload)
 	if err != nil {
 		return solana.Signature{}, err
 	}
-	req.Header.Set("Content-Type", "text/plain")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(requestBody))
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.authToken != "" {
+		req.Header.Set("apikey", c.authToken)
+	}
 
 	resp, err := getHTTPClient().Do(req)
 	if err != nil {
@@ -1180,6 +1379,70 @@ func (c *BlockRazorClient) SendTransactions(ctx context.Context, tradeType Trade
 func (c *BlockRazorClient) GetTipAccount() string   { return randomTipAccount(blockRazorTipAccounts) }
 func (c *BlockRazorClient) GetSwqosType() SwqosType { return SwqosTypeBlockRazor }
 func (c *BlockRazorClient) MinTipSol() float64      { return MinTipBlockRazor }
+
+// BlockRazorGrpcClient uses the official SendBinaryTransaction RPC.
+type BlockRazorGrpcClient struct {
+	client        blockrazorpb.ServerClient
+	authToken     string
+	mevProtection bool
+}
+
+func NewBlockRazorGrpcClient(endpoint, authToken string, mevProtection bool) (*BlockRazorGrpcClient, error) {
+	target := strings.TrimPrefix(strings.TrimPrefix(endpoint, "http://"), "https://")
+	conn, err := grpc.NewClient(
+		target,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{Time: 30 * time.Second, Timeout: 3 * time.Second}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &BlockRazorGrpcClient{
+		client:        blockrazorpb.NewServerClient(conn),
+		authToken:     authToken,
+		mevProtection: mevProtection,
+	}, nil
+}
+
+func (c *BlockRazorGrpcClient) requestContext(ctx context.Context) context.Context {
+	if c.authToken == "" {
+		return ctx
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs("apikey", c.authToken))
+}
+
+func (c *BlockRazorGrpcClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	mode := "fast"
+	if c.mevProtection {
+		mode = "sandwichMitigation"
+	}
+	response, err := c.client.SendBinaryTransaction(c.requestContext(ctx), &blockrazorpb.SendBinaryRequest{
+		BinaryTransaction: transaction,
+		Mode:              mode,
+		SafeWindow:        3,
+		RevertProtection:  false,
+	})
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	return signatureFromRequiredBase58(response.GetSignature())
+}
+
+func (c *BlockRazorGrpcClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	signatures := make([]solana.Signature, 0, len(transactions))
+	for _, tx := range transactions {
+		sig, err := c.SendTransaction(ctx, tradeType, tx, waitConfirmation)
+		if err != nil {
+			return signatures, err
+		}
+		signatures = append(signatures, sig)
+	}
+	return signatures, nil
+}
+
+func (c *BlockRazorGrpcClient) GetTipAccount() string   { return randomTipAccount(blockRazorTipAccounts) }
+func (c *BlockRazorGrpcClient) GetSwqosType() SwqosType { return SwqosTypeBlockRazor }
+func (c *BlockRazorGrpcClient) MinTipSol() float64      { return MinTipBlockRazor }
 
 // ===== Astralane Client =====
 
@@ -1678,37 +1941,72 @@ func newAstralaneQuicTLSConfig(apiKey string) (*tls.Config, error) {
 type AstralaneQuicClient struct {
 	endpoint string
 	apiKey   string
+	mu       sync.Mutex
+	conn     *quic.Conn
+	tlsCfg   *tls.Config
+	tlsErr   error
+	tlsOnce  sync.Once
 }
 
 func NewAstralaneQuicClient(endpoint, apiKey string) *AstralaneQuicClient {
 	return &AstralaneQuicClient{endpoint: endpoint, apiKey: apiKey}
 }
 
-func (c *AstralaneQuicClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
-	if len(transaction) > 1232 {
-		return solana.Signature{}, &TradeError{Code: 400, Message: fmt.Sprintf("Astralane QUIC transaction too large: %d > 1232", len(transaction))}
+func (c *AstralaneQuicClient) connectLocked(ctx context.Context) error {
+	if c.conn != nil && c.conn.Context().Err() == nil {
+		return nil
 	}
-	tlsCfg, err := newAstralaneQuicTLSConfig(c.apiKey)
-	if err != nil {
-		return solana.Signature{}, &TradeError{Code: 500, Message: err.Error()}
+	c.tlsOnce.Do(func() {
+		c.tlsCfg, c.tlsErr = newAstralaneQuicTLSConfig(c.apiKey)
+	})
+	if c.tlsErr != nil {
+		return c.tlsErr
 	}
-	conn, err := quic.DialAddr(ctx, c.endpoint, tlsCfg, &quic.Config{
+	conn, err := quic.DialAddr(ctx, c.endpoint, c.tlsCfg.Clone(), &quic.Config{
 		MaxIdleTimeout:  30 * time.Second,
 		KeepAlivePeriod: 25 * time.Second,
 	})
 	if err != nil {
-		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Astralane QUIC dial %s: %v", c.endpoint, err)}
+		return fmt.Errorf("Astralane QUIC dial %s: %w", c.endpoint, err)
 	}
-	defer conn.CloseWithError(0, "done") //nolint:errcheck
-	stream, err := conn.OpenUniStreamSync(ctx)
+	c.conn = conn
+	return nil
+}
+
+func (c *AstralaneQuicClient) sendLocked(ctx context.Context, transaction []byte) error {
+	if err := c.connectLocked(ctx); err != nil {
+		return err
+	}
+	stream, err := c.conn.OpenUniStreamSync(ctx)
+	if err == nil {
+		_, err = stream.Write(transaction)
+	}
+	if err == nil {
+		err = stream.Close()
+	}
 	if err != nil {
-		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Astralane QUIC open stream: %v", err)}
+		_ = c.conn.CloseWithError(0, "reconnect")
+		c.conn = nil
 	}
-	if _, err = stream.Write(transaction); err != nil {
-		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Astralane QUIC write: %v", err)}
+	return err
+}
+
+func (c *AstralaneQuicClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	if len(transaction) > 1232 {
+		return solana.Signature{}, &TradeError{Code: 400, Message: fmt.Sprintf("Astralane QUIC transaction too large: %d > 1232", len(transaction))}
 	}
-	if err = stream.Close(); err != nil {
-		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Astralane QUIC close: %v", err)}
+	c.mu.Lock()
+	err := c.sendLocked(ctx, transaction)
+	if err != nil {
+		err = c.sendLocked(ctx, transaction)
+	}
+	c.mu.Unlock()
+	if err != nil {
+		var appErr *quic.ApplicationError
+		if errors.As(err, &appErr) && uint64(appErr.ErrorCode) == 1 {
+			return solana.Signature{}, &TradeError{Code: 401, Message: "Astralane QUIC rejected the API key"}
+		}
+		return solana.Signature{}, &TradeError{Code: 503, Message: fmt.Sprintf("Astralane QUIC send failed: %v", err)}
 	}
 	signature, err := signatureFromSerializedTransaction(transaction)
 	if err != nil {
@@ -2062,8 +2360,25 @@ func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL stri
 		}
 		if config.CustomURL != "" {
 			endpoint = config.CustomURL
+			if config.Transport == nil || *config.Transport == soltradesdk.SwqosTransportHTTP {
+				return NewTemporalClient(endpoint, config.APIKey), nil
+			}
 		}
-		return NewTemporalClient(endpoint, config.APIKey), nil
+		if config.Transport != nil {
+			switch *config.Transport {
+			case soltradesdk.SwqosTransportHTTP:
+				return NewTemporalClient(endpoint, config.APIKey), nil
+			case soltradesdk.SwqosTransportGRPC:
+				return nil, &TradeError{Code: 400, Message: "Temporal does not provide a gRPC transaction-submission API"}
+			case soltradesdk.SwqosTransportQUIC:
+				return NewTemporalQuicClient(endpoint, config.APIKey)
+			}
+		}
+		quicClient, err := NewTemporalQuicClient(endpoint, config.APIKey)
+		if err != nil {
+			return nil, err
+		}
+		return newFallbackSwqosClient(quicClient, NewTemporalClient(endpoint, config.APIKey)), nil
 
 	case SwqosTypeBloxroute:
 		endpoint, ok := bloxrouteEndpoints[config.Region]
@@ -2099,14 +2414,34 @@ func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL stri
 		return NewFlashBlockClient(endpoint, config.APIKey), nil
 
 	case SwqosTypeBlockRazor:
-		endpoint, ok := blockRazorEndpoints[config.Region]
+		httpEndpoint, ok := blockRazorEndpoints[config.Region]
 		if !ok {
-			endpoint = blockRazorEndpoints[SwqosRegionDefault]
+			httpEndpoint = blockRazorEndpoints[SwqosRegionDefault]
 		}
 		if config.CustomURL != "" {
-			endpoint = config.CustomURL
+			if config.Transport == nil || *config.Transport == soltradesdk.SwqosTransportHTTP {
+				return NewBlockRazorClient(config.CustomURL, config.APIKey, config.MEVProtection), nil
+			}
+			httpEndpoint = config.CustomURL
 		}
-		return NewBlockRazorClient(endpoint, config.APIKey, config.MEVProtection), nil
+		if config.Transport != nil && *config.Transport == soltradesdk.SwqosTransportQUIC {
+			return nil, &TradeError{Code: 400, Message: "BlockRazor does not provide a QUIC transaction-submission API"}
+		}
+		grpcEndpoint := blockRazorGRPCEndpoints[config.Region]
+		if grpcEndpoint == "" {
+			grpcEndpoint = blockRazorGRPCEndpoints[SwqosRegionDefault]
+		}
+		if config.CustomURL != "" {
+			grpcEndpoint = config.CustomURL
+		}
+		grpcClient, err := NewBlockRazorGrpcClient(grpcEndpoint, config.APIKey, config.MEVProtection)
+		if err != nil {
+			return nil, err
+		}
+		if config.Transport != nil && *config.Transport == soltradesdk.SwqosTransportGRPC {
+			return grpcClient, nil
+		}
+		return newFallbackSwqosClient(grpcClient, NewBlockRazorClient(httpEndpoint, config.APIKey, config.MEVProtection)), nil
 
 	case SwqosTypeAstralane:
 		endpoint, ok := astralaneEndpoints[config.Region]
@@ -2115,6 +2450,9 @@ func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL stri
 		}
 		if config.CustomURL != "" {
 			endpoint = config.CustomURL
+			if config.AstralaneMode == nil {
+				return NewAstralaneClient(endpoint, config.APIKey), nil
+			}
 		}
 		if config.AstralaneMode != nil {
 			switch *config.AstralaneMode {
@@ -2141,6 +2479,20 @@ func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL stri
 				}
 				return NewAstralaneQuicClient(quicEndpoint, config.APIKey), nil
 			}
+		}
+		if config.AstralaneMode == nil {
+			port := "7000"
+			if config.MEVProtection {
+				port = "9000"
+			}
+			host := astralaneQuicHosts[config.Region]
+			if host == "" {
+				host = astralaneQuicHosts[SwqosRegionDefault]
+			}
+			return newFallbackSwqosClient(
+				NewAstralaneQuicClient(net.JoinHostPort(host, port), config.APIKey),
+				NewAstralaneClient(endpoint, config.APIKey),
+			), nil
 		}
 		return NewAstralaneClient(endpoint, config.APIKey), nil
 

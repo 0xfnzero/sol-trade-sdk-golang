@@ -956,9 +956,9 @@ func (f *SwqosProviderFactory) CreateProvider(config *SwqosConfigExtended) (inte
 	case SwqosTypeFlashBlock:
 		return newSenderBackedExtClient(config, "")
 	case SwqosTypeBlockRazor:
-		return NewBlockRazorExtClient(config), nil
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeAstralane:
-		return NewAstralaneExtClient(config), nil
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeStellium:
 		return newSenderBackedExtClient(config, "")
 	case SwqosTypeLightspeed:

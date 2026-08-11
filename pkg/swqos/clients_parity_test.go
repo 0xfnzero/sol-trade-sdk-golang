@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -23,7 +25,7 @@ func TestSwqosEndpointParityRustV4021(t *testing.T) {
 	if node1Endpoints[SwqosRegionSingapore] != "http://tk.node1.me" {
 		t.Fatalf("unexpected Node1 Singapore endpoint: %s", node1Endpoints[SwqosRegionSingapore])
 	}
-	if blockRazorEndpoints[SwqosRegionSingapore] != "http://tokyo.solana.blockrazor.xyz:443/v2/sendTransaction" {
+	if blockRazorEndpoints[SwqosRegionSingapore] != "http://singapore.solana.blockrazor.xyz:443/sendTransaction" {
 		t.Fatalf("unexpected BlockRazor Singapore endpoint: %s", blockRazorEndpoints[SwqosRegionSingapore])
 	}
 	if astralaneEndpoints[SwqosRegionSLC] != "http://la.gateway.astralane.io/irisb" {
@@ -77,15 +79,19 @@ func TestBlockRazorHTTPAcceptsPlainTextSignature(t *testing.T) {
 	want := "99eUso3aSbE9tqGSTXzo3TLfKb9RkMTURrHKQ1K7Zh3BbeqPevr5E1iCbpTjqHuTFLtfxTTD5ekfVuZFzQyEQf8"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("Content-Type"); got != "text/plain" {
-			t.Fatalf("expected text/plain content type, got %q", got)
+		if got := r.Header.Get("Content-Type"); got != "application/json" {
+			t.Fatalf("expected application/json content type, got %q", got)
+		}
+		if got := r.Header.Get("apikey"); got != "token" {
+			t.Fatalf("expected apikey header, got %q", got)
 		}
 		body, _ := io.ReadAll(r.Body)
-		if string(body) != base64.StdEncoding.EncodeToString(tx) {
-			t.Fatalf("unexpected body: %q", string(body))
+		var payload map[string]interface{}
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Fatal(err)
 		}
-		if r.URL.Query().Get("auth") != "token" || r.URL.Query().Get("mode") != "fast" {
-			t.Fatalf("unexpected query: %s", r.URL.RawQuery)
+		if payload["transaction"] != base64.StdEncoding.EncodeToString(tx) || payload["mode"] != "fast" {
+			t.Fatalf("unexpected payload: %#v", payload)
 		}
 		_, _ = w.Write([]byte(want))
 	}))
@@ -249,15 +255,19 @@ func TestExtendedBlockRazorDelegatesToSenderRequestShape(t *testing.T) {
 		if r.URL.Path == "/api/v1/submit" {
 			t.Fatalf("extended provider must not use legacy /api/v1/submit")
 		}
-		if got := r.Header.Get("Content-Type"); got != "text/plain" {
-			t.Fatalf("expected text/plain content type, got %q", got)
+		if got := r.Header.Get("Content-Type"); got != "application/json" {
+			t.Fatalf("expected application/json content type, got %q", got)
+		}
+		if got := r.Header.Get("apikey"); got != "token" {
+			t.Fatalf("expected apikey header, got %q", got)
 		}
 		body, _ := io.ReadAll(r.Body)
-		if string(body) != base64.StdEncoding.EncodeToString(tx) {
-			t.Fatalf("unexpected body: %q", string(body))
+		var payload map[string]interface{}
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Fatal(err)
 		}
-		if r.URL.Query().Get("auth") != "token" || r.URL.Query().Get("mode") != "fast" {
-			t.Fatalf("unexpected query: %s", r.URL.RawQuery)
+		if payload["transaction"] != base64.StdEncoding.EncodeToString(tx) || payload["mode"] != "fast" {
+			t.Fatalf("unexpected payload: %#v", payload)
 		}
 		_, _ = w.Write([]byte(want))
 	}))
@@ -406,5 +416,65 @@ func TestExtendedFactoryPreservesHeliusSwqosOnly(t *testing.T) {
 	}
 	if !client.swqosOnly {
 		t.Fatal("expected swqosOnly to be preserved")
+	}
+}
+
+func TestDefaultProviderTransportChains(t *testing.T) {
+	factory := &ClientFactory{}
+	tests := []struct {
+		name         string
+		config       soltradesdk.SwqosConfig
+		primaryType  interface{}
+		fallbackType interface{}
+	}{
+		{"Temporal", soltradesdk.SwqosConfig{Type: SwqosTypeTemporal, APIKey: "token"}, (*TemporalQuicClient)(nil), (*TemporalClient)(nil)},
+		{"BlockRazor", soltradesdk.SwqosConfig{Type: SwqosTypeBlockRazor, APIKey: "token"}, (*BlockRazorGrpcClient)(nil), (*BlockRazorClient)(nil)},
+		{"Astralane", soltradesdk.SwqosConfig{Type: SwqosTypeAstralane, APIKey: "token"}, (*AstralaneQuicClient)(nil), (*AstralaneClient)(nil)},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client, err := factory.CreateClient(test.config, "https://rpc.example")
+			if err != nil {
+				t.Fatal(err)
+			}
+			chain, ok := client.(*fallbackSwqosClient)
+			if !ok {
+				t.Fatalf("expected fallback transport chain, got %T", client)
+			}
+			if fmt.Sprintf("%T", chain.primary) != fmt.Sprintf("%T", test.primaryType) {
+				t.Fatalf("unexpected primary transport: %T", chain.primary)
+			}
+			if fmt.Sprintf("%T", chain.fallback) != fmt.Sprintf("%T", test.fallbackType) {
+				t.Fatalf("unexpected fallback transport: %T", chain.fallback)
+			}
+		})
+	}
+}
+
+func TestTemporalBatchUsesBigEndianUint16Lengths(t *testing.T) {
+	first := append([]byte{1}, make([]byte, 65)...)
+	second := append([]byte{1}, make([]byte, 66)...)
+	encoded, err := encodeTemporalBatch([][]byte{first, second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := append([]byte{0, byte(len(first))}, first...)
+	want = append(want, 0, byte(len(second)))
+	want = append(want, second...)
+	if string(encoded) != string(want) {
+		t.Fatalf("unexpected Temporal batch framing")
+	}
+}
+
+func TestFallbackPolicyOnlyAllowsTransportAndServiceErrors(t *testing.T) {
+	if !shouldFallbackTransport(&TradeError{Code: 503, Message: "down"}) {
+		t.Fatal("expected service failure to permit fallback")
+	}
+	if shouldFallbackTransport(&TradeError{Code: 401, Message: "bad key"}) {
+		t.Fatal("authentication errors must not permit fallback")
+	}
+	if shouldFallbackTransport(errors.New("unclassified application error")) {
+		t.Fatal("unclassified errors must not permit fallback")
 	}
 }

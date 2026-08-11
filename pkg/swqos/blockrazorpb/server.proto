@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package serverpb;
+
+option go_package = "github.com/0xfnzero/sol-trade-sdk-golang/pkg/swqos/blockrazorpb";
+
+service Server {
+  rpc SendBinaryTransaction(SendBinaryRequest) returns (SendResponse);
+}
+
+message SendBinaryRequest {
+  bytes binaryTransaction = 1;
+  string mode = 2;
+  int32 safeWindow = 3;
+  bool revertProtection = 4;
+}
+
+message SendResponse {
+  string signature = 1;
+}
