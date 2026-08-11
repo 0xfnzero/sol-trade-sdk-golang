@@ -3,6 +3,7 @@ package instruction
 import (
 	"encoding/binary"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
@@ -408,6 +409,58 @@ func TestPumpSwapOmitsPoolV2WhenKnownCoinCreatorIsDefault(t *testing.T) {
 	}
 }
 
+func TestPumpSwapUsesQuoteTokenProgramForFeeVaults(t *testing.T) {
+	protocolParams := testPumpSwapParams(func(p *PumpSwapParams) {
+		p.QuoteTokenProgram = constants.TOKEN_PROGRAM_2022
+	})
+	ixs, err := BuildBuyInstructions(&BuildBuyParams{
+		Payer:               testPK(99),
+		InputAmount:         1_000_000,
+		SlippageBasisPoints: 300,
+		ProtocolParams:      protocolParams,
+		CreateInputMintAta:  false,
+		CreateOutputMintAta: false,
+		UseExactQuoteAmount: true,
+	})
+	if err != nil {
+		t.Fatalf("build error: %v", err)
+	}
+
+	accounts := ixs[len(ixs)-1].Accounts()
+	wantFeeATA := GetAssociatedTokenAddress(
+		accounts[9].PublicKey,
+		protocolParams.QuoteMint,
+		constants.TOKEN_PROGRAM_2022,
+	)
+	if !accounts[10].PublicKey.Equals(wantFeeATA) {
+		t.Fatalf("fee recipient ATA = %s, want %s", accounts[10].PublicKey, wantFeeATA)
+	}
+
+	protocolExtra := accounts[len(accounts)-2].PublicKey
+	wantExtraATA := GetAssociatedTokenAddress(
+		protocolExtra,
+		protocolParams.QuoteMint,
+		constants.TOKEN_PROGRAM_2022,
+	)
+	if !accounts[len(accounts)-1].PublicKey.Equals(wantExtraATA) {
+		t.Fatalf("extra fee ATA = %s, want %s", accounts[len(accounts)-1].PublicKey, wantExtraATA)
+	}
+
+	creatorATA := GetCoinCreatorVaultAtaWithTokenProgram(
+		protocolParams.CoinCreator,
+		protocolParams.QuoteMint,
+		constants.TOKEN_PROGRAM_2022,
+	)
+	wantCreatorATA := GetAssociatedTokenAddress(
+		GetCoinCreatorVaultAuthority(protocolParams.CoinCreator),
+		protocolParams.QuoteMint,
+		constants.TOKEN_PROGRAM_2022,
+	)
+	if !creatorATA.Equals(wantCreatorATA) {
+		t.Fatalf("creator vault ATA = %s, want %s", creatorATA, wantCreatorATA)
+	}
+}
+
 type fakePumpSwapFetcher struct {
 	accounts map[solana.PublicKey][]byte
 	balances map[solana.PublicKey]uint64
@@ -470,7 +523,7 @@ func testMintBytes(supply uint64) []byte {
 
 func testPoolBytes(pool *PumpSwapPool) []byte {
 	data := make([]byte, 0, 8+PoolSize)
-	data = append(data, make([]byte, 8)...)
+	data = append(data, PUMPSWAP_POOL_DISCRIMINATOR...)
 	data = append(data, pool.PoolBump)
 	buf2 := make([]byte, 2)
 	binary.LittleEndian.PutUint16(buf2, pool.Index)
@@ -493,7 +546,11 @@ func testPoolBytes(pool *PumpSwapPool) []byte {
 	} else {
 		data = append(data, byte(0))
 	}
-	data = append(data, make([]byte, 7)...)
+	if pool.VirtualQuoteReserves == nil {
+		data = append(data, make([]byte, 7)...)
+	} else {
+		data = append(data, signedI128LE(pool.VirtualQuoteReserves)...)
+	}
 	return data
 }
 
@@ -545,6 +602,7 @@ func TestNewPumpSwapParamsFromPoolAddressDiscoversFeeConfig(t *testing.T) {
 		LpSupply:              100,
 		CoinCreator:           coinCreator,
 		IsCashbackCoin:        true,
+		VirtualQuoteReserves:  big.NewInt(100),
 	}
 	fetcher := fakePumpSwapFetcher{
 		accounts: map[solana.PublicKey][]byte{
@@ -554,7 +612,7 @@ func TestNewPumpSwapParamsFromPoolAddressDiscoversFeeConfig(t *testing.T) {
 		},
 		balances: map[solana.PublicKey]uint64{
 			pool.PoolBaseTokenAccount:  1_000,
-			pool.PoolQuoteTokenAccount: 1_000,
+			pool.PoolQuoteTokenAccount: 50,
 		},
 	}
 	params, err := NewPumpSwapParamsFromPoolAddress(fetcher, poolAddress, nil)
@@ -569,6 +627,9 @@ func TestNewPumpSwapParamsFromPoolAddressDiscoversFeeConfig(t *testing.T) {
 	}
 	if params.BaseMintSupply == nil || *params.BaseMintSupply != 10_000 {
 		t.Fatalf("base mint supply = %+v", params.BaseMintSupply)
+	}
+	if params.PoolQuoteTokenReserves != 50 || params.VirtualQuoteReserves.Cmp(big.NewInt(100)) != 0 {
+		t.Fatalf("quote reserves raw=%d virtual=%v", params.PoolQuoteTokenReserves, params.VirtualQuoteReserves)
 	}
 	if !params.CoinCreatorVaultAuthority.Equals(GetCoinCreatorVaultAuthority(coinCreator)) {
 		t.Fatalf("coin creator vault authority mismatch")

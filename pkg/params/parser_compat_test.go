@@ -1,6 +1,7 @@
 package params
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
@@ -94,6 +95,7 @@ func TestNewPumpSwapParamsFromParserTradeUsesCreatorVaultAccounts(t *testing.T) 
 		PoolQuoteTokenAccount:     solana.NewWallet().PublicKey().String(),
 		PoolBaseTokenReserves:     10,
 		PoolQuoteTokenReserves:    20,
+		VirtualQuoteReserves:      big.NewInt(7),
 		CoinCreatorVaultATA:       vault.String(),
 		CoinCreatorVaultAuthority: authority.String(),
 		BaseTokenProgram:          constants.TOKEN_PROGRAM.String(),
@@ -120,6 +122,7 @@ func TestNewPumpSwapParamsFromParserTradeUsesFeeBasisPoints(t *testing.T) {
 		PoolQuoteTokenAccount:     solana.NewWallet().PublicKey().String(),
 		PoolBaseTokenReserves:     10,
 		PoolQuoteTokenReserves:    20,
+		VirtualQuoteReserves:      big.NewInt(7),
 		CoinCreatorVaultATA:       solana.NewWallet().PublicKey().String(),
 		CoinCreatorVaultAuthority: solana.NewWallet().PublicKey().String(),
 		BaseTokenProgram:          constants.TOKEN_PROGRAM.String(),
@@ -138,6 +141,9 @@ func TestNewPumpSwapParamsFromParserTradeUsesFeeBasisPoints(t *testing.T) {
 	}
 	if p.CashbackFeeBasisPoints != 4 {
 		t.Fatalf("cashback fee bps = %d", p.CashbackFeeBasisPoints)
+	}
+	if p.VirtualQuoteReserves == nil || p.VirtualQuoteReserves.Cmp(big.NewInt(7)) != 0 {
+		t.Fatalf("virtual quote reserves = %v", p.VirtualQuoteReserves)
 	}
 	if p.FeeBasisPoints == nil {
 		t.Fatal("fee basis points not mapped")

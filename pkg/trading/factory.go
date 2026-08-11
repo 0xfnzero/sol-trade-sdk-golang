@@ -3,6 +3,7 @@ package trading
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 	"github.com/gagliardetto/solana-go"
@@ -91,6 +92,7 @@ type PumpSwapBuyParams struct {
 	PoolQuoteTokenAccount  solana.PublicKey
 	PoolBaseTokenReserves  uint64
 	PoolQuoteTokenReserves uint64
+	VirtualQuoteReserves   *big.Int
 	CoinCreatorVaultATA    solana.PublicKey
 	CoinCreatorVaultAuth   solana.PublicKey
 	BaseTokenProgram       solana.PublicKey
@@ -111,6 +113,7 @@ type PumpSwapSellParams struct {
 	PoolQuoteTokenAccount  solana.PublicKey
 	PoolBaseTokenReserves  uint64
 	PoolQuoteTokenReserves uint64
+	VirtualQuoteReserves   *big.Int
 	CoinCreatorVaultATA    solana.PublicKey
 	CoinCreatorVaultAuth   solana.PublicKey
 	BaseTokenProgram       solana.PublicKey

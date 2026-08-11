@@ -2,7 +2,9 @@ package calc
 
 import (
 	"errors"
+	"fmt"
 	"math"
+	"math/big"
 	"math/bits"
 )
 
@@ -234,6 +236,11 @@ const (
 	PumpSwapCoinCreatorFeeBasisPoints uint64 = 5  // 0.05% (was 10)
 )
 
+var (
+	pumpSwapI128Min = new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), 127))
+	pumpSwapI128Max = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1))
+)
+
 type PumpSwapFeeBasisPoints struct {
 	LPFeeBasisPoints          uint64
 	ProtocolFeeBasisPoints    uint64
@@ -280,16 +287,37 @@ type SellQuoteInputResult struct {
 	MinQuote         uint64
 }
 
+// EffectiveQuoteReserves returns the PumpSwap reserves used for pricing.
+// virtualQuoteReserves is a signed i128 on chain; nil is treated as zero.
+func EffectiveQuoteReserves(quoteVaultBalance uint64, virtualQuoteReserves *big.Int) (uint64, error) {
+	effective := new(big.Int).SetUint64(quoteVaultBalance)
+	if virtualQuoteReserves != nil {
+		if virtualQuoteReserves.Cmp(pumpSwapI128Min) < 0 || virtualQuoteReserves.Cmp(pumpSwapI128Max) > 0 {
+			return 0, fmt.Errorf("virtual quote reserves are outside the signed i128 range: %s", virtualQuoteReserves)
+		}
+		effective.Add(effective, virtualQuoteReserves)
+	}
+	if effective.Sign() <= 0 || !effective.IsUint64() {
+		virtual := "0"
+		if virtualQuoteReserves != nil {
+			virtual = virtualQuoteReserves.String()
+		}
+		return 0, fmt.Errorf("invalid effective quote reserves: raw=%d, virtual=%s", quoteVaultBalance, virtual)
+	}
+	return effective.Uint64(), nil
+}
+
 // BuyBaseInputInternal calculates quote needed to buy base tokens on PumpSwap
 func BuyBaseInputInternal(
 	base uint64,
 	slippageBasisPoints uint64,
 	baseReserve uint64,
 	quoteReserve uint64,
+	virtualQuoteReserves *big.Int,
 	hasCoinCreator bool,
 ) (*BuyBaseInputResult, error) {
 	fees := LegacyPumpSwapFeeBasisPoints(hasCoinCreator)
-	return BuyBaseInputInternalWithFees(base, slippageBasisPoints, baseReserve, quoteReserve, fees)
+	return BuyBaseInputInternalWithFees(base, slippageBasisPoints, baseReserve, quoteReserve, virtualQuoteReserves, fees)
 }
 
 func BuyBaseInputInternalWithFees(
@@ -297,17 +325,22 @@ func BuyBaseInputInternalWithFees(
 	slippageBasisPoints uint64,
 	baseReserve uint64,
 	quoteReserve uint64,
+	virtualQuoteReserves *big.Int,
 	feeBasisPoints PumpSwapFeeBasisPoints,
 ) (*BuyBaseInputResult, error) {
 	if baseReserve == 0 || quoteReserve == 0 {
 		return nil, ErrInvalidReserves
+	}
+	effectiveQuoteReserve, err := EffectiveQuoteReserves(quoteReserve, virtualQuoteReserves)
+	if err != nil {
+		return nil, err
 	}
 	if base > baseReserve {
 		return nil, ErrInsufficientReserves
 	}
 
 	// Use 128-bit multiplication to avoid overflow
-	numerator := mul128(quoteReserve, base)
+	numerator := mul128(effectiveQuoteReserve, base)
 	denominator := baseReserve - base
 
 	if denominator == 0 {
@@ -340,10 +373,11 @@ func BuyQuoteInputInternal(
 	slippageBasisPoints uint64,
 	baseReserve uint64,
 	quoteReserve uint64,
+	virtualQuoteReserves *big.Int,
 	hasCoinCreator bool,
 ) (*BuyQuoteInputResult, error) {
 	fees := LegacyPumpSwapFeeBasisPoints(hasCoinCreator)
-	return BuyQuoteInputInternalWithFees(quote, slippageBasisPoints, baseReserve, quoteReserve, fees)
+	return BuyQuoteInputInternalWithFees(quote, slippageBasisPoints, baseReserve, quoteReserve, virtualQuoteReserves, fees)
 }
 
 func BuyQuoteInputInternalWithFees(
@@ -351,10 +385,15 @@ func BuyQuoteInputInternalWithFees(
 	slippageBasisPoints uint64,
 	baseReserve uint64,
 	quoteReserve uint64,
+	virtualQuoteReserves *big.Int,
 	feeBasisPoints PumpSwapFeeBasisPoints,
 ) (*BuyQuoteInputResult, error) {
 	if baseReserve == 0 || quoteReserve == 0 {
 		return nil, ErrInvalidReserves
+	}
+	effectiveQuoteReserve, err := EffectiveQuoteReserves(quoteReserve, virtualQuoteReserves)
+	if err != nil {
+		return nil, err
 	}
 
 	totalFeeBps := feeBasisPoints.LPFeeBasisPoints + feeBasisPoints.ProtocolFeeBasisPoints + feeBasisPoints.CoinCreatorFeeBasisPoints
@@ -377,7 +416,10 @@ func BuyQuoteInputInternalWithFees(
 	// numerator = baseReserve * effectiveQuote
 	numerator := mul128(baseReserve, inputAmount)
 	// denominatorEffective = quoteReserve + effectiveQuote
-	denominatorEffective := quoteReserve + inputAmount
+	denominatorEffective := effectiveQuoteReserve + inputAmount
+	if denominatorEffective < effectiveQuoteReserve {
+		return nil, ErrOverflow
+	}
 
 	if denominatorEffective == 0 {
 		return nil, ErrPoolDepleted
@@ -399,10 +441,11 @@ func SellBaseInputInternal(
 	slippageBasisPoints uint64,
 	baseReserve uint64,
 	quoteReserve uint64,
+	virtualQuoteReserves *big.Int,
 	hasCoinCreator bool,
 ) (*SellBaseInputResult, error) {
 	fees := LegacyPumpSwapFeeBasisPoints(hasCoinCreator)
-	return SellBaseInputInternalWithFees(base, slippageBasisPoints, baseReserve, quoteReserve, fees)
+	return SellBaseInputInternalWithFees(base, slippageBasisPoints, baseReserve, quoteReserve, virtualQuoteReserves, fees)
 }
 
 func SellBaseInputInternalWithFees(
@@ -410,14 +453,19 @@ func SellBaseInputInternalWithFees(
 	slippageBasisPoints uint64,
 	baseReserve uint64,
 	quoteReserve uint64,
+	virtualQuoteReserves *big.Int,
 	feeBasisPoints PumpSwapFeeBasisPoints,
 ) (*SellBaseInputResult, error) {
 	if baseReserve == 0 || quoteReserve == 0 {
 		return nil, ErrInvalidReserves
 	}
+	effectiveQuoteReserve, err := EffectiveQuoteReserves(quoteReserve, virtualQuoteReserves)
+	if err != nil {
+		return nil, err
+	}
 
 	// Use 128-bit arithmetic: (quoteReserve * base) / (baseReserve + base)
-	numerator := mul128(quoteReserve, base)
+	numerator := mul128(effectiveQuoteReserve, base)
 	denominator := baseReserve + base
 	if denominator == 0 {
 		return nil, ErrPoolDepleted
@@ -431,6 +479,10 @@ func SellBaseInputInternalWithFees(
 	totalFees := lpFee + protocolFee + coinCreatorFee
 	if totalFees > quoteAmountOutUint {
 		return nil, ErrFeesExceedOutput
+	}
+	quoteVaultOutflow := quoteAmountOutUint - lpFee
+	if quoteVaultOutflow > quoteReserve {
+		return nil, errors.New("insufficient real quote reserves to cover the sell output")
 	}
 	finalQuote := quoteAmountOutUint - totalFees
 	minQuote, _ := CalculateWithSlippageSell(finalQuote, slippageBasisPoints)
@@ -448,10 +500,11 @@ func SellQuoteInputInternal(
 	slippageBasisPoints uint64,
 	baseReserve uint64,
 	quoteReserve uint64,
+	virtualQuoteReserves *big.Int,
 	hasCoinCreator bool,
 ) (*SellQuoteInputResult, error) {
 	fees := LegacyPumpSwapFeeBasisPoints(hasCoinCreator)
-	return SellQuoteInputInternalWithFees(quote, slippageBasisPoints, baseReserve, quoteReserve, fees)
+	return SellQuoteInputInternalWithFees(quote, slippageBasisPoints, baseReserve, quoteReserve, virtualQuoteReserves, fees)
 }
 
 func SellQuoteInputInternalWithFees(
@@ -459,6 +512,7 @@ func SellQuoteInputInternalWithFees(
 	slippageBasisPoints uint64,
 	baseReserve uint64,
 	quoteReserve uint64,
+	virtualQuoteReserves *big.Int,
 	feeBasisPoints PumpSwapFeeBasisPoints,
 ) (*SellQuoteInputResult, error) {
 	if baseReserve == 0 || quoteReserve == 0 {
@@ -466,6 +520,10 @@ func SellQuoteInputInternalWithFees(
 	}
 	if quote > quoteReserve {
 		return nil, ErrInsufficientReserves
+	}
+	effectiveQuoteReserve, err := EffectiveQuoteReserves(quoteReserve, virtualQuoteReserves)
+	if err != nil {
+		return nil, err
 	}
 
 	rawQuote := calculateQuoteAmountOut(
@@ -475,13 +533,21 @@ func SellQuoteInputInternalWithFees(
 		feeBasisPoints.CoinCreatorFeeBasisPoints,
 	)
 
-	if rawQuote >= quoteReserve {
+	lpFee, err := ComputeFee(rawQuote, feeBasisPoints.LPFeeBasisPoints)
+	if err != nil {
+		return nil, err
+	}
+	if rawQuote < lpFee || rawQuote-lpFee > quoteReserve {
+		return nil, errors.New("insufficient real quote reserves to cover the sell output")
+	}
+
+	if rawQuote >= effectiveQuoteReserve {
 		return nil, ErrInvalidInputCalc
 	}
 
 	// Use 128-bit arithmetic for ceiling division
 	numerator := mul128(baseReserve, rawQuote)
-	denominator := quoteReserve - rawQuote
+	denominator := effectiveQuoteReserve - rawQuote
 	baseAmountIn := div128(numerator, denominator)
 	// Add 1 for ceiling division
 	if numerator.Lo%denominator != 0 || numerator.Hi != 0 {

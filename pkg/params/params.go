@@ -2,6 +2,7 @@ package params
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
@@ -204,6 +205,7 @@ type PumpSwapParams struct {
 	PoolQuoteTokenAccount  solana.PublicKey
 	PoolBaseTokenReserves  uint64
 	PoolQuoteTokenReserves uint64
+	VirtualQuoteReserves   *big.Int
 	CoinCreatorVaultATA    solana.PublicKey
 	CoinCreatorVaultAuth   solana.PublicKey
 	BaseTokenProgram       solana.PublicKey
@@ -223,6 +225,7 @@ func NewPumpSwapParams(
 	pool, baseMint, quoteMint,
 	poolBaseTokenAccount, poolQuoteTokenAccount solana.PublicKey,
 	poolBaseTokenReserves, poolQuoteTokenReserves uint64,
+	virtualQuoteReserves *big.Int,
 	coinCreatorVaultATA, coinCreatorVaultAuth solana.PublicKey,
 	baseTokenProgram, quoteTokenProgram solana.PublicKey,
 	isMayhemMode, isCashbackCoin bool,
@@ -235,6 +238,7 @@ func NewPumpSwapParams(
 		PoolQuoteTokenAccount:  poolQuoteTokenAccount,
 		PoolBaseTokenReserves:  poolBaseTokenReserves,
 		PoolQuoteTokenReserves: poolQuoteTokenReserves,
+		VirtualQuoteReserves:   cloneBigInt(virtualQuoteReserves),
 		CoinCreatorVaultATA:    coinCreatorVaultATA,
 		CoinCreatorVaultAuth:   coinCreatorVaultAuth,
 		BaseTokenProgram:       baseTokenProgram,
@@ -242,6 +246,18 @@ func NewPumpSwapParams(
 		IsMayhemMode:           isMayhemMode,
 		IsCashbackCoin:         isCashbackCoin,
 	}
+}
+
+func cloneBigInt(value *big.Int) *big.Int {
+	if value == nil {
+		return new(big.Int)
+	}
+	return new(big.Int).Set(value)
+}
+
+// EffectiveQuoteReserves returns quote_vault_balance + virtual_quote_reserves.
+func (p *PumpSwapParams) EffectiveQuoteReserves() (uint64, error) {
+	return calc.EffectiveQuoteReserves(p.PoolQuoteTokenReserves, p.VirtualQuoteReserves)
 }
 
 func (p *PumpSwapParams) WithCoinCreator(coinCreator solana.PublicKey) *PumpSwapParams {
@@ -272,6 +288,7 @@ type PumpSwapParserTradeEvent struct {
 	PoolQuoteTokenAccount     string
 	PoolBaseTokenReserves     uint64
 	PoolQuoteTokenReserves    uint64
+	VirtualQuoteReserves      *big.Int
 	CoinCreatorVaultATA       string
 	CoinCreatorVaultAuthority string
 	BaseTokenProgram          string
@@ -339,6 +356,7 @@ func NewPumpSwapParamsFromParserTrade(event PumpSwapParserTradeEvent) (*PumpSwap
 		poolQuoteTokenAccount,
 		event.PoolBaseTokenReserves,
 		event.PoolQuoteTokenReserves,
+		event.VirtualQuoteReserves,
 		coinCreatorVaultATA,
 		coinCreatorVaultAuthority,
 		baseTokenProgram,

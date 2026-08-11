@@ -350,6 +350,7 @@ func toPumpSwapParams(p *params.PumpSwapParams) *PumpSwapParams {
 		PoolQuoteTokenAccount:     p.PoolQuoteTokenAccount,
 		PoolBaseTokenReserves:     p.PoolBaseTokenReserves,
 		PoolQuoteTokenReserves:    p.PoolQuoteTokenReserves,
+		VirtualQuoteReserves:      p.VirtualQuoteReserves,
 		CoinCreatorVaultAta:       p.CoinCreatorVaultATA,
 		CoinCreatorVaultAuthority: p.CoinCreatorVaultAuth,
 		BaseTokenProgram:          p.BaseTokenProgram,

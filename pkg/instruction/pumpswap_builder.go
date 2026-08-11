@@ -4,6 +4,7 @@
 package instruction
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/binary"
@@ -64,6 +65,7 @@ var (
 	PUMPSWAP_BUY_EXACT_QUOTE_IN_DISCRIMINATOR = []byte{198, 46, 21, 82, 180, 217, 232, 112}
 	PUMPSWAP_SELL_DISCRIMINATOR               = []byte{51, 230, 133, 164, 1, 127, 131, 173}
 	PUMPSWAP_CLAIM_CASHBACK_DISCRIMINATOR     = []byte{37, 58, 35, 126, 190, 53, 228, 197}
+	PUMPSWAP_POOL_DISCRIMINATOR               = []byte{241, 154, 109, 4, 17, 177, 109, 188}
 )
 
 // Seeds - from Rust: src/instruction/utils/pumpswap.rs
@@ -147,8 +149,15 @@ func GetCoinCreatorVaultAuthority(coinCreator solana.PublicKey) solana.PublicKey
 
 // GetCoinCreatorVaultAta returns the coin creator vault ATA for the quote mint.
 func GetCoinCreatorVaultAta(coinCreator, quoteMint solana.PublicKey) solana.PublicKey {
+	return GetCoinCreatorVaultAtaWithTokenProgram(coinCreator, quoteMint, constants.TOKEN_PROGRAM)
+}
+
+// GetCoinCreatorVaultAtaWithTokenProgram derives the creator vault for the quote mint's token program.
+func GetCoinCreatorVaultAtaWithTokenProgram(
+	coinCreator, quoteMint, quoteTokenProgram solana.PublicKey,
+) solana.PublicKey {
 	authority := GetCoinCreatorVaultAuthority(coinCreator)
-	return GetAssociatedTokenAddress(authority, quoteMint, constants.TOKEN_PROGRAM)
+	return GetAssociatedTokenAddress(authority, quoteMint, quoteTokenProgram)
 }
 
 // GetPumpSwapUserVolumeAccumulatorPDA returns the user volume accumulator PDA for PumpSwap.
@@ -183,6 +192,7 @@ type PumpSwapParams struct {
 	PoolQuoteTokenAccount     solana.PublicKey
 	PoolBaseTokenReserves     uint64
 	PoolQuoteTokenReserves    uint64
+	VirtualQuoteReserves      *big.Int
 	CoinCreatorVaultAta       solana.PublicKey
 	CoinCreatorVaultAuthority solana.PublicKey
 	BaseTokenProgram          solana.PublicKey
@@ -367,6 +377,7 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 			params.SlippageBasisPoints,
 			pp.PoolBaseTokenReserves,
 			pp.PoolQuoteTokenReserves,
+			pp.VirtualQuoteReserves,
 			feeBasisPoints,
 		)
 		if err != nil {
@@ -380,6 +391,7 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 			params.SlippageBasisPoints,
 			pp.PoolBaseTokenReserves,
 			pp.PoolQuoteTokenReserves,
+			pp.VirtualQuoteReserves,
 			feeBasisPoints,
 		)
 		if err != nil {
@@ -405,7 +417,7 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 	} else {
 		feeRecipient = GetProtocolFeeRecipientRandom()
 	}
-	feeRecipientAta := GetAssociatedTokenAddress(feeRecipient, pp.QuoteMint, constants.TOKEN_PROGRAM)
+	feeRecipientAta := GetAssociatedTokenAddress(feeRecipient, pp.QuoteMint, pp.QuoteTokenProgram)
 
 	// Build instructions
 	instructions := make([]solana.Instruction, 0, 6)
@@ -487,7 +499,7 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 		PublicKey: protocolExtra, IsSigner: false, IsWritable: false,
 	})
 	accounts = append(accounts, solana.AccountMeta{
-		PublicKey: GetAssociatedTokenAddress(protocolExtra, pp.QuoteMint, constants.TOKEN_PROGRAM), IsSigner: false, IsWritable: true,
+		PublicKey: GetAssociatedTokenAddress(protocolExtra, pp.QuoteMint, pp.QuoteTokenProgram), IsSigner: false, IsWritable: true,
 	})
 
 	// Build instruction data
@@ -570,6 +582,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 			params.SlippageBasisPoints,
 			pp.PoolBaseTokenReserves,
 			pp.PoolQuoteTokenReserves,
+			pp.VirtualQuoteReserves,
 			feeBasisPoints,
 		)
 		if err != nil {
@@ -582,6 +595,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 			params.SlippageBasisPoints,
 			pp.PoolBaseTokenReserves,
 			pp.PoolQuoteTokenReserves,
+			pp.VirtualQuoteReserves,
 			feeBasisPoints,
 		)
 		if err != nil {
@@ -607,7 +621,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	} else {
 		feeRecipient = GetProtocolFeeRecipientRandom()
 	}
-	feeRecipientAta := GetAssociatedTokenAddress(feeRecipient, pp.QuoteMint, constants.TOKEN_PROGRAM)
+	feeRecipientAta := GetAssociatedTokenAddress(feeRecipient, pp.QuoteMint, pp.QuoteTokenProgram)
 
 	// Build instructions
 	instructions := make([]solana.Instruction, 0, 3)
@@ -680,7 +694,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 		PublicKey: protocolExtra, IsSigner: false, IsWritable: false,
 	})
 	accounts = append(accounts, solana.AccountMeta{
-		PublicKey: GetAssociatedTokenAddress(protocolExtra, pp.QuoteMint, constants.TOKEN_PROGRAM), IsSigner: false, IsWritable: true,
+		PublicKey: GetAssociatedTokenAddress(protocolExtra, pp.QuoteMint, pp.QuoteTokenProgram), IsSigner: false, IsWritable: true,
 	})
 
 	// Build instruction data
@@ -749,8 +763,10 @@ func BuildClaimCashbackInstruction(payer, quoteMint, quoteTokenProgram solana.Pu
 
 // ===== Pool Types and Decoding - from Rust: src/instruction/utils/pumpswap_types.rs =====
 
-// PoolSize is the size of a PumpSwap pool account in bytes
-const PoolSize = 244
+const (
+	PoolSize       = 253
+	LegacyPoolSize = 244
+)
 
 // PumpSwapPool represents a decoded PumpSwap pool
 type PumpSwapPool struct {
@@ -766,6 +782,7 @@ type PumpSwapPool struct {
 	CoinCreator           solana.PublicKey
 	IsMayhemMode          bool
 	IsCashbackCoin        bool
+	VirtualQuoteReserves  *big.Int
 }
 
 type PumpSwapFeeTier struct {
@@ -782,7 +799,7 @@ type PumpSwapFeeConfig struct {
 // DecodePool decodes a PumpSwap pool from account data
 // Returns nil if data is invalid or too short
 func DecodePool(data []byte) *PumpSwapPool {
-	if len(data) < PoolSize {
+	if len(data) < PoolSize && len(data) != LegacyPoolSize {
 		return nil
 	}
 
@@ -835,8 +852,43 @@ func DecodePool(data []byte) *PumpSwapPool {
 
 	// is_cashback_coin: bool
 	pool.IsCashbackCoin = data[offset] == 1
+	offset++
+
+	if len(data) >= PoolSize {
+		pool.VirtualQuoteReserves = decodeSignedI128LE(data[offset : offset+16])
+	} else {
+		pool.VirtualQuoteReserves = new(big.Int)
+	}
 
 	return pool
+}
+
+// DecodePoolAccount validates the Anchor discriminator before decoding a full account.
+func DecodePoolAccount(data []byte) *PumpSwapPool {
+	if len(data) < len(PUMPSWAP_POOL_DISCRIMINATOR) ||
+		!bytes.Equal(data[:len(PUMPSWAP_POOL_DISCRIMINATOR)], PUMPSWAP_POOL_DISCRIMINATOR) {
+		return nil
+	}
+	return DecodePool(data[len(PUMPSWAP_POOL_DISCRIMINATOR):])
+}
+
+func decodeSignedI128LE(data []byte) *big.Int {
+	bigEndian := make([]byte, len(data))
+	for i := range data {
+		bigEndian[len(data)-1-i] = data[i]
+	}
+	value := new(big.Int).SetBytes(bigEndian)
+	if len(data) == 16 && data[15]&0x80 != 0 {
+		value.Sub(value, new(big.Int).Lsh(big.NewInt(1), 128))
+	}
+	return value
+}
+
+func cloneBigIntOrZero(value *big.Int) *big.Int {
+	if value == nil {
+		return new(big.Int)
+	}
+	return new(big.Int).Set(value)
 }
 
 func DecodeMintSupply(data []byte) (uint64, bool) {
@@ -1063,10 +1115,7 @@ func FetchPool(fetcher PoolFetcher, poolAddress solana.PublicKey) (*PumpSwapPool
 	if err != nil {
 		return nil, err
 	}
-	if len(data) < 8 {
-		return nil, fmt.Errorf("account data too short")
-	}
-	pool := DecodePool(data[8:])
+	pool := DecodePoolAccount(data)
 	if pool == nil {
 		return nil, fmt.Errorf("failed to decode pool")
 	}
@@ -1094,6 +1143,10 @@ func NewPumpSwapParamsFromPoolData(
 	feeBasisPoints *calc.PumpSwapFeeBasisPoints,
 ) (*PumpSwapParams, error) {
 	baseBalance, quoteBalance, err := GetTokenBalances(fetcher, pool)
+	if err != nil {
+		return nil, err
+	}
+	effectiveQuoteBalance, err := calc.EffectiveQuoteReserves(quoteBalance, pool.VirtualQuoteReserves)
 	if err != nil {
 		return nil, err
 	}
@@ -1127,7 +1180,7 @@ func NewPumpSwapParamsFromPoolData(
 			pool.BaseMint,
 			baseMintSupply,
 			baseBalance,
-			quoteBalance,
+			effectiveQuoteBalance,
 		)
 	}
 	if pool.CoinCreator.IsZero() {
@@ -1135,14 +1188,19 @@ func NewPumpSwapParamsFromPoolData(
 	}
 
 	return &PumpSwapParams{
-		Pool:                      poolAddress,
-		BaseMint:                  pool.BaseMint,
-		QuoteMint:                 pool.QuoteMint,
-		PoolBaseTokenAccount:      pool.PoolBaseTokenAccount,
-		PoolQuoteTokenAccount:     pool.PoolQuoteTokenAccount,
-		PoolBaseTokenReserves:     baseBalance,
-		PoolQuoteTokenReserves:    quoteBalance,
-		CoinCreatorVaultAta:       GetCoinCreatorVaultAta(pool.CoinCreator, pool.QuoteMint),
+		Pool:                   poolAddress,
+		BaseMint:               pool.BaseMint,
+		QuoteMint:              pool.QuoteMint,
+		PoolBaseTokenAccount:   pool.PoolBaseTokenAccount,
+		PoolQuoteTokenAccount:  pool.PoolQuoteTokenAccount,
+		PoolBaseTokenReserves:  baseBalance,
+		PoolQuoteTokenReserves: quoteBalance,
+		VirtualQuoteReserves:   cloneBigIntOrZero(pool.VirtualQuoteReserves),
+		CoinCreatorVaultAta: GetCoinCreatorVaultAtaWithTokenProgram(
+			pool.CoinCreator,
+			pool.QuoteMint,
+			quoteTokenProgram,
+		),
 		CoinCreatorVaultAuthority: GetCoinCreatorVaultAuthority(pool.CoinCreator),
 		BaseTokenProgram:          baseTokenProgram,
 		QuoteTokenProgram:         quoteTokenProgram,
@@ -1187,8 +1245,8 @@ func FindByMint(fetcher PoolFetcher, mint solana.PublicKey) (*PumpSwapPool, sola
 	// 1. Try v2 PDA
 	poolV2 := GetPoolV2PDA(mint)
 	data, err := fetcher.GetAccountInfo(poolV2)
-	if err == nil && len(data) >= 8 {
-		pool := DecodePool(data[8:])
+	if err == nil {
+		pool := DecodePoolAccount(data)
 		if pool != nil && pool.BaseMint.Equals(mint) {
 			return pool, poolV2, nil
 		}
@@ -1197,8 +1255,8 @@ func FindByMint(fetcher PoolFetcher, mint solana.PublicKey) (*PumpSwapPool, sola
 	// 2. Try canonical pool PDA
 	canonical := GetCanonicalPoolPDA(mint)
 	data, err = fetcher.GetAccountInfo(canonical)
-	if err == nil && len(data) >= 8 {
-		pool := DecodePool(data[8:])
+	if err == nil {
+		pool := DecodePoolAccount(data)
 		if pool != nil && pool.BaseMint.Equals(mint) {
 			return pool, canonical, nil
 		}
@@ -1235,10 +1293,10 @@ func NewPumpSwapParamsFromMintByRPC(
 // ===== Pool Size Constants - from Rust: src/instruction/utils/pumpswap.rs =====
 
 const (
-	// PoolDataLenSPL is the pool data size for SPL Token (8 discriminator + 244 data)
-	PoolDataLenSPL = 8 + 244
-	// PoolDataLenT22 is the pool data size for Token2022
-	PoolDataLenT22 = 643
+	PoolDataLenLegacy  = 8 + LegacyPoolSize
+	PoolDataLenCurrent = 8 + PoolSize
+	PoolDataLenPadded  = 300
+	PoolDataLenT22     = 643
 )
 
 // ProgramAccountsFetcher defines interface for fetching program accounts from RPC
@@ -1292,11 +1350,9 @@ func FindByBaseMint(fetcher ProgramAccountsFetcher, baseMint solana.PublicKey) (
 	var pools []poolResult
 
 	for _, result := range results {
-		if len(result.Data) > 8 {
-			pool := DecodePool(result.Data[8:])
-			if pool != nil {
-				pools = append(pools, poolResult{pubkey: result.Pubkey, pool: pool})
-			}
+		pool := DecodePoolAccount(result.Data)
+		if pool != nil {
+			pools = append(pools, poolResult{pubkey: result.Pubkey, pool: pool})
 		}
 	}
 
@@ -1344,11 +1400,9 @@ func FindByQuoteMint(fetcher ProgramAccountsFetcher, quoteMint solana.PublicKey)
 	var pools []poolResult
 
 	for _, result := range results {
-		if len(result.Data) > 8 {
-			pool := DecodePool(result.Data[8:])
-			if pool != nil {
-				pools = append(pools, poolResult{pubkey: result.Pubkey, pool: pool})
-			}
+		pool := DecodePoolAccount(result.Data)
+		if pool != nil {
+			pools = append(pools, poolResult{pubkey: result.Pubkey, pool: pool})
 		}
 	}
 

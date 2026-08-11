@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"strings"
 	"time"
@@ -165,6 +166,7 @@ func PumpSwapParams() *dexparams.PumpSwapParams {
 		ExamplePublicKey(21), ExamplePublicKey(22), constants.WSOL_TOKEN_ACCOUNT,
 		ExamplePublicKey(23), ExamplePublicKey(24),
 		2_000_000_000, 50_000_000_000,
+		big.NewInt(0),
 		ExamplePublicKey(25), ExamplePublicKey(26),
 		constants.TOKEN_PROGRAM, constants.TOKEN_PROGRAM,
 		false, true,
