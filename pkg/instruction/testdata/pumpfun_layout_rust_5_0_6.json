@@ -1,0 +1,167 @@
+{
+  "baseline_commit": "dc9741b6074df21418f16b6175f497fbebecb723",
+  "source": "src/instruction/pumpfun.rs should_use_v2_layout and effective_quote_mint_and_token_program",
+  "cases": [
+    {
+      "quote": "default",
+      "curve_quote": "default",
+      "settlement": "default",
+      "v2": false,
+      "error": false,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "default",
+      "curve_quote": "default",
+      "settlement": "SOL",
+      "v2": false,
+      "error": false,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "default",
+      "curve_quote": "default",
+      "settlement": "WSOL",
+      "v2": true,
+      "error": false,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "default",
+      "curve_quote": "default",
+      "settlement": "USDC",
+      "v2": false,
+      "error": false,
+      "strict_endpoint_error": true
+    },
+    {
+      "quote": "SOL",
+      "curve_quote": "default",
+      "settlement": "default",
+      "v2": false,
+      "error": false,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "SOL",
+      "curve_quote": "default",
+      "settlement": "SOL",
+      "v2": false,
+      "error": false,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "SOL",
+      "curve_quote": "default",
+      "settlement": "WSOL",
+      "v2": true,
+      "error": false,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "SOL",
+      "curve_quote": "default",
+      "settlement": "USDC",
+      "v2": false,
+      "error": false,
+      "strict_endpoint_error": true
+    },
+    {
+      "quote": "WSOL",
+      "curve_quote": "default",
+      "settlement": "default",
+      "v2": false,
+      "error": false,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "WSOL",
+      "curve_quote": "default",
+      "settlement": "SOL",
+      "v2": false,
+      "error": false,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "WSOL",
+      "curve_quote": "default",
+      "settlement": "WSOL",
+      "v2": true,
+      "error": false,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "WSOL",
+      "curve_quote": "default",
+      "settlement": "USDC",
+      "v2": false,
+      "error": false,
+      "strict_endpoint_error": true
+    },
+    {
+      "quote": "USDC",
+      "curve_quote": "default",
+      "settlement": "default",
+      "v2": true,
+      "error": true,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "USDC",
+      "curve_quote": "default",
+      "settlement": "SOL",
+      "v2": true,
+      "error": true,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "USDC",
+      "curve_quote": "default",
+      "settlement": "WSOL",
+      "v2": true,
+      "error": true,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "USDC",
+      "curve_quote": "default",
+      "settlement": "USDC",
+      "v2": true,
+      "error": false,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "default",
+      "curve_quote": "USDC",
+      "settlement": "USDC",
+      "v2": true,
+      "error": false,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "default",
+      "curve_quote": "USDC",
+      "settlement": "SOL",
+      "v2": true,
+      "error": true,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "WSOL",
+      "curve_quote": "USDC",
+      "settlement": "SOL",
+      "v2": false,
+      "error": false,
+      "strict_endpoint_error": false
+    },
+    {
+      "quote": "USDC",
+      "curve_quote": "WSOL",
+      "settlement": "USDC",
+      "v2": true,
+      "error": false,
+      "strict_endpoint_error": false
+    }
+  ],
+  "native_endpoint_validation": "Intentional stricter check: native legacy layout rejects non-native requested endpoint, rather than silently consuming SOL"
+}

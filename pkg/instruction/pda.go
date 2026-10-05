@@ -2,6 +2,7 @@ package instruction
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
 	"github.com/gagliardetto/solana-go"
@@ -94,14 +95,11 @@ func GetAssociatedTokenAddress(owner, mint solana.PublicKey, tokenProgram solana
 }
 
 // GetPoolPDA derives the pool PDA for PumpSwap
-func GetPoolPDA(baseMint, quoteMint solana.PublicKey) solana.PublicKey {
-	seeds := [][]byte{
-		[]byte("pool"),
-		baseMint[:],
-		quoteMint[:],
-	}
-	pubkey, _, _ := solana.FindProgramAddress(seeds, constants.PUMPSWAP_PROGRAM_ID)
-	return pubkey
+func GetPoolPDA(baseMint, quoteMint solana.PublicKey, index uint16, creator solana.PublicKey) solana.PublicKey {
+	var bytes [2]byte
+	binary.LittleEndian.PutUint16(bytes[:], index)
+	key, _, _ := solana.FindProgramAddress([][]byte{[]byte("pool"), bytes[:], creator[:], baseMint[:], quoteMint[:]}, constants.PUMPSWAP_PROGRAM_ID)
+	return key
 }
 
 // CreateAssociatedTokenAccountInstruction creates an instruction to create an ATA

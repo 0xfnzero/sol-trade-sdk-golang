@@ -36,14 +36,13 @@ func (*NoCopy) Unlock() {}
 
 // Add adds offset to pointer
 func Add(p unsafe.Pointer, offset uintptr) unsafe.Pointer {
-	return unsafe.Pointer(uintptr(p) + offset)
+	return unsafe.Add(p, offset)
 }
 
 // Align aligns pointer to boundary
 func Align(p unsafe.Pointer, boundary uintptr) unsafe.Pointer {
-	addr := uintptr(p)
-	aligned := (addr + boundary - 1) &^ (boundary - 1)
-	return unsafe.Pointer(aligned)
+	offset := (-uintptr(p)) & (boundary - 1)
+	return unsafe.Add(p, offset)
 }
 
 // IsAligned checks if pointer is aligned

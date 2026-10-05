@@ -18,11 +18,16 @@ const (
 	DexTypeRaydiumCpmm
 	DexTypeRaydiumAmmV4
 	DexTypeMeteoraDammV2
+	DexTypeLaunchLab
+	DexTypeStonkFun
+	DexTypeRaydiumClmm
+	DexTypeOrcaWhirlpool
+	DexTypeMeteoraDlmm
 )
 
 // String returns the string representation of DexType
 func (d DexType) String() string {
-	return [...]string{"PumpFun", "PumpSwap", "Bonk", "RaydiumCpmm", "RaydiumAmmV4", "MeteoraDammV2"}[d]
+	return [...]string{"PumpFun", "PumpSwap", "Bonk", "RaydiumCpmm", "RaydiumAmmV4", "MeteoraDammV2", "LaunchLab", "StonkFun", "RaydiumClmm", "OrcaWhirlpool", "MeteoraDlmm"}[d]
 }
 
 // TradeTokenType represents the type of token to trade
@@ -101,8 +106,16 @@ const (
 	SwqosTypeSpeedlanding
 	SwqosTypeHelius
 	SwqosTypeSolami
+	SwqosTypeLunarLander
+	SwqosTypeGlaive
 	SwqosTypeDefault
 )
+
+// TradeRiskGate runs before buy instruction construction / submission.
+// Sell paths must not call this gate.
+type TradeRiskGate interface {
+	CheckBuy(params *TradeBuyParams) error
+}
 
 // SwqosConfig represents SWQOS service configuration
 type SwqosConfig struct {
@@ -116,7 +129,7 @@ type SwqosConfig struct {
 	SwqosOnly     *bool
 }
 
-// IsSwqosTypeBlacklisted matches Rust v4.0.21 SWQOS_BLACKLIST.
+// IsSwqosTypeBlacklisted matches Rust v5.0.2 SWQOS_BLACKLIST.
 func IsSwqosTypeBlacklisted(swqosType SwqosType) bool {
 	return swqosType == SwqosTypeNextBlock
 }
@@ -828,6 +841,7 @@ type TradingClient struct {
 	rpcClient   *rpc.Client
 	tradeConfig *TradeConfig
 	logEnabled  bool
+	riskGate    TradeRiskGate
 }
 
 // NewTradingClient creates a new TradingClient
@@ -861,10 +875,21 @@ func (c *TradingClient) GetPayer() solana.PublicKey {
 	return c.payer.PublicKey()
 }
 
+// WithRiskGate attaches a pre-buy risk gate (buy paths only).
+func (c *TradingClient) WithRiskGate(gate TradeRiskGate) *TradingClient {
+	c.riskGate = gate
+	return c
+}
+
 // Buy executes a buy order
 func (c *TradingClient) Buy(ctx context.Context, params TradeBuyParams) (*TradeResult, error) {
 	if err := validateTradeBoundary(params.InputTokenAmount, params.SlippageBasisPoints, params.FixedOutputTokenAmount); err != nil {
 		return nil, err
+	}
+	if c.riskGate != nil {
+		if err := c.riskGate.CheckBuy(&params); err != nil {
+			return nil, err
+		}
 	}
 	return c.executeTrade(ctx, TradeTypeBuy, params)
 }

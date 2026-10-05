@@ -242,6 +242,7 @@ func (b *RaydiumAmmV4InstructionBuilder) BuildBuyInstructions(bp *BuildParams) (
 	return RaydiumAmmV4BuildBuyInstructions(&RaydiumAmmV4BuildBuyParams{
 		Payer:               bp.Payer,
 		OutputMint:          bp.OutputMint,
+		InputMint:           bp.InputMint,
 		InputAmount:         bp.InputAmount,
 		SlippageBasisPoints: bp.SlippageBasisPoints,
 		ProtocolParams:      toRaydiumAmmV4Params(protocolParams),
@@ -326,6 +327,7 @@ func toPumpFunParams(p *params.PumpFunParams) *PumpFunParams {
 			Creator:              p.BondingCurve.Creator,
 			IsMayhemMode:         p.BondingCurve.IsMayhemMode,
 			IsCashbackCoin:       p.BondingCurve.IsCashbackCoin,
+			QuoteMint:            p.BondingCurve.QuoteMint,
 		}
 	}
 	return &PumpFunParams{
@@ -418,6 +420,8 @@ func toRaydiumAmmV4Params(p *params.RaydiumAmmV4Params) *RaydiumAmmV4Params {
 		PcMint:                p.PcMint,
 		CoinReserve:           p.CoinReserve,
 		PcReserve:             p.PcReserve,
+		SwapFeeNumerator:      p.SwapFeeNumerator,
+		SwapFeeDenominator:    p.SwapFeeDenominator,
 	}
 }
 

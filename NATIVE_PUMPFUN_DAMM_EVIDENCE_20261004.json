@@ -1,0 +1,102 @@
+{
+  "date": "2026-10-04",
+  "trade_commit": "dc9741b6074df21418f16b6175f497fbebecb723",
+  "parser_commit": "78a686a012ef3d685624d1b1bdba39766cb000bd",
+  "full_parity_complete": false,
+  "damm_cached_autoquote_complete": false,
+  "pumpfun_cached_factory_complete": false,
+  "damm_native_pool_state_complete": true,
+  "damm_full_borsh_fields_verified": true,
+  "broadcast": false,
+  "logs": {
+    "native-pumpfun-damm-final-node": {
+      "path": "/tmp/native-pumpfun-damm-final-node.log",
+      "sha256": "6190caadbfb320400aad4d5cfd3c1efc68595f5ed8de39ad3d932326a6918ca3"
+    },
+    "native-pumpfun-damm-final-node-types": {
+      "path": "/tmp/native-pumpfun-damm-final-node-types.log",
+      "sha256": "27f85f726c9845371f3f68810a150db307fb9865012df830082c6343a9562d4f"
+    },
+    "native-pumpfun-damm-final-node-build": {
+      "path": "/tmp/native-pumpfun-damm-final-node-build.log",
+      "sha256": "9d94e0e9486ec8c865e919f5c68b81559703c3e440b58763e0395fccedea43e1"
+    },
+    "native-pumpfun-damm-final-python": {
+      "path": "/tmp/native-pumpfun-damm-final-python.log",
+      "sha256": "aa402c189db37ae625c4efb43dabdfbed3bac09d02488d9370749672a85b0898"
+    },
+    "native-pumpfun-damm-final-go": {
+      "path": "/tmp/native-pumpfun-damm-final-go.log",
+      "sha256": "0ff476e5a3c395f5d24cd73e24baad91b427f3b8806ec64c053782b0a231664d"
+    },
+    "native-pumpfun-damm-final-go-vet": {
+      "path": "/tmp/native-pumpfun-damm-final-go-vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-pumpfun-damm-final-go-race": {
+      "path": "/tmp/native-pumpfun-damm-final-go-race.log",
+      "sha256": "a2783af5aac42f4fcfa5d1853da4fc0081a2b376a61832b83f6339183f707acf"
+    },
+    "native-damm-node-example-types": {
+      "path": "/tmp/native-damm-node-example-types.log",
+      "sha256": "98243071c5ac96b104f0a45dea85bd4219d1424d9eabf85db1840b20d23b1a1c"
+    },
+    "damm-v2-layout-oracle": {
+      "path": "/tmp/damm-v2-layout-oracle.log",
+      "sha256": "c78f55fdaac4d3f4bb53f05524894a63d9c5b69543199aec5e4e67fc17df1fac"
+    },
+    "native-damm-live-grpc": {
+      "path": "/tmp/native-damm-live-grpc.log",
+      "sha256": "37a8aeeec39e16880623f19667d6a873514ee6e5e55889a28ee4b25bfbdb7b85"
+    },
+    "native-damm-cold": {
+      "path": "/tmp/native-damm-cold.log",
+      "sha256": "ef954f3f07ad659eef36766ee5d0a156bdab5df718146f58a578fe6d2d630c05"
+    },
+    "native-damm-node-simulation": {
+      "path": "/tmp/native-damm-node-simulation.log",
+      "sha256": "b061caf31876029e96b690d9fde994bc786c7fa6d0b57cda3f27895013a49ebe"
+    },
+    "native-damm-go-simulation": {
+      "path": "/tmp/native-damm-go-simulation.log",
+      "sha256": "97f2c844fdd0815a361eebad580238fd5a0b1827d77139aa7167872b518ae192"
+    },
+    "native-damm-python-simulation": {
+      "path": "/tmp/native-damm-python-simulation.log",
+      "sha256": "71468e473f6a4bc8e7a09580b66ad24b08a7642b164bd6c2929534155f74c4e7"
+    },
+    "native-damm-python-simulation-before-referral-fix": {
+      "path": "/tmp/native-damm-python-simulation-before-referral-fix.log",
+      "sha256": "87050c725a33e412fc464103a62f77ff3cccd393bc560a58c5a357f36b971429"
+    },
+    "native-damm-parser-node-tests": {
+      "path": "/tmp/native-damm-parser-node-tests.log",
+      "sha256": "ef6d6684aa7853327405dee8da9fe1cda3a7bd3c42bec0061ea2bba68d0524a2"
+    },
+    "native-damm-parser-go-tests": {
+      "path": "/tmp/native-damm-parser-go-tests.log",
+      "sha256": "ed3ad4f9a932464fa54666ac5c6bf56580565aba3cb16da1088505d3ff9aa235"
+    },
+    "native-damm-parser-python-tests": {
+      "path": "/tmp/native-damm-parser-python-tests.log",
+      "sha256": "ec2f6b8cc9cb75fa4de6a18612635f0860dfcd1b69b4f4c35ca66d7ff4f5ca16"
+    }
+  },
+  "tests": {
+    "trade_node": 3001,
+    "trade_python": 3043,
+    "trade_go_full": true,
+    "trade_go_vet": true,
+    "trade_go_related_race": true,
+    "parser_node_passed": 203,
+    "parser_node_skipped": 8,
+    "parser_python": 189,
+    "parser_go_full": true
+  },
+  "wire_sha256": "1ecb3d7d397b18ac6e499f62352de4773009460150489c670dc9b17c8a2faf6e",
+  "wire_bytes": 683,
+  "successful_simulations": 3,
+  "failed_simulation_recorded": true,
+  "failed_simulation_error": "Custom 3005",
+  "parser_complete_fields_match": true
+}

@@ -1,0 +1,98 @@
+[
+  {
+    "amount": "1000000",
+    "coin_in": true,
+    "coin_reserve": "153051064940764",
+    "pc_reserve": "18680043528262",
+    "out": "121745",
+    "minimum": "120516"
+  },
+  {
+    "amount": "1000000",
+    "coin_in": true,
+    "coin_reserve": "153042452341180",
+    "pc_reserve": "18681098169366",
+    "out": "121759",
+    "minimum": "120516"
+  },
+  {
+    "amount": "1000000",
+    "coin_in": true,
+    "coin_reserve": "153042195417274",
+    "pc_reserve": "18681129760683",
+    "out": "121760",
+    "minimum": "120516"
+  },
+  {
+    "amount": "10000",
+    "coin_in": false,
+    "coin_reserve": "153051072297628",
+    "pc_reserve": "18680042632644",
+    "out": "81728",
+    "minimum": "80917"
+  },
+  {
+    "amount": "10000",
+    "coin_in": false,
+    "coin_reserve": "153042195335556",
+    "pc_reserve": "18681129770683",
+    "out": "81718",
+    "minimum": "80917"
+  },
+  {
+    "amount": "10000",
+    "coin_in": false,
+    "coin_reserve": "153042195335556",
+    "pc_reserve": "18681129770683",
+    "out": "81718",
+    "minimum": "80917"
+  },
+  {
+    "amount": "1000000",
+    "coin_in": true,
+    "coin_reserve": "153051942103468",
+    "pc_reserve": "18679936738091",
+    "out": "121744",
+    "minimum": "120516"
+  },
+  {
+    "amount": "1000000",
+    "coin_in": true,
+    "coin_reserve": "153044173357835",
+    "pc_reserve": "18680889004565",
+    "out": "121756",
+    "minimum": "120516"
+  },
+  {
+    "amount": "1000000",
+    "coin_in": true,
+    "coin_reserve": "153044173439555",
+    "pc_reserve": "18680888994565",
+    "out": "121756",
+    "minimum": "120516"
+  },
+  {
+    "amount": "3189",
+    "coin_in": false,
+    "coin_reserve": "153051942103468",
+    "pc_reserve": "18679936738091",
+    "out": "26063",
+    "minimum": "25804"
+  },
+  {
+    "amount": "3189",
+    "coin_in": false,
+    "coin_reserve": "153043993572473",
+    "pc_reserve": "18680911004565",
+    "out": "26060",
+    "minimum": "25804"
+  },
+  {
+    "amount": "3189",
+    "coin_in": false,
+    "coin_reserve": "153044173357835",
+    "pc_reserve": "18680889004565",
+    "out": "26060",
+    "minimum": "25804"
+  }
+]

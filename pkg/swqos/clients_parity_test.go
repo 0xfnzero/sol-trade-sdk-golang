@@ -46,6 +46,94 @@ func TestSwqosEndpointParityRustV4021(t *testing.T) {
 	if speedlandingEndpoints[SwqosRegionSingapore] != "sgp.speedlanding.trade:17778" {
 		t.Fatalf("unexpected Speedlanding Singapore endpoint: %s", speedlandingEndpoints[SwqosRegionSingapore])
 	}
+	if lunarLanderEndpoints[SwqosRegionFrankfurt] != "http://fra-1.prod.lunar-lander.hellomoon.io" {
+		t.Fatalf("unexpected LunarLander Frankfurt endpoint: %s", lunarLanderEndpoints[SwqosRegionFrankfurt])
+	}
+	if lunarLanderQuicEndpoints[SwqosRegionFrankfurt] != "fra-1.prod.lunar-lander.hellomoon.io:16888" {
+		t.Fatalf("unexpected LunarLander QUIC Frankfurt endpoint: %s", lunarLanderQuicEndpoints[SwqosRegionFrankfurt])
+	}
+	if glaiveEndpoints[SwqosRegionFrankfurt] != "http://fra.glaive.trade" {
+		t.Fatalf("unexpected Glaive Frankfurt endpoint: %s", glaiveEndpoints[SwqosRegionFrankfurt])
+	}
+	if glaiveQuicEndpoints[SwqosRegionFrankfurt] != "fra.glaive.trade:4000" {
+		t.Fatalf("unexpected Glaive QUIC Frankfurt endpoint: %s", glaiveQuicEndpoints[SwqosRegionFrankfurt])
+	}
+	if MinTipLunarLander != 0.001 {
+		t.Fatalf("unexpected LunarLander min tip: %f", MinTipLunarLander)
+	}
+	if MinTipGlaive != 0.0001 {
+		t.Fatalf("unexpected Glaive min tip: %f", MinTipGlaive)
+	}
+	if len(glaiveTipAccounts) != 6 {
+		t.Fatalf("expected 6 Glaive tip accounts, got %d", len(glaiveTipAccounts))
+	}
+}
+
+func TestGlaiveBinaryURLAndAuthFrame(t *testing.T) {
+	const testUUID = "00112233-4455-4677-8899-aabbccddeeff"
+	url, err := buildGlaiveBinaryURL("http://fra.glaive.trade", testUUID, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(url, "/binary") || !strings.Contains(url, "api-key="+testUUID) || !strings.Contains(url, "mev-protect=true") {
+		t.Fatalf("unexpected Glaive binary URL: %s", url)
+	}
+	frame, err := buildGlaiveAuthFrame(testUUID, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := [16]byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x46, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+	if [16]byte(frame[:16]) != want || frame[16] != 1 {
+		t.Fatalf("unexpected auth frame: %v", frame)
+	}
+}
+
+func TestLunarLanderAndGlaiveFactoryDefaultsToQuic(t *testing.T) {
+	factory := &ClientFactory{}
+	lunar, err := factory.CreateClient(soltradesdk.SwqosConfig{
+		Type:   SwqosTypeLunarLander,
+		Region: SwqosRegionFrankfurt,
+		APIKey: "test-key",
+	}, "https://rpc.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := lunar.(*LunarLanderQuicClient); !ok {
+		t.Fatalf("expected LunarLanderQuicClient, got %T", lunar)
+	}
+	glaive, err := factory.CreateClient(soltradesdk.SwqosConfig{
+		Type:   SwqosTypeGlaive,
+		Region: SwqosRegionFrankfurt,
+		APIKey: "00112233-4455-4677-8899-aabbccddeeff",
+	}, "https://rpc.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := glaive.(*GlaiveQuicClient); !ok {
+		t.Fatalf("expected GlaiveQuicClient, got %T", glaive)
+	}
+	httpTransport := soltradesdk.SwqosTransportHTTP
+	glaiveHTTP, err := factory.CreateClient(soltradesdk.SwqosConfig{
+		Type:      SwqosTypeGlaive,
+		Region:    SwqosRegionFrankfurt,
+		APIKey:    "00112233-4455-4677-8899-aabbccddeeff",
+		Transport: &httpTransport,
+	}, "https://rpc.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := glaiveHTTP.(*GlaiveClient); !ok {
+		t.Fatalf("expected GlaiveClient, got %T", glaiveHTTP)
+	}
+	grpcTransport := soltradesdk.SwqosTransportGRPC
+	if _, err := factory.CreateClient(soltradesdk.SwqosConfig{
+		Type:      SwqosTypeGlaive,
+		Region:    SwqosRegionFrankfurt,
+		APIKey:    "00112233-4455-4677-8899-aabbccddeeff",
+		Transport: &grpcTransport,
+	}, "https://rpc.example"); err == nil {
+		t.Fatal("expected Glaive gRPC to fail")
+	}
 }
 
 func TestDefaultExtendedSwqosConfigUsesRustMevDefault(t *testing.T) {

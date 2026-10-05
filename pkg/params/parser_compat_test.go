@@ -154,3 +154,20 @@ func TestNewPumpSwapParamsFromParserTradeUsesFeeBasisPoints(t *testing.T) {
 		t.Fatalf("fee bps = %+v", *p.FeeBasisPoints)
 	}
 }
+
+func TestPumpFunQuoteSwitchCarriesCurveContext(t *testing.T) {
+	p := NewPumpFunParams(&BondingCurveAccount{VirtualSolReserves: 30000000123, RealSolReserves: 123}, solana.PublicKey{}, solana.PublicKey{}, solana.PublicKey{})
+	p.WithQuoteMint(constants.USDC_TOKEN_ACCOUNT)
+	if p.BondingCurve.VirtualSolReserves != 4292000123 || !p.BondingCurve.QuoteMint.Equals(constants.USDC_TOKEN_ACCOUNT) {
+		t.Fatal("USDC curve not updated")
+	}
+	p.WithQuoteMint(constants.SOL_TOKEN_ACCOUNT)
+	if p.BondingCurve.VirtualSolReserves != 30000000123 || !p.BondingCurve.QuoteMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || !p.QuoteMint.IsZero() {
+		t.Fatal("native curve/layout context not updated")
+	}
+	p.BondingCurve.VirtualSolReserves = 45
+	p.WithQuoteMint(constants.USDC_TOKEN_ACCOUNT)
+	if p.BondingCurve.VirtualSolReserves != 45 {
+		t.Fatal("observed reserves replaced")
+	}
+}

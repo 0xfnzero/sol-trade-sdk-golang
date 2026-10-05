@@ -75,13 +75,17 @@ This SDK is available in multiple languages:
 
 ## 🔖 Current Release
 
-**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.5`
+**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.6`
 
 This release refreshes PumpFun V2 and USDC quote-pool handling, keeps the default RPC submit lane active alongside SWQoS lanes, and aligns Raydium CPMM fixed-output swaps with the on-chain `swap_base_out` instruction. Trade execution requires a caller-supplied recent blockhash or durable nonce; hot-path execution does not query RPC for blockhash, account, or balance data.
 
-## Rust v4.0.21 Parity
+## v0.1.6
 
-This SDK now tracks the Rust SDK `v4.0.21` public behavior for high-level trade intent APIs and SWQoS provider coverage. New code can use `BuySimple` / `SellSimple` with `AccountPolicy`, `BuyAmount`, and `SellAmount`; these convert to the existing `Buy` / `Sell` params without removing the legacy API. The root `TradingClient` still documents its execution boundary and does not claim to build or submit trades by itself. SWQoS coverage includes the Rust `Solami` type and defaults (`beam.solami.dev:11000`, min tip `0.0001 SOL`); live Solami submit uses the main QUIC client path and requires the same base58 Solana keypair api token model as Rust. Explicit SWQoS routes still keep the default RPC lane appended. NextBlock is still filtered by the Rust parity blacklist unless Rust changes that behavior. Legacy extended provider classes such as `Triton`, `QuickNode`, `Syndica`, `Figment`, and `Alchemy` are kept only for source compatibility and are not part of Rust `v4.0.21` trading provider parity.
+Adds cache-backed trade/route preparation, CLMM/Whirlpool/DLMM integer quotes, PumpFun native settlement and multihop support, StonkFun routes, V1 serialization, token mint validation and simulation examples. Includes native alignment evidence and regression fixtures. The new Rust CPMM creator-fee collection API is not yet included in this language release; do not assume full Rust 5.0.7 API parity.
+
+## Rust v5.0.2 Parity
+
+This SDK now tracks the Rust SDK `v5.0.2` public behavior for high-level trade intent APIs and SWQoS provider coverage. Also aligned: `TradeRiskGate` / `WithRiskGate` (buy paths only), Meteora DAMM v2 `swapMode` / rate-limiter sysvar / referral, and Bonk slippage clamp at 9999 bps. New code can use `BuySimple` / `SellSimple` with `AccountPolicy`, `BuyAmount`, and `SellAmount`; these convert to the existing `Buy` / `Sell` params without removing the legacy API. The root `TradingClient` still documents its execution boundary and does not claim to build or submit trades by itself. SWQoS coverage includes LunarLander, Glaive, and Solami alongside the existing provider set. Explicit SWQoS routes still keep the default RPC lane appended. NextBlock is still filtered by the Rust parity blacklist unless Rust changes that behavior. Legacy extended provider classes such as `Triton`, `QuickNode`, `Syndica`, `Figment`, and `Alchemy` are kept only for source compatibility and are not part of Rust `v5.0.2` trading provider parity.
 
 ## ✨ Features
 
@@ -91,7 +95,7 @@ This SDK now tracks the Rust SDK `v4.0.21` public behavior for high-level trade 
 4. **Raydium CPMM Builders**: Instruction builders and params for Raydium CPMM fixed-input and fixed-output swaps
 5. **Raydium AMM V4 Builders**: Instruction builders and params for Raydium AMM V4 swaps
 6. **Meteora DAMM V2 Builders**: Instruction builders and params for Meteora DAMM V2 operations
-7. **Multiple MEV Protection**: Support for the Rust v4.0.21 SWQoS set, including Jito, ZeroSlot, Temporal, Bloxroute, FlashBlock, BlockRazor, Node1, Astralane, Stellium, Lightspeed, Soyas, Speedlanding, Helius, Solami, and Default RPC
+7. **Multiple MEV Protection**: Support for the Rust v5.0.2 SWQoS set, including Jito, ZeroSlot, Temporal, Bloxroute, FlashBlock, BlockRazor, Node1, Astralane, Stellium, Lightspeed, Soyas, Speedlanding, Helius, Solami, LunarLander, Glaive, and Default RPC
 8. **Concurrent Trading**: Submit through every configured SWQoS provider plus the default RPC lane; the first accepted result can return early while slower routes continue submitting
 9. **Unified Trading Interface**: Use unified trading protocol types for trading operations, including Rust-parity `BuySimple` / `SellSimple` intent params
 10. **Middleware System**: Support for custom instruction middleware in lower-level instruction/executor paths
@@ -113,7 +117,7 @@ Add the dependency to your `go.mod`:
 
 ```go
 // Add to your go.mod
-require github.com/0xfnzero/sol-trade-sdk-golang v0.1.5
+require github.com/0xfnzero/sol-trade-sdk-golang v0.1.6
 
 replace github.com/0xfnzero/sol-trade-sdk-golang => ./sol-trade-sdk-golang
 ```
@@ -127,7 +131,7 @@ go mod tidy
 ### Use Go Modules
 
 ```bash
-go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.5
+go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.6
 ```
 
 ## 🛠️ Usage Examples
@@ -409,3 +413,16 @@ MIT License
 3. Pay attention to slippage settings to avoid transaction failures
 4. Monitor balances and transaction fees
 5. Comply with relevant laws and regulations
+
+## Native alignment status
+
+See [NATIVE_ALIGNMENT.md](NATIVE_ALIGNMENT.md) for implemented native APIs, Rust golden tests, mainnet simulation evidence, examples, and remaining parity gaps. Full cross-language parity is still in progress.
+
+
+实时 parser → trade 接入使用 Yellowstone **gRPC**；见 [gRPC 缓存接入与三语言示例](examples/GRPC_CACHE.md)。此路径不使用 WebSocket，报价和构建热路径不调用 RPC。
+
+
+[本轮原生对齐 API 迁移](NATIVE_MIGRATION.md)（实施中，尚未发布）。
+
+
+DAMM v2 单跳缓存准备与显式模拟见 [cached_damm_v2](examples/cached_damm_v2/main.go)，完整范围及真实成功/失败记录见 [验收记录](NATIVE_DAMM_FACTORY_ALIGNMENT_20261004.md)。当前要求调用方显式最低输出，预计到账未知；SOL 与已有 WSOL 使用不同账户结算。PumpFun 当前配置读取见 [配置缓存记录](NATIVE_PUMPFUN_CONFIG_ALIGNMENT_20261004.md)，尚不代表完整费用报价或 cached factory。

@@ -22,6 +22,7 @@ type BondingCurveAccount struct {
 	Creator              solana.PublicKey
 	IsMayhemMode         bool
 	IsCashbackCoin       bool
+	QuoteMint            solana.PublicKey
 }
 
 // PumpFunParams represents PumpFun protocol specific parameters
@@ -74,6 +75,29 @@ func (p *PumpFunParams) WithCreatorVault(vault solana.PublicKey) *PumpFunParams 
 // WithQuoteMint sets the PumpFun quote mint. Zero and SOL_TOKEN_ACCOUNT keep legacy SOL layout.
 func (p *PumpFunParams) WithQuoteMint(quoteMint solana.PublicKey) *PumpFunParams {
 	p.QuoteMint = pumpFunQuoteMintForLayout(quoteMint)
+	if p.BondingCurve != nil {
+		normalized := p.QuoteMint
+		if normalized.IsZero() {
+			normalized = constants.WSOL_TOKEN_ACCOUNT
+		}
+		oldInitial, newInitial := uint64(30000000000), uint64(30000000000)
+		if p.BondingCurve.QuoteMint.Equals(constants.USDC_TOKEN_ACCOUNT) {
+			oldInitial = 4292000000
+		}
+		if normalized.Equals(constants.USDC_TOKEN_ACCOUNT) {
+			newInitial = 4292000000
+		}
+		saturatingAdd := func(a, b uint64) uint64 {
+			if b > ^uint64(0)-a {
+				return ^uint64(0)
+			}
+			return a + b
+		}
+		if p.BondingCurve.VirtualSolReserves == saturatingAdd(oldInitial, p.BondingCurve.RealSolReserves) {
+			p.BondingCurve.VirtualSolReserves = saturatingAdd(newInitial, p.BondingCurve.RealSolReserves)
+		}
+		p.BondingCurve.QuoteMint = normalized
+	}
 	return p
 }
 
@@ -95,6 +119,14 @@ func NewPumpFunParamsFromTrade(
 	isCashbackCoin bool,
 	mayhemMode bool,
 ) *PumpFunParams {
+	mayhemMode = constants.ReconcileMayhemModeForTrade(&mayhemMode, feeRecipient)
+	if bondingCurve.IsZero() && !mint.IsZero() {
+		bondingCurve, _, _ = solana.FindProgramAddress([][]byte{[]byte("bonding-curve"), mint[:]}, constants.PUMPFUN_PROGRAM_ID)
+	}
+	normalized := quoteMint
+	if normalized.IsZero() || normalized.Equals(constants.SOL_TOKEN_ACCOUNT) {
+		normalized = constants.WSOL_TOKEN_ACCOUNT
+	}
 	return &PumpFunParams{
 		BondingCurve: &BondingCurveAccount{
 			Account:              bondingCurve,
@@ -105,6 +137,8 @@ func NewPumpFunParamsFromTrade(
 			Creator:              creator,
 			IsMayhemMode:         mayhemMode,
 			IsCashbackCoin:       isCashbackCoin,
+			QuoteMint:            normalized,
+			TokenTotalSupply:     1000000000000000,
 		},
 		AssociatedBondingCurve:    associatedBondingCurve,
 		CreatorVault:              creatorVault,
@@ -445,23 +479,24 @@ func NewRaydiumCpmmParams(
 
 // RaydiumAmmV4Params represents Raydium AMM V4 protocol specific parameters
 type RaydiumAmmV4Params struct {
-	Amm                   solana.PublicKey
-	AmmOpenOrders         solana.PublicKey
-	AmmTargetOrders       solana.PublicKey
-	TokenCoin             solana.PublicKey
-	TokenPc               solana.PublicKey
-	SerumProgram          solana.PublicKey
-	SerumMarket           solana.PublicKey
-	SerumBids             solana.PublicKey
-	SerumAsks             solana.PublicKey
-	SerumEventQueue       solana.PublicKey
-	SerumCoinVaultAccount solana.PublicKey
-	SerumPcVaultAccount   solana.PublicKey
-	SerumVaultSigner      solana.PublicKey
-	CoinMint              solana.PublicKey
-	PcMint                solana.PublicKey
-	CoinReserve           uint64
-	PcReserve             uint64
+	Amm                                  solana.PublicKey
+	AmmOpenOrders                        solana.PublicKey
+	AmmTargetOrders                      solana.PublicKey
+	TokenCoin                            solana.PublicKey
+	TokenPc                              solana.PublicKey
+	SerumProgram                         solana.PublicKey
+	SerumMarket                          solana.PublicKey
+	SerumBids                            solana.PublicKey
+	SerumAsks                            solana.PublicKey
+	SerumEventQueue                      solana.PublicKey
+	SerumCoinVaultAccount                solana.PublicKey
+	SerumPcVaultAccount                  solana.PublicKey
+	SerumVaultSigner                     solana.PublicKey
+	CoinMint                             solana.PublicKey
+	PcMint                               solana.PublicKey
+	CoinReserve                          uint64
+	PcReserve                            uint64
+	SwapFeeNumerator, SwapFeeDenominator *uint64
 }
 
 // NewRaydiumAmmV4Params creates new Raydium AMM V4 params

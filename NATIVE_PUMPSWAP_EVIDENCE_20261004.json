@@ -1,0 +1,157 @@
+{
+  "baseline_trade_commit": "dc9741b6074df21418f16b6175f497fbebecb723",
+  "date": "2026-10-04",
+  "full_parity_complete": false,
+  "pump_swap_cached_exact_in_preparation": {
+    "non_cashback_zero_transfer_fee": true,
+    "cashback": false,
+    "nonzero_transfer_fee": false,
+    "mayhem_mainnet_simulation": false
+  },
+  "new_mainnet_simulation_performed": true,
+  "broadcast_performed": false,
+  "hot_path_rpc_calls": 0,
+  "hot_path_rpc_evidence": "Node fetch and Python requests blocked in full-wire replay; Go factory initialized with nil RPC",
+  "rust_oracle_inputs": 18,
+  "rust_oracle_results": 72,
+  "tests": {
+    "trade_node_passed": 2943,
+    "trade_python_passed": 2983,
+    "trade_go_full_test": true,
+    "trade_go_vet": true,
+    "trade_go_related_race": true,
+    "parser_node_passed": 201,
+    "parser_node_skipped": 8,
+    "parser_python_passed": 187,
+    "parser_go_full_test": true
+  },
+  "parser_full_fields_match": true,
+  "parser_integer_comparison": "Exact decimal string normalization; no numeric rounding",
+  "grpc_refresh": {
+    "pool": "ExeEkqqAa6PoN5aMLW9mYAsVaqYMHtzva74eDc1CfBkZ",
+    "slot": "452990569",
+    "source": "Yellowstone actual pool update; static state remains explicit cold observation",
+    "automatic_fork_recovery_verified": false
+  },
+  "logs": {
+    "final-node-tests": {
+      "path": "/tmp/native-pumpswap-final-node-tests.log",
+      "sha256": "fe643b14dd51a13e9354fb6c9076c9782a633307f1a5ff87df8cb8e6f7a31fe2"
+    },
+    "final-node-type": {
+      "path": "/tmp/native-pumpswap-final-node-type.log",
+      "sha256": "27f85f726c9845371f3f68810a150db307fb9865012df830082c6343a9562d4f"
+    },
+    "final-node-build": {
+      "path": "/tmp/native-pumpswap-final-node-build.log",
+      "sha256": "adc9fbeb796de1eea35a7883c5f90bdfb06b9c0b479758796e65d5b18478790f"
+    },
+    "final-python-tests": {
+      "path": "/tmp/native-pumpswap-final-python-tests.log",
+      "sha256": "636c93773615788036c5725ab59ad21ba6f15c2a9403f82ae22cec709ccdd1b2"
+    },
+    "final-go-tests": {
+      "path": "/tmp/native-pumpswap-final-go-tests.log",
+      "sha256": "3097c9f3dec4fd9b30fd8361c4a35493ef8db712c19541c5a17e92a1dc002462"
+    },
+    "final-go-vet": {
+      "path": "/tmp/native-pumpswap-final-go-vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "final-go-race": {
+      "path": "/tmp/native-pumpswap-final-go-race.log",
+      "sha256": "fd1beb80ed93f217311ca9c69385ff509de513f3a2b94e21bb2b330c846b0217"
+    },
+    "final-go-trading-race": {
+      "path": "/tmp/native-pumpswap-final-go-trading-race.log",
+      "sha256": "8efc6a3734acb8f8ad11c2385441c51bc4f5ee89098d274f7559b8d9bcd6506c"
+    },
+    "parser-node-full": {
+      "path": "/tmp/native-pumpswap-parser-node-full.log",
+      "sha256": "3617cf03d51c8cc02a9726e4f4065428cb823370a7532124ac4d35360fa8a057"
+    },
+    "parser-python-full": {
+      "path": "/tmp/native-pumpswap-parser-python-full.log",
+      "sha256": "4c28d53f2e30cdcc69ab8f53594fb77c33402ae2c621780ce127fb409cc63776"
+    },
+    "parser-go-full": {
+      "path": "/tmp/native-pumpswap-parser-go-full.log",
+      "sha256": "3d688fc784db4a12607da214d4a6057ad72e01acb2f1acf8fecd12d8729f237f"
+    },
+    "active-grpc-refresh": {
+      "path": "/tmp/native-pumpswap-active-grpc-refresh.log",
+      "sha256": "8f665a1397ded238cf197f35deb6733bc352106b8997b22de7ed89baa80d16c6"
+    },
+    "recent-holder": {
+      "path": "/tmp/native-pumpswap-recent-holder.log",
+      "sha256": "7537eb4e86ae9b5c52ea1dc0ea2e14c08e692a8e994157bffc37be62f33a5d80"
+    },
+    "parser-node": {
+      "path": "/tmp/native-pumpswap-parser-node.log",
+      "sha256": "89e3af80b639eed4ea42264ca12025c8997920325d93a5945a4d05061d2896de"
+    },
+    "parser-go": {
+      "path": "/tmp/native-pumpswap-parser-go.log",
+      "sha256": "53b76b2da32fc242816487021447a4d065a0f8e2cc12f34cdf0fa23c60913ac5"
+    },
+    "parser-python": {
+      "path": "/tmp/native-pumpswap-parser-python.log",
+      "sha256": "4dda85e2098f1ac077e835016e4b026cd21b395ad0da1d4528ed7b258a8885b0"
+    }
+  },
+  "simulations": [
+    {
+      "name": "pumpswap_buy",
+      "validations": [
+        {
+          "language": "node",
+          "slot": "452992833",
+          "units": 98296
+        },
+        {
+          "language": "go",
+          "slot": "452992835",
+          "units": 98296
+        },
+        {
+          "language": "python",
+          "slot": "452991476",
+          "units": 98296
+        }
+      ],
+      "wire_sha256": "7cf1c2af38ae59dcb9a1bc0131efaf27a40db9f3817e23ad4590681e787bf80a",
+      "wire_bytes": 1177,
+      "parser_input": "10000",
+      "parser_output": null
+    },
+    {
+      "name": "pumpswap_sell",
+      "validations": [
+        {
+          "language": "node",
+          "slot": "452993201",
+          "units": 77997
+        },
+        {
+          "language": "go",
+          "slot": "452993199",
+          "units": 77997
+        },
+        {
+          "language": "python",
+          "slot": "452993167",
+          "units": 77996
+        }
+      ],
+      "wire_sha256": "4b2764e4445ff59e9b4dbd2706e787fb252956df3b86dd2c970e911a1e91f6b2",
+      "wire_bytes": 1111,
+      "parser_input": "100000000",
+      "parser_output": "6096773"
+    }
+  ],
+  "fixtures": {
+    "pumpswap_sell_mainnet_20261004.json": "2b2a72e74685a6add4ef91b86cabf10c92261d914ce59a11ee2a32abc025d57f",
+    "pumpswap_buy_mainnet_20261004.json": "3d305d48c8c990acdec6f5b1f10a22e2858418db154d91f178a2af1ea8941e24",
+    "pumpswap_mainnet_simulations_20261004.json": "c7bdc8f75557e2dace12dffde13b3b7d1c87d763aeec600324286c111dadddf4"
+  }
+}

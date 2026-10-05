@@ -1,0 +1,65 @@
+[
+  {
+    "name": "cached-whirlpool-python-buy",
+    "pre_sqrt_price": "6428441955379957169",
+    "amount_in": "10000",
+    "down": false,
+    "actual_output": "82096"
+  },
+  {
+    "name": "cached-sol-route-python-buy",
+    "pre_sqrt_price": "6436343572681874789",
+    "amount_in": "1000000",
+    "down": true,
+    "actual_output": "121376"
+  },
+  {
+    "name": "cached-sol-route-python-sell",
+    "pre_sqrt_price": "6436343572681874789",
+    "amount_in": "3159",
+    "down": false,
+    "actual_output": "25866"
+  },
+  {
+    "name": "cached-whirlpool-node-buy",
+    "pre_sqrt_price": "6429738018439838110",
+    "amount_in": "10000",
+    "down": false,
+    "actual_output": "82063"
+  },
+  {
+    "name": "cached-sol-route-node-buy",
+    "pre_sqrt_price": "6436343572681874789",
+    "amount_in": "1000000",
+    "down": true,
+    "actual_output": "121376"
+  },
+  {
+    "name": "cached-sol-route-node-sell",
+    "pre_sqrt_price": "6436343572681874789",
+    "amount_in": "3159",
+    "down": false,
+    "actual_output": "25866"
+  },
+  {
+    "name": "cached-whirlpool-go-buy",
+    "pre_sqrt_price": "6429738018439838110",
+    "amount_in": "10000",
+    "down": false,
+    "actual_output": "82063"
+  },
+  {
+    "name": "cached-sol-route-go-buy",
+    "pre_sqrt_price": "6436343572681874789",
+    "amount_in": "1000000",
+    "down": true,
+    "actual_output": "121376"
+  },
+  {
+    "name": "cached-sol-route-go-sell",
+    "pre_sqrt_price": "6436343572681874789",
+    "amount_in": "3159",
+    "down": false,
+    "actual_output": "25866"
+  }
+]

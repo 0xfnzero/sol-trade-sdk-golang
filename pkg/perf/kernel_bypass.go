@@ -364,15 +364,10 @@ func (f *DirectIOFile) readDirect(size int, offset int64) ([]byte, error) {
 	offsetDiff := offset - alignedOffset
 	alignedSize := ((int64(size) + offsetDiff + align - 1) / align) * align
 
-	// Allocate aligned buffer
-	buf := make([]byte, alignedSize)
-	// Ensure 512-byte alignment
-	if int(uintptr(unsafe.Pointer(&buf[0])))%512 != 0 {
-		// Re-allocate aligned buffer
-		buf = make([]byte, alignedSize+512)
-		alignedPtr := (uintptr(unsafe.Pointer(&buf[0])) + 511) &^ 511
-		buf = (*[1 << 30]byte)(unsafe.Pointer(alignedPtr))[:alignedSize]
-	}
+	// Keep alignment as an offset into the backing slice so the GC retains it.
+	backing := make([]byte, alignedSize+511)
+	shift := int((-uintptr(unsafe.Pointer(&backing[0]))) & 511)
+	buf := backing[shift : shift+int(alignedSize)]
 
 	n, err := syscall.Pread(f.fd, buf, alignedOffset)
 	if err != nil {

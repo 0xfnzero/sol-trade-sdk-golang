@@ -168,23 +168,20 @@ func BonkBuildBuyInstructions(params *BonkBuildBuyParams) ([]solana.Instruction,
 		quoteTokenMint = constants.USD1_TOKEN_ACCOUNT
 	}
 
-	// Calculate minimum amount out
+	// Calculate minimum amount out (buy: SOL -> token)
 	amountIn := params.InputAmount
 	shareFeeRate := uint64(0)
 	var minimumAmountOut uint64
 	if params.FixedOutputAmount != nil {
 		minimumAmountOut = *params.FixedOutputAmount
 	} else {
-		minimumAmountOut = calc.GetBonkAmountOut(
+		minimumAmountOut = calc.GetBonkBuyTokenAmountFromSolAmount(
 			amountIn,
-			BonkProtocolFeeRate,
-			BonkPlatformFeeRate,
-			shareFeeRate,
 			pp.VirtualBase,
 			pp.VirtualQuote,
 			pp.RealBase,
 			pp.RealQuote,
-			int(params.SlippageBasisPoints),
+			params.SlippageBasisPoints,
 		)
 	}
 
@@ -290,22 +287,19 @@ func BonkBuildSellInstructions(params *BonkBuildSellParams) ([]solana.Instructio
 		quoteTokenMint = constants.USD1_TOKEN_ACCOUNT
 	}
 
-	// Calculate minimum amount out
+	// Calculate minimum amount out (sell: token -> SOL)
 	shareFeeRate := uint64(0)
 	var minimumAmountOut uint64
 	if params.FixedOutputAmount != nil {
 		minimumAmountOut = *params.FixedOutputAmount
 	} else {
-		minimumAmountOut = calc.GetBonkAmountOut(
+		minimumAmountOut = calc.GetBonkSellSolAmountFromTokenAmount(
 			params.InputAmount,
-			BonkProtocolFeeRate,
-			BonkPlatformFeeRate,
-			shareFeeRate,
 			pp.VirtualBase,
 			pp.VirtualQuote,
 			pp.RealBase,
 			pp.RealQuote,
-			int(params.SlippageBasisPoints),
+			params.SlippageBasisPoints,
 		)
 	}
 

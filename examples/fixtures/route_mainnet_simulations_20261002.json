@@ -1,0 +1,458 @@
+[
+  {
+    "language": "python",
+    "direction": "buy",
+    "quote": {
+      "minimum_amount_out": "2902282840",
+      "legs": [
+        {
+          "amount_in": "10000",
+          "amount_out": "4302",
+          "minimum_amount_out": "4258"
+        },
+        {
+          "amount_in": "4258",
+          "amount_out": "2931598828",
+          "minimum_amount_out": "2902282840"
+        }
+      ],
+      "intermediate_residuals": [
+        {
+          "mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+          "amount": "44"
+        }
+      ],
+      "wire_bytes": 1188
+    },
+    "actual_output": "2931598828",
+    "slot": 452532710,
+    "err": null,
+    "units": 126462,
+    "logs": [
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 7338 of 300000 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 4357 of 292662 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 7357 of 288305 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK invoke [1]",
+      "Program log: Instruction: SwapV2",
+      "Program data: QMbN6CYIceIuznemrnHZrqRVXwHYNbN/IZfJCJg0M3T1DkSwBEkM8Q0DuOgs33RhhCA9/pycC5m5X4G51AR1jhwkS5CdeF3IH7rEN/ga4DRrYL49d9hrXrK/ubj+mHCOEZRwVfYPm7IBVpyvJF78L3c1YBgbwe5d0jBOxD5G1CRQJjBe1/m4Hc4QAAAAAAAAAAAAAAAAAAAQJwAAAAAAAAAAAAAAAAAAAKnVSMd5YxeGAQAAAAAAAAAY3Rw8K2MAAAAAAAAAAAAA6CAAAAAAAAAAAAAACgAAAAAAAAA=",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 243400 compute units",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3710 of 240978 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK consumed 45866 of 280948 compute units",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK success",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj invoke [1]",
+      "Program log: Instruction: BuyExactIn",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj invoke [2]",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj consumed 626 of 206385 compute units",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj success",
+      "Program data: vdt/007mYe6f9UC3E0A9oh5RDstF2aA9pRWgLqu0eKR6V+UkO1AWxwB4xftR0QIAPJ0OPunPAwCckIlaAAAAAICHLZNoAQAA+X8hAAAAAAC6Ba5DaQEAAGWQIQAAAAAAohAAAAAAAAA6foCwAAAAAAsAAAAAAAAAKwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3710 of 202433 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3432 of 196664 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3602 of 179821 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj consumed 61544 of 235082 compute units",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj success"
+    ]
+  },
+  {
+    "language": "node",
+    "direction": "buy",
+    "quote": {
+      "minimum_amount_out": "2902282840",
+      "legs": [
+        {
+          "amount_in": "10000",
+          "amount_out": "4302",
+          "minimum_amount_out": "4258"
+        },
+        {
+          "amount_in": "4258",
+          "amount_out": "2931598828",
+          "minimum_amount_out": "2902282840"
+        }
+      ],
+      "intermediate_residuals": [
+        {
+          "mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+          "amount": "44"
+        }
+      ],
+      "wire_bytes": 1188
+    },
+    "actual_output": "2931598828",
+    "slot": 452532910,
+    "err": null,
+    "units": 126463,
+    "logs": [
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 7338 of 300000 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 4357 of 292662 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 7357 of 288305 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK invoke [1]",
+      "Program log: Instruction: SwapV2",
+      "Program data: QMbN6CYIceIuznemrnHZrqRVXwHYNbN/IZfJCJg0M3T1DkSwBEkM8Q0DuOgs33RhhCA9/pycC5m5X4G51AR1jhwkS5CdeF3IH7rEN/ga4DRrYL49d9hrXrK/ubj+mHCOEZRwVfYPm7IBVpyvJF78L3c1YBgbwe5d0jBOxD5G1CRQJjBe1/m4Hc4QAAAAAAAAAAAAAAAAAAAQJwAAAAAAAAAAAAAAAAAAACkPaQUNUxeGAQAAAAAAAAAY3Rw8K2MAAAAAAAAAAAAA6CAAAAAAAAAAAAAACgAAAAAAAAA=",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 243399 compute units",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3710 of 240977 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK consumed 45867 of 280948 compute units",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK success",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj invoke [1]",
+      "Program log: Instruction: BuyExactIn",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj invoke [2]",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj consumed 626 of 206384 compute units",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj success",
+      "Program data: vdt/007mYe6f9UC3E0A9oh5RDstF2aA9pRWgLqu0eKR6V+UkO1AWxwB4xftR0QIAPJ0OPunPAwCckIlaAAAAAICHLZNoAQAA+X8hAAAAAAC6Ba5DaQEAAGWQIQAAAAAAohAAAAAAAAA6foCwAAAAAAsAAAAAAAAAKwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3710 of 202432 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3432 of 196663 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3602 of 179820 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj consumed 61544 of 235081 compute units",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj success"
+    ]
+  },
+  {
+    "language": "go",
+    "direction": "buy",
+    "quote": {
+      "intermediate_residuals": [
+        {
+          "amount": "44",
+          "mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+        }
+      ],
+      "legs": [
+        {
+          "amount_in": "10000",
+          "amount_out": "4302",
+          "minimum_amount_out": "4258"
+        },
+        {
+          "amount_in": "4258",
+          "amount_out": "2931598828",
+          "minimum_amount_out": "2902282840"
+        }
+      ],
+      "minimum_amount_out": "2902282840",
+      "wire_bytes": 1188
+    },
+    "actual_output": "2931598828",
+    "slot": 452532899,
+    "err": null,
+    "units": 126463,
+    "logs": [
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 7338 of 300000 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 4357 of 292662 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 7357 of 288305 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK invoke [1]",
+      "Program log: Instruction: SwapV2",
+      "Program data: QMbN6CYIceIuznemrnHZrqRVXwHYNbN/IZfJCJg0M3T1DkSwBEkM8Q0DuOgs33RhhCA9/pycC5m5X4G51AR1jhwkS5CdeF3IH7rEN/ga4DRrYL49d9hrXrK/ubj+mHCOEZRwVfYPm7IBVpyvJF78L3c1YBgbwe5d0jBOxD5G1CRQJjBe1/m4Hc4QAAAAAAAAAAAAAAAAAAAQJwAAAAAAAAAAAAAAAAAAACkPaQUNUxeGAQAAAAAAAAAY3Rw8K2MAAAAAAAAAAAAA6CAAAAAAAAAAAAAACgAAAAAAAAA=",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 243399 compute units",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3710 of 240977 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK consumed 45867 of 280948 compute units",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK success",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj invoke [1]",
+      "Program log: Instruction: BuyExactIn",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj invoke [2]",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj consumed 626 of 206384 compute units",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj success",
+      "Program data: vdt/007mYe6f9UC3E0A9oh5RDstF2aA9pRWgLqu0eKR6V+UkO1AWxwB4xftR0QIAPJ0OPunPAwCckIlaAAAAAICHLZNoAQAA+X8hAAAAAAC6Ba5DaQEAAGWQIQAAAAAAohAAAAAAAAA6foCwAAAAAAsAAAAAAAAAKwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3710 of 202432 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3432 of 196663 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3602 of 179820 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj consumed 61544 of 235081 compute units",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj success"
+    ]
+  },
+  {
+    "language": "python",
+    "direction": "sell",
+    "quote": {
+      "minimum_amount_out": "3153",
+      "legs": [
+        {
+          "amount_in": "1000000000",
+          "amount_out": "1387",
+          "minimum_amount_out": "1374"
+        },
+        {
+          "amount_in": "1374",
+          "amount_out": "3185",
+          "minimum_amount_out": "3153"
+        }
+      ],
+      "intermediate_residuals": [
+        {
+          "mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+          "amount": "13"
+        }
+      ],
+      "wire_bytes": 1188
+    },
+    "actual_output": "3185",
+    "slot": 452532864,
+    "err": null,
+    "units": 129970,
+    "logs": [
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 7357 of 300000 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 4357 of 292643 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 7338 of 288286 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj invoke [1]",
+      "Program log: Instruction: SellExactIn",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj invoke [2]",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj consumed 626 of 252363 compute units",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj success",
+      "Program data: vdt/007mYe6f9UC3E0A9oh5RDstF2aA9pRWgLqu0eKR6V+UkO1AWxwB4xftR0QIAPJ0OPunPAwCckIlaAAAAAICHLZNoAQAA+X8hAAAAAAAAVCtYaAEAAHx6IQAAAAAAgDMCOwAAAABrBQAAAAAAAAQAAAAAAAAADgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAB",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3378 of 248498 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3710 of 243062 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3602 of 225941 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj consumed 61290 of 280948 compute units",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj success",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK invoke [1]",
+      "Program log: Instruction: SwapV2",
+      "Program data: QMbN6CYIceIuznemrnHZrqRVXwHYNbN/IZfJCJg0M3T1DkSwBEkM8Q0DuOgs33RhhCA9/pycC5m5X4G51AR1jhwkS5CdeF3IH7rEN/ga4DRrYL49d9hrXrK/ubj+mHCOEZRwVfYPm7IBVpyvJF78L3c1YBgbwe5d0jBOxD5G1CRQJjBe1/m4HV4FAAAAAAAAAAAAAAAAAABxDAAAAAAAAAAAAAAAAAAAAceWhO8pRheGAQAAAAAAAAAY3Rw8K2MAAAAAAAAAAAAA6CAAAAIAAAAAAAAAAAAAAAAAAAA=",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3710 of 178298 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 172321 compute units",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK consumed 49628 of 219658 compute units",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK success"
+    ]
+  },
+  {
+    "language": "node",
+    "direction": "sell",
+    "quote": {
+      "minimum_amount_out": "3153",
+      "legs": [
+        {
+          "amount_in": "1000000000",
+          "amount_out": "1387",
+          "minimum_amount_out": "1374"
+        },
+        {
+          "amount_in": "1374",
+          "amount_out": "3185",
+          "minimum_amount_out": "3153"
+        }
+      ],
+      "intermediate_residuals": [
+        {
+          "mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+          "amount": "13"
+        }
+      ],
+      "wire_bytes": 1188
+    },
+    "actual_output": "3185",
+    "slot": 452533045,
+    "err": null,
+    "units": 129974,
+    "logs": [
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 7357 of 300000 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 4357 of 292643 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 7338 of 288286 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj invoke [1]",
+      "Program log: Instruction: SellExactIn",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj invoke [2]",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj consumed 626 of 252363 compute units",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj success",
+      "Program data: vdt/007mYe6f9UC3E0A9oh5RDstF2aA9pRWgLqu0eKR6V+UkO1AWxwB4xftR0QIAPJ0OPunPAwCckIlaAAAAAICHLZNoAQAA+X8hAAAAAAAAVCtYaAEAAHx6IQAAAAAAgDMCOwAAAABrBQAAAAAAAAQAAAAAAAAADgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAB",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3378 of 248498 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3710 of 243062 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3602 of 225941 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj consumed 61290 of 280948 compute units",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj success",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK invoke [1]",
+      "Program log: Instruction: SwapV2",
+      "Program data: QMbN6CYIceIuznemrnHZrqRVXwHYNbN/IZfJCJg0M3T1DkSwBEkM8Q0DuOgs33RhhCA9/pycC5m5X4G51AR1jhwkS5CdeF3IH7rEN/ga4DRrYL49d9hrXrK/ubj+mHCOEZRwVfYPm7IBVpyvJF78L3c1YBgbwe5d0jBOxD5G1CRQJjBe1/m4HV4FAAAAAAAAAAAAAAAAAABxDAAAAAAAAAAAAAAAAAAAAYN9R28aVheGAQAAAAAAAAAY3Rw8K2MAAAAAAAAAAAAA6CAAAAIAAAAAAAAAAAAAAAAAAAA=",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3710 of 178294 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 172317 compute units",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK consumed 49632 of 219658 compute units",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK success"
+    ]
+  },
+  {
+    "language": "go",
+    "direction": "sell",
+    "quote": {
+      "intermediate_residuals": [
+        {
+          "amount": "13",
+          "mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+        }
+      ],
+      "legs": [
+        {
+          "amount_in": "1000000000",
+          "amount_out": "1387",
+          "minimum_amount_out": "1374"
+        },
+        {
+          "amount_in": "1374",
+          "amount_out": "3185",
+          "minimum_amount_out": "3153"
+        }
+      ],
+      "minimum_amount_out": "3153",
+      "wire_bytes": 1188
+    },
+    "actual_output": "3185",
+    "slot": 452533043,
+    "err": null,
+    "units": 129974,
+    "logs": [
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 7357 of 300000 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 4357 of 292643 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL invoke [1]",
+      "Program log: CreateIdempotent",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL consumed 7338 of 288286 compute units",
+      "Program ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL success",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj invoke [1]",
+      "Program log: Instruction: SellExactIn",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj invoke [2]",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj consumed 626 of 252363 compute units",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj success",
+      "Program data: vdt/007mYe6f9UC3E0A9oh5RDstF2aA9pRWgLqu0eKR6V+UkO1AWxwB4xftR0QIAPJ0OPunPAwCckIlaAAAAAICHLZNoAQAA+X8hAAAAAAAAVCtYaAEAAHx6IQAAAAAAgDMCOwAAAABrBQAAAAAAAAQAAAAAAAAADgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAB",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3378 of 248498 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3710 of 243062 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3602 of 225941 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj consumed 61290 of 280948 compute units",
+      "Program LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj success",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK invoke [1]",
+      "Program log: Instruction: SwapV2",
+      "Program data: QMbN6CYIceIuznemrnHZrqRVXwHYNbN/IZfJCJg0M3T1DkSwBEkM8Q0DuOgs33RhhCA9/pycC5m5X4G51AR1jhwkS5CdeF3IH7rEN/ga4DRrYL49d9hrXrK/ubj+mHCOEZRwVfYPm7IBVpyvJF78L3c1YBgbwe5d0jBOxD5G1CRQJjBe1/m4HV4FAAAAAAAAAAAAAAAAAABxDAAAAAAAAAAAAAAAAAAAAYN9R28aVheGAQAAAAAAAAAY3Rw8K2MAAAAAAAAAAAAA6CAAAAIAAAAAAAAAAAAAAAAAAAA=",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]",
+      "Program log: Instruction: TransferChecked",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3710 of 178294 compute units",
+      "Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 172317 compute units",
+      "Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK consumed 49632 of 219658 compute units",
+      "Program CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK success"
+    ]
+  }
+]

@@ -163,6 +163,7 @@ func GetCreator(creatorVaultPDA solana.PublicKey) solana.PublicKey {
 
 // BondingCurve represents the bonding curve data
 type BondingCurve struct {
+	QuoteMint            solana.PublicKey
 	Account              solana.PublicKey
 	VirtualTokenReserves uint64
 	VirtualSolReserves   uint64
@@ -265,14 +266,18 @@ func pumpFunEffectiveMintTokenProgram(mint solana.PublicKey, pp *PumpFunParams) 
 }
 
 func pumpFunEffectiveQuoteMint(pp *PumpFunParams) solana.PublicKey {
-	if pumpFunUsablePubkey(pp.QuoteMint) && !pp.QuoteMint.Equals(constants.SOL_TOKEN_ACCOUNT) {
-		return pp.QuoteMint
+	quote := pp.QuoteMint
+	if quote.IsZero() && pp.BondingCurve != nil {
+		quote = pp.BondingCurve.QuoteMint
 	}
-	return constants.WSOL_TOKEN_ACCOUNT
+	if quote.IsZero() || quote.Equals(constants.SOL_TOKEN_ACCOUNT) {
+		return constants.WSOL_TOKEN_ACCOUNT
+	}
+	return quote
 }
 
-func pumpFunUsesV2Layout(pp *PumpFunParams) bool {
-	return pumpFunUsablePubkey(pp.QuoteMint) && !pp.QuoteMint.Equals(constants.SOL_TOKEN_ACCOUNT)
+func pumpFunUsesV2Layout(pp *PumpFunParams, settlementMint solana.PublicKey) bool {
+	return !pumpFunIsSolQuoteMint(pumpFunEffectiveQuoteMint(pp)) || settlementMint.Equals(constants.WSOL_TOKEN_ACCOUNT)
 }
 
 func pumpFunIsSolQuoteMint(mint solana.PublicKey) bool {
@@ -302,7 +307,7 @@ func pumpFunValidateV2SellQuoteMint(outputMint, quoteMint solana.PublicKey) erro
 }
 
 func pumpFunFeeRecipient(pp *PumpFunParams) solana.PublicKey {
-	if pumpFunUsablePubkey(pp.FeeRecipient) {
+	if constants.FeeRecipientOKForBondingCurveMode(pp.FeeRecipient, pp.BondingCurve != nil && pp.BondingCurve.IsMayhemMode) {
 		return pp.FeeRecipient
 	}
 	if pp.BondingCurve != nil && pp.BondingCurve.IsMayhemMode {
@@ -321,7 +326,10 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 	}
 
 	pp := params.ProtocolParams
-	if pumpFunUsesV2Layout(pp) {
+	if !params.InputMint.IsZero() && !pumpFunUsesV2Layout(pp, params.InputMint) && !pumpFunIsSolQuoteMint(params.InputMint) {
+		return nil, fmt.Errorf("PumpFun native input_mint does not match quote_mint")
+	}
+	if pumpFunUsesV2Layout(pp, params.InputMint) {
 		return PumpFunBuildBuyV2Instructions(params)
 	}
 	bondingCurve := pp.BondingCurve
@@ -450,7 +458,10 @@ func PumpFunBuildSellInstructions(params *PumpFunBuildSellParams) ([]solana.Inst
 	}
 
 	pp := params.ProtocolParams
-	if pumpFunUsesV2Layout(pp) {
+	if !params.OutputMint.IsZero() && !pumpFunUsesV2Layout(pp, params.OutputMint) && !pumpFunIsSolQuoteMint(params.OutputMint) {
+		return nil, fmt.Errorf("PumpFun native output_mint does not match quote_mint")
+	}
+	if pumpFunUsesV2Layout(pp, params.OutputMint) {
 		return PumpFunBuildSellV2Instructions(params)
 	}
 	bondingCurve := pp.BondingCurve

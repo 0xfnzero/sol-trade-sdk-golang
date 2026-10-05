@@ -101,17 +101,17 @@ func TestRaydiumAmmV4UsesMarketAccountOrder(t *testing.T) {
 		t.Fatalf("data error: %v", err)
 	}
 
-	if len(accounts) != 18 {
+	if len(accounts) != 8 {
 		t.Fatalf("accounts len = %d", len(accounts))
 	}
-	if data[0] != RaydiumAmmV4SwapBaseOutDiscriminator[0] {
+	if data[0] != RaydiumAmmV4SwapBaseOutV2Discriminator[0] {
 		t.Fatalf("discriminator = %d", data[0])
 	}
-	if !accounts[3].PublicKey.Equals(testPK(5)) || !accounts[4].PublicKey.Equals(testPK(6)) {
-		t.Fatalf("market order accounts not mapped")
+	if !accounts[3].PublicKey.Equals(testPK(3)) || !accounts[4].PublicKey.Equals(testPK(4)) {
+		t.Fatalf("V2 vault accounts not mapped")
 	}
-	if !accounts[7].PublicKey.Equals(testPK(7)) || !accounts[14].PublicKey.Equals(testPK(14)) {
-		t.Fatalf("serum accounts not mapped")
+	if !accounts[7].PublicKey.Equals(testPK(99)) || !accounts[7].IsSigner || accounts[7].IsWritable {
+		t.Fatalf("V2 owner not mapped")
 	}
 }
 
@@ -258,7 +258,7 @@ func TestMeteoraDammV2UsesSwap2PartialFill(t *testing.T) {
 		t.Fatalf("data error: %v", err)
 	}
 
-	if len(accounts) != 13 {
+	if len(accounts) != 14 {
 		t.Fatalf("accounts len = %d", len(accounts))
 	}
 	if string(data[:8]) != string(MeteoraDammV2Swap2Discriminator) {
@@ -267,7 +267,7 @@ func TestMeteoraDammV2UsesSwap2PartialFill(t *testing.T) {
 	if data[24] != MeteoraDammV2SwapModePartialFill {
 		t.Fatalf("swap mode = %d", data[24])
 	}
-	if !accounts[12].PublicKey.Equals(METEORA_DAMM_V2_PROGRAM) {
+	if !accounts[13].PublicKey.Equals(METEORA_DAMM_V2_PROGRAM) {
 		t.Fatalf("program account not last")
 	}
 }
@@ -496,9 +496,9 @@ func appendU128(data []byte, value uint64) []byte {
 
 func testFeeConfigBytes() []byte {
 	data := make([]byte, 0, 8+1+32+24+4+2*40+4)
-	data = append(data, make([]byte, 8)...)    // discriminator
-	data = append(data, byte(1))               // bump
-	data = append(data, testPK(55).Bytes()...) // admin
+	data = append(data, []byte{143, 52, 146, 187, 219, 123, 76, 155}...) // discriminator
+	data = append(data, byte(1))                                         // bump
+	data = append(data, testPK(55).Bytes()...)                           // admin
 	data = appendU64(data, 30)
 	data = appendU64(data, 7)
 	data = appendU64(data, 9)
@@ -743,7 +743,7 @@ func TestPumpFunV2FixedOutputUsesBuyV2(t *testing.T) {
 	fixedOutput := uint64(42)
 	ixs, err := PumpFunBuildBuyInstructions(&PumpFunBuildBuyParams{
 		Payer:               testPK(99),
-		InputMint:           constants.SOL_TOKEN_ACCOUNT,
+		InputMint:           constants.WSOL_TOKEN_ACCOUNT,
 		OutputMint:          testPK(2),
 		InputAmount:         100_000,
 		SlippageBasisPoints: 300,
@@ -775,7 +775,7 @@ func TestPumpFunV2RegularWsolBuyWrapsMaxQuoteBudget(t *testing.T) {
 	useExact := false
 	ixs, err := PumpFunBuildBuyInstructions(&PumpFunBuildBuyParams{
 		Payer:               testPK(99),
-		InputMint:           constants.SOL_TOKEN_ACCOUNT,
+		InputMint:           constants.WSOL_TOKEN_ACCOUNT,
 		OutputMint:          testPK(2),
 		InputAmount:         100_000,
 		SlippageBasisPoints: 1000,
@@ -792,5 +792,16 @@ func TestPumpFunV2RegularWsolBuyWrapsMaxQuoteBudget(t *testing.T) {
 	}
 	if !ixs[1].ProgramID().Equals(constants.SYSTEM_PROGRAM) {
 		t.Fatalf("expected system transfer as second instruction")
+	}
+}
+
+func TestPumpSwapFeeConfigRejectsWrongType(t *testing.T) {
+	data := testFeeConfigBytes()
+	data[0] ^= 1
+	if DecodeFeeConfig(data) != nil {
+		t.Fatal("wrong account type decoded as fee config")
+	}
+	if DecodeFeeConfig(data[:7]) != nil {
+		t.Fatal("short discriminator accepted")
 	}
 }

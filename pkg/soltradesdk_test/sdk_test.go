@@ -99,8 +99,8 @@ func TestBondingCurve_GetBuyPrice(t *testing.T) {
 		Complete:             false,
 	}
 
-	tokens := curve.GetBuyPrice(1_000_000)
-	if tokens == 0 {
+	tokens, err := curve.GetBuyPrice(1_000_000)
+	if err != nil || tokens == 0 {
 		t.Error("expected non-zero token output")
 	}
 }
@@ -113,13 +113,13 @@ func TestBondingCurve_GetSellPrice(t *testing.T) {
 		Complete:             false,
 	}
 
-	sol := curve.GetSellPrice(1_000_000_000, 100)
-	if sol == 0 {
+	sol, err := curve.GetSellPrice(1_000_000_000, 100)
+	if err != nil || sol == 0 {
 		t.Error("expected non-zero SOL output")
 	}
 }
 
-func TestBondingCurve_CompleteReturnsZero(t *testing.T) {
+func TestBondingCurve_CompleteReturnsError(t *testing.T) {
 	curve := &common.BondingCurveAccount{
 		VirtualTokenReserves: 1073000000000000,
 		VirtualSolReserves:   30000000000,
@@ -127,12 +127,12 @@ func TestBondingCurve_CompleteReturnsZero(t *testing.T) {
 		Complete:             true,
 	}
 
-	if curve.GetBuyPrice(1_000_000) != 0 {
-		t.Error("expected zero tokens for complete curve")
+	if _, err := curve.GetBuyPrice(1_000_000); err == nil {
+		t.Error("expected completed-curve error")
 	}
 
-	if curve.GetSellPrice(1_000_000_000, 100) != 0 {
-		t.Error("expected zero SOL for complete curve")
+	if _, err := curve.GetSellPrice(1_000_000_000, 100); err == nil {
+		t.Error("expected completed-curve error")
 	}
 }
 

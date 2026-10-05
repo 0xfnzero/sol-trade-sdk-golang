@@ -185,26 +185,27 @@ func GetUserVolumeAccumulatorQuoteAta(user, quoteMint, quoteTokenProgram solana.
 
 // PumpSwapParams contains parameters for PumpSwap operations
 type PumpSwapParams struct {
-	Pool                      solana.PublicKey
-	BaseMint                  solana.PublicKey
-	QuoteMint                 solana.PublicKey
-	PoolBaseTokenAccount      solana.PublicKey
-	PoolQuoteTokenAccount     solana.PublicKey
-	PoolBaseTokenReserves     uint64
-	PoolQuoteTokenReserves    uint64
-	VirtualQuoteReserves      *big.Int
-	CoinCreatorVaultAta       solana.PublicKey
-	CoinCreatorVaultAuthority solana.PublicKey
-	BaseTokenProgram          solana.PublicKey
-	QuoteTokenProgram         solana.PublicKey
-	IsMayhemMode              bool
-	IsCashbackCoin            bool
-	PoolCreator               solana.PublicKey
-	CoinCreator               solana.PublicKey
-	CoinCreatorKnown          bool
-	CashbackFeeBasisPoints    uint64
-	FeeBasisPoints            *calc.PumpSwapFeeBasisPoints
-	BaseMintSupply            *uint64
+	Pool                         solana.PublicKey
+	BaseMint                     solana.PublicKey
+	QuoteMint                    solana.PublicKey
+	PoolBaseTokenAccount         solana.PublicKey
+	PoolQuoteTokenAccount        solana.PublicKey
+	PoolBaseTokenReserves        uint64
+	PoolQuoteTokenReserves       uint64
+	VirtualQuoteReserves         *big.Int
+	CoinCreatorVaultAta          solana.PublicKey
+	CoinCreatorVaultAuthority    solana.PublicKey
+	BaseTokenProgram             solana.PublicKey
+	QuoteTokenProgram            solana.PublicKey
+	IsMayhemMode                 bool
+	IsCashbackCoin               bool
+	PoolCreator                  solana.PublicKey
+	CoinCreator                  solana.PublicKey
+	CoinCreatorKnown             bool
+	CashbackFeeBasisPoints       uint64
+	FeeBasisPoints               *calc.PumpSwapFeeBasisPoints
+	BaseMintSupply               *uint64
+	ProtocolFeeRecipientOverride *solana.PublicKey
 }
 
 // BuildBuyParams contains parameters for building buy instructions
@@ -371,7 +372,16 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 	var tokenAmount uint64
 	var solAmount uint64
 
-	if quoteIsWsolOrUsdc {
+	if params.FixedOutputAmount != nil {
+		if !quoteIsWsolOrUsdc {
+			return nil, fmt.Errorf("PumpSwap exact-output buy requires a buy instruction")
+		}
+		if *params.FixedOutputAmount >= pp.PoolBaseTokenReserves {
+			return nil, fmt.Errorf("exact base output must be below the pool base reserve")
+		}
+		tokenAmount = *params.FixedOutputAmount
+		solAmount = params.InputAmount
+	} else if quoteIsWsolOrUsdc {
 		result, err := calc.BuyQuoteInputInternalWithFees(
 			params.InputAmount,
 			params.SlippageBasisPoints,
@@ -401,11 +411,6 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 		solAmount = params.InputAmount
 	}
 
-	// Override token amount if fixed output is specified
-	if params.FixedOutputAmount != nil {
-		tokenAmount = *params.FixedOutputAmount
-	}
-
 	// Get user token accounts
 	userBaseTokenAccount := GetAssociatedTokenAddress(params.Payer, pp.BaseMint, pp.BaseTokenProgram)
 	userQuoteTokenAccount := GetAssociatedTokenAddress(params.Payer, pp.QuoteMint, pp.QuoteTokenProgram)
@@ -414,6 +419,8 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 	var feeRecipient solana.PublicKey
 	if pp.IsMayhemMode {
 		feeRecipient = GetMayhemFeeRecipientRandom()
+	} else if pp.ProtocolFeeRecipientOverride != nil {
+		feeRecipient = *pp.ProtocolFeeRecipientOverride
 	} else {
 		feeRecipient = GetProtocolFeeRecipientRandom()
 	}
@@ -576,7 +583,16 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	tokenAmount := params.InputAmount
 	var solAmount uint64
 
-	if quoteIsWsolOrUsdc {
+	if params.FixedOutputAmount != nil {
+		if quoteIsWsolOrUsdc {
+			return nil, fmt.Errorf("PumpSwap exact-output sell requires a buy instruction")
+		}
+		if *params.FixedOutputAmount >= pp.PoolBaseTokenReserves {
+			return nil, fmt.Errorf("exact base output must be below the pool base reserve")
+		}
+		tokenAmount = params.InputAmount
+		solAmount = *params.FixedOutputAmount
+	} else if quoteIsWsolOrUsdc {
 		result, err := calc.SellBaseInputInternalWithFees(
 			params.InputAmount,
 			params.SlippageBasisPoints,
@@ -605,11 +621,6 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 		solAmount = result.Base
 	}
 
-	// Override sol amount if fixed output is specified
-	if params.FixedOutputAmount != nil {
-		solAmount = *params.FixedOutputAmount
-	}
-
 	// Get user token accounts
 	userBaseTokenAccount := GetAssociatedTokenAddress(params.Payer, pp.BaseMint, pp.BaseTokenProgram)
 	userQuoteTokenAccount := GetAssociatedTokenAddress(params.Payer, pp.QuoteMint, pp.QuoteTokenProgram)
@@ -618,6 +629,8 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	var feeRecipient solana.PublicKey
 	if pp.IsMayhemMode {
 		feeRecipient = GetMayhemFeeRecipientRandom()
+	} else if pp.ProtocolFeeRecipientOverride != nil {
+		feeRecipient = *pp.ProtocolFeeRecipientOverride
 	} else {
 		feeRecipient = GetProtocolFeeRecipientRandom()
 	}
@@ -942,6 +955,9 @@ func decodePumpSwapFeeTiers(data []byte, offset int) ([]PumpSwapFeeTier, int, bo
 }
 
 func DecodeFeeConfig(data []byte) *PumpSwapFeeConfig {
+	if len(data) < 8 || !bytes.Equal(data[:8], []byte{143, 52, 146, 187, 219, 123, 76, 155}) {
+		return nil
+	}
 	offset := 8  // discriminator
 	offset++     // bump
 	offset += 32 // admin

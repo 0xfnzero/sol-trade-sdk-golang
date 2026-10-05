@@ -285,17 +285,19 @@ func deriveKey(password string, salt []byte) []byte {
 // Known program IDs
 var KnownProgramIDs = map[string][]string{
 	"pumpfun": {
-		"6EF8rrecthR5Dkzon8Nwu78hRvfCKopJFfWcCzNfXt3D",
+		"6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
 	},
 	"pumpswap": {
-		"pAMMBay6oceH9fJKBRdGP4LmVn7LKwEqT7dPWn1oLKs",
+		"pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
 	},
 	"raydium": {
+		"CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
 		"CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
 		"675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
 	},
 	"meteora": {
-		"MERLuDFBMmsHnsBPZw2sDQZHvXFM4sPkHePSuUZnPdK",
+		"LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+		"cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
 	},
 	"system": {
 		"11111111111111111111111111111111",

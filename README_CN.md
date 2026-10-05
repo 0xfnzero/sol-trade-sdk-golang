@@ -75,13 +75,17 @@
 
 ## 🔖 当前版本
 
-**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.5`
+**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.6`
 
 本版本刷新 PumpFun V2 与 USDC quote 池处理逻辑，确保默认 RPC 提交通道会和 SWQoS 通道一起发出，并将 Raydium CPMM fixed-output 交易对齐到链上 `swap_base_out` 指令。交易执行必须由调用方传入 recent blockhash 或 durable nonce；热路径不会查询 RPC 获取 blockhash、账户或余额数据。
 
-## Rust v4.0.21 对齐
+## v0.1.6
 
-本 SDK 现在按 Rust SDK `v4.0.21` 对齐高层交易 intent API 和 SWQoS provider 覆盖。新代码可以使用 `BuySimple` / `SellSimple`，并通过 `AccountPolicy`、`BuyAmount`、`SellAmount` 描述意图；内部会转换到现有 `Buy` / `Sell` 参数，不移除旧 API。根 `TradingClient` 仍明确其执行边界，不宣称自己会构建或提交交易。SWQoS 已包含 Rust 的 `Solami` 类型与默认配置（`beam.solami.dev:11000`，最小 tip `0.0001 SOL`）；真实 Solami 提交走主 QUIC client 路径，并需要和 Rust 相同的 base58 Solana keypair api token。配置显式 SWQoS 时仍会自动追加默认 RPC 通道。NextBlock 仍按 Rust parity 黑名单过滤，除非 Rust 后续改变该行为。`Triton`、`QuickNode`、`Syndica`、`Figment`、`Alchemy` 等历史 extended provider 类仅为源码兼容保留，不属于 Rust `v4.0.21` 交易 provider 对齐范围。
+新增缓存交易/路由准备、CLMM/Whirlpool/DLMM 整数报价、PumpFun 原生结算及多跳、StonkFun 路由、V1 序列化、token mint 校验和模拟示例，包含原生对齐证据及回归样本。此语言版本尚未包含 Rust 新增的 CPMM creator-fee 领取 API，不代表完整的 Rust 5.0.7 API 对齐。
+
+## Rust v5.0.2 对齐
+
+本 SDK 现在按 Rust SDK `v5.0.2` 对齐高层交易 intent API 和 SWQoS provider 覆盖。同步包含：`TradeRiskGate`（仅买入路径）、Meteora DAMM v2 的 `swap_mode` / rate-limiter sysvar / referral，以及 Bonk 滑点 clamp（9999 bps）。新代码可以使用 `BuySimple` / `SellSimple`，并通过 `AccountPolicy`、`BuyAmount`、`SellAmount` 描述意图；内部会转换到现有 `Buy` / `Sell` 参数，不移除旧 API。根 `TradingClient` 仍明确其执行边界，不宣称自己会构建或提交交易。SWQoS 已包含 LunarLander、Glaive、Solami 等与 Rust 对齐的类型。配置显式 SWQoS 时仍会自动追加默认 RPC 通道。NextBlock 仍按 Rust parity 黑名单过滤。`Triton`、`QuickNode`、`Syndica`、`Figment`、`Alchemy` 等历史 extended provider 类仅为源码兼容保留，不属于 Rust `v5.0.2` 交易 provider 对齐范围。
 
 ## ✨ 项目特性
 
@@ -91,7 +95,7 @@
 4. **Raydium CPMM 构建器**: 提供 Raydium CPMM fixed-input 和 fixed-output swap 的指令构建器和参数
 5. **Raydium AMM V4 构建器**: 提供 Raydium AMM V4 swap 的指令构建器和参数
 6. **Meteora DAMM V2 构建器**: 提供 Meteora DAMM V2 操作的指令构建器和参数
-7. **多种 MEV 保护**: 支持 Rust v4.0.21 SWQoS 集合，包括 Jito、ZeroSlot、Temporal、Bloxroute、FlashBlock、BlockRazor、Node1、Astralane、Stellium、Lightspeed、Soyas、Speedlanding、Helius、Solami 和默认 RPC
+7. **多种 MEV 保护**: 支持 Rust v5.0.2 SWQoS 集合，包括 Jito、ZeroSlot、Temporal、Bloxroute、FlashBlock、BlockRazor、Node1、Astralane、Stellium、Lightspeed、Soyas、Speedlanding、Helius、Solami、LunarLander、Glaive 和默认 RPC
 8. **并发交易**: 所有已配置的 SWQoS 通道和默认 RPC 通道都会发出提交；首个成功只影响返回，较慢通道会继续提交
 9. **统一交易接口**: 使用统一的交易协议类型进行交易操作，并支持 Rust 对齐的 `BuySimple` / `SellSimple` intent 参数
 10. **中间件系统**: 在低层指令/执行器路径支持自定义指令中间件
@@ -113,7 +117,7 @@ git clone https://github.com/0xfnzero/sol-trade-sdk-golang
 
 ```go
 // 添加到您的 go.mod
-require github.com/0xfnzero/sol-trade-sdk-golang v0.1.5
+require github.com/0xfnzero/sol-trade-sdk-golang v0.1.6
 
 replace github.com/0xfnzero/sol-trade-sdk-golang => ./sol-trade-sdk-golang
 ```
@@ -127,7 +131,7 @@ go mod tidy
 ### 使用 Go Modules
 
 ```bash
-go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.5
+go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.6
 ```
 
 ## 🛠️ 使用示例
@@ -407,3 +411,10 @@ MIT License
 3. 注意滑点设置以避免交易失败
 4. 监控余额和交易费用
 5. 遵守相关法律法规
+
+## Native alignment status
+
+See [NATIVE_ALIGNMENT.md](NATIVE_ALIGNMENT.md) for implemented native APIs, Rust golden tests, mainnet simulation evidence, examples, and remaining parity gaps. Full cross-language parity is still in progress.
+
+
+[本轮原生对齐 API 迁移](NATIVE_MIGRATION.md)（实施中，尚未发布）。

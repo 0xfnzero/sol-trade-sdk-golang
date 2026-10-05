@@ -53,6 +53,8 @@ const (
 	SwqosTypeSpeedlanding = soltradesdk.SwqosTypeSpeedlanding
 	SwqosTypeHelius       = soltradesdk.SwqosTypeHelius
 	SwqosTypeSolami       = soltradesdk.SwqosTypeSolami
+	SwqosTypeLunarLander  = soltradesdk.SwqosTypeLunarLander
+	SwqosTypeGlaive       = soltradesdk.SwqosTypeGlaive
 	SwqosTypeDefault      = soltradesdk.SwqosTypeDefault
 
 	AccountPolicyAuto           = soltradesdk.AccountPolicyAuto

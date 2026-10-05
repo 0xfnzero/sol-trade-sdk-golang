@@ -196,6 +196,10 @@ func swqosTypeName(swqosType SwqosType) string {
 		return "Helius"
 	case SwqosTypeSolami:
 		return "Solami"
+	case SwqosTypeLunarLander:
+		return "LunarLander"
+	case SwqosTypeGlaive:
+		return "Glaive"
 	case SwqosTypeDefault:
 		return "Default"
 	default:
@@ -938,7 +942,7 @@ type SwqosProviderFactory struct{}
 // CreateProvider creates a provider based on type
 func (f *SwqosProviderFactory) CreateProvider(config *SwqosConfigExtended) (interface{}, error) {
 	if soltradesdk.IsSwqosTypeBlacklisted(config.Type) {
-		return nil, fmt.Errorf("SWQOS type is blacklisted by Rust v4.0.21 parity: %v", config.Type)
+		return nil, fmt.Errorf("SWQOS type is blacklisted by Rust v5.0.2 parity: %v", config.Type)
 	}
 	switch config.Type {
 	case SwqosTypeJito:
@@ -969,6 +973,10 @@ func (f *SwqosProviderFactory) CreateProvider(config *SwqosConfigExtended) (inte
 		return NewSpeedlandingExtClient(config), nil
 	case SwqosTypeSolami:
 		return NewSolamiExtClient(config), nil
+	case SwqosTypeLunarLander:
+		return newSenderBackedExtClient(config, "")
+	case SwqosTypeGlaive:
+		return newSenderBackedExtClient(config, "")
 	case SwqosTypeHelius:
 		return newSenderBackedExtClient(config, "")
 	case SwqosTypeDefault:

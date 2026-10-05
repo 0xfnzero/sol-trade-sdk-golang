@@ -1,0 +1,241 @@
+{
+  "rust_commit": "dc9741b6074df21418f16b6175f497fbebecb723",
+  "source_sha256": "edbeff46cda1ec9a01ef343ecdc1cd356c718077f24f1b108987889dcf84e7d8",
+  "generation": "Compiled pinned Rust calc source in standalone development oracle. No Rust installation/runtime dependency in native packages. Fee constants 95/30 from pinned source.",
+  "cases": [
+    {
+      "virtual_token": "1073000000000000",
+      "virtual_quote": "30000000000",
+      "real_token": "793100000000000",
+      "amount": "1",
+      "has_creator": false,
+      "buy": "0",
+      "sell": "0"
+    },
+    {
+      "virtual_token": "1073000000000000",
+      "virtual_quote": "30000000000",
+      "real_token": "793100000000000",
+      "amount": "1",
+      "has_creator": true,
+      "buy": "0",
+      "sell": "0"
+    },
+    {
+      "virtual_token": "1073000000000000",
+      "virtual_quote": "30000000000",
+      "real_token": "793100000000000",
+      "amount": "2",
+      "has_creator": false,
+      "buy": "0",
+      "sell": "0"
+    },
+    {
+      "virtual_token": "1073000000000000",
+      "virtual_quote": "30000000000",
+      "real_token": "793100000000000",
+      "amount": "2",
+      "has_creator": true,
+      "buy": "0",
+      "sell": "0"
+    },
+    {
+      "virtual_token": "1000",
+      "virtual_quote": "100",
+      "real_token": "3",
+      "amount": "10000001",
+      "has_creator": false,
+      "buy": "3",
+      "sell": "98"
+    },
+    {
+      "virtual_token": "1000",
+      "virtual_quote": "100",
+      "real_token": "3",
+      "amount": "10000001",
+      "has_creator": true,
+      "buy": "3",
+      "sell": "97"
+    },
+    {
+      "virtual_token": "1000",
+      "virtual_quote": "100",
+      "real_token": "0",
+      "amount": "100",
+      "has_creator": false,
+      "buy": "0",
+      "sell": "8"
+    },
+    {
+      "virtual_token": "1000",
+      "virtual_quote": "100",
+      "real_token": "0",
+      "amount": "100",
+      "has_creator": true,
+      "buy": "0",
+      "sell": "8"
+    },
+    {
+      "virtual_token": "18446744073709551615",
+      "virtual_quote": "18446744073709551615",
+      "real_token": "18446744073709551615",
+      "amount": "18446744073709551615",
+      "has_creator": false,
+      "buy": "9179768138198333721",
+      "sell": "9135750002504655436"
+    },
+    {
+      "virtual_token": "18446744073709551615",
+      "virtual_quote": "18446744073709551615",
+      "real_token": "18446744073709551615",
+      "amount": "18446744073709551615",
+      "has_creator": true,
+      "buy": "9166084011781143659",
+      "sell": "9108079886394091109"
+    },
+    {
+      "virtual_token": "1000",
+      "virtual_quote": "100",
+      "real_token": "1000",
+      "amount": "1000000000",
+      "has_creator": false,
+      "buy": "999",
+      "sell": "98"
+    },
+    {
+      "virtual_token": "1000",
+      "virtual_quote": "100",
+      "real_token": "1000",
+      "amount": "1000000000",
+      "has_creator": true,
+      "buy": "999",
+      "sell": "97"
+    },
+    {
+      "virtual_token": "1000",
+      "virtual_quote": "100",
+      "real_token": "1000",
+      "amount": "100",
+      "has_creator": false,
+      "buy": "494",
+      "sell": "8"
+    },
+    {
+      "virtual_token": "1000",
+      "virtual_quote": "100",
+      "real_token": "1000",
+      "amount": "100",
+      "has_creator": true,
+      "buy": "492",
+      "sell": "8"
+    },
+    {
+      "virtual_token": "1000",
+      "virtual_quote": "100",
+      "real_token": "1000",
+      "amount": "3",
+      "has_creator": false,
+      "buy": "9",
+      "sell": "0"
+    },
+    {
+      "virtual_token": "1000",
+      "virtual_quote": "100",
+      "real_token": "1000",
+      "amount": "3",
+      "has_creator": true,
+      "buy": "9",
+      "sell": "0"
+    },
+    {
+      "virtual_token": "0",
+      "virtual_quote": "100",
+      "real_token": "1000",
+      "amount": "100",
+      "has_creator": false,
+      "buy": "0",
+      "sell": "0"
+    },
+    {
+      "virtual_token": "0",
+      "virtual_quote": "100",
+      "real_token": "1000",
+      "amount": "100",
+      "has_creator": true,
+      "buy": "0",
+      "sell": "0"
+    },
+    {
+      "virtual_token": "340282366920938463463374607431768211455",
+      "virtual_quote": "1",
+      "real_token": "340282366920938463463374607431768211455",
+      "amount": "100",
+      "has_creator": false,
+      "buy": "0",
+      "sell": "99"
+    },
+    {
+      "virtual_token": "340282366920938463463374607431768211455",
+      "virtual_quote": "1",
+      "real_token": "340282366920938463463374607431768211455",
+      "amount": "100",
+      "has_creator": true,
+      "buy": "0",
+      "sell": "98"
+    },
+    {
+      "virtual_token": "1",
+      "virtual_quote": "340282366920938463463374607431768211455",
+      "real_token": "340282366920938463463374607431768211455",
+      "amount": "100",
+      "has_creator": false,
+      "buy": "0",
+      "sell": "18446744073709551615"
+    },
+    {
+      "virtual_token": "1",
+      "virtual_quote": "340282366920938463463374607431768211455",
+      "real_token": "340282366920938463463374607431768211455",
+      "amount": "100",
+      "has_creator": true,
+      "buy": "0",
+      "sell": "18446744073709551615"
+    },
+    {
+      "virtual_token": "340282366920938463463374607431768211455",
+      "virtual_quote": "340282366920938463463374607431768211455",
+      "real_token": "340282366920938463463374607431768211455",
+      "amount": "1",
+      "has_creator": false,
+      "buy": "0",
+      "sell": "18446744073709551615"
+    },
+    {
+      "virtual_token": "340282366920938463463374607431768211455",
+      "virtual_quote": "340282366920938463463374607431768211455",
+      "real_token": "340282366920938463463374607431768211455",
+      "amount": "1",
+      "has_creator": true,
+      "buy": "0",
+      "sell": "18446744073709551615"
+    },
+    {
+      "virtual_token": "1208925819614629174706176",
+      "virtual_quote": "1180591620717411303424",
+      "real_token": "1208925819614629174706176",
+      "amount": "1000000000",
+      "has_creator": false,
+      "buy": "1014363544575",
+      "sell": "967284"
+    },
+    {
+      "virtual_token": "1208925819614629174706176",
+      "virtual_quote": "1180591620717411303424",
+      "real_token": "1208925819614629174706176",
+      "amount": "1000000000",
+      "has_creator": true,
+      "buy": "1011358022655",
+      "sell": "964354"
+    }
+  ]
+}

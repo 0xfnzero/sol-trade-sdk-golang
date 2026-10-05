@@ -2,6 +2,7 @@ package seed
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 
 	"github.com/gagliardetto/solana-go"
@@ -22,7 +23,7 @@ func CreateProgramAddress(seeds [][]byte, programID solana.PublicKey) (solana.Pu
 // ===== PumpFun PDAs =====
 
 // PumpFun Program ID
-var PumpFunProgramID = solana.MustPublicKeyFromBase58("6EF8rrecthR5Dkzon8Nwu78hRvfCKFJdMZzMMTrWr1Bv")
+var PumpFunProgramID = solana.MustPublicKeyFromBase58("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
 
 // GetBondingCurvePDA returns the bonding curve PDA for a mint
 func GetBondingCurvePDA(mint solana.PublicKey) (solana.PublicKey, uint8, error) {
@@ -43,20 +44,13 @@ func GetGlobalAccountPDA() (solana.PublicKey, uint8, error) {
 
 // GetFeeRecipientPDA returns the fee recipient PDA
 func GetFeeRecipientPDA(isMayhemMode bool) (solana.PublicKey, uint8, error) {
-	var seed []byte
-	if isMayhemMode {
-		seed = []byte("fee_recipient_mayhem")
-	} else {
-		seed = []byte("fee_recipient")
-	}
-	seeds := [][]byte{seed}
-	return FindProgramAddress(seeds, PumpFunProgramID)
+	return solana.PublicKey{}, 0, errors.New("PumpFun fee recipient is configured, not a PDA; read current Global config")
 }
 
 // GetEventAuthorityPDA returns the event authority PDA
 func GetEventAuthorityPDA() (solana.PublicKey, uint8, error) {
 	seeds := [][]byte{
-		[]byte("event"),
+		[]byte("__event_authority"),
 	}
 	return FindProgramAddress(seeds, PumpFunProgramID)
 }
@@ -73,16 +67,13 @@ func GetUserVolumeAccumulatorPDA(user solana.PublicKey) (solana.PublicKey, uint8
 // ===== PumpSwap PDAs =====
 
 // PumpSwap Program ID
-var PumpSwapProgramID = solana.MustPublicKeyFromBase58("pAMMBay6oceH9fJKFRHoe4LvJhu5yQJtezhkEL5DHyJ")
+var PumpSwapProgramID = solana.MustPublicKeyFromBase58("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA")
 
 // GetPumpSwapPoolPDA returns the pool PDA
-func GetPumpSwapPoolPDA(baseMint, quoteMint solana.PublicKey) (solana.PublicKey, uint8, error) {
-	seeds := [][]byte{
-		[]byte("pool"),
-		baseMint[:],
-		quoteMint[:],
-	}
-	return FindProgramAddress(seeds, PumpSwapProgramID)
+func GetPumpSwapPoolPDA(baseMint, quoteMint solana.PublicKey, index uint16, creator solana.PublicKey) (solana.PublicKey, uint8, error) {
+	var bytes [2]byte
+	binary.LittleEndian.PutUint16(bytes[:], index)
+	return FindProgramAddress([][]byte{[]byte("pool"), bytes[:], creator[:], baseMint[:], quoteMint[:]}, PumpSwapProgramID)
 }
 
 // ===== Raydium PDAs =====
@@ -115,16 +106,11 @@ func GetRaydiumCpmmPoolPDA(ammConfig, baseMint, quoteMint solana.PublicKey) (sol
 // ===== Meteora PDAs =====
 
 // Meteora DAMM V2 Program ID
-var MeteoraDammV2ProgramID = solana.MustPublicKeyFromBase58("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo")
+var MeteoraDammV2ProgramID = solana.MustPublicKeyFromBase58("cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG")
 
 // GetMeteoraPoolPDA returns the Meteora pool PDA
 func GetMeteoraPoolPDA(tokenAMint, tokenBMint solana.PublicKey) (solana.PublicKey, uint8, error) {
-	seeds := [][]byte{
-		[]byte("pool"),
-		tokenAMint[:],
-		tokenBMint[:],
-	}
-	return FindProgramAddress(seeds, MeteoraDammV2ProgramID)
+	return solana.PublicKey{}, 0, errors.New("DAMM v2 pool cannot be derived from two mints alone; provide the observed pool address")
 }
 
 // ===== Associated Token Account =====

@@ -6,11 +6,11 @@ package instruction
 import (
 	"encoding/binary"
 	"fmt"
+	"math/big"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
 )
 
@@ -25,6 +25,8 @@ var (
 
 // Discriminators - from Rust: src/instruction/utils/raydium_amm_v4.rs
 var (
+	RaydiumAmmV4SwapBaseInV2Discriminator  = []byte{16}
+	RaydiumAmmV4SwapBaseOutV2Discriminator = []byte{17}
 	// RaydiumAmmV4SwapBaseInDiscriminator is the discriminator for swap_base_in instruction
 	RaydiumAmmV4SwapBaseInDiscriminator = []byte{9}
 	// RaydiumAmmV4SwapBaseOutDiscriminator is the discriminator for swap_base_out instruction
@@ -43,29 +45,31 @@ const (
 
 // RaydiumAmmV4Params contains parameters for Raydium AMM V4 operations
 type RaydiumAmmV4Params struct {
-	Amm                   solana.PublicKey
-	AmmOpenOrders         solana.PublicKey
-	AmmTargetOrders       solana.PublicKey
-	TokenCoin             solana.PublicKey
-	TokenPc               solana.PublicKey
-	SerumProgram          solana.PublicKey
-	SerumMarket           solana.PublicKey
-	SerumBids             solana.PublicKey
-	SerumAsks             solana.PublicKey
-	SerumEventQueue       solana.PublicKey
-	SerumCoinVaultAccount solana.PublicKey
-	SerumPcVaultAccount   solana.PublicKey
-	SerumVaultSigner      solana.PublicKey
-	CoinMint              solana.PublicKey
-	PcMint                solana.PublicKey
-	CoinReserve           uint64
-	PcReserve             uint64
+	Amm                                  solana.PublicKey
+	AmmOpenOrders                        solana.PublicKey
+	AmmTargetOrders                      solana.PublicKey
+	TokenCoin                            solana.PublicKey
+	TokenPc                              solana.PublicKey
+	SerumProgram                         solana.PublicKey
+	SerumMarket                          solana.PublicKey
+	SerumBids                            solana.PublicKey
+	SerumAsks                            solana.PublicKey
+	SerumEventQueue                      solana.PublicKey
+	SerumCoinVaultAccount                solana.PublicKey
+	SerumPcVaultAccount                  solana.PublicKey
+	SerumVaultSigner                     solana.PublicKey
+	CoinMint                             solana.PublicKey
+	PcMint                               solana.PublicKey
+	CoinReserve                          uint64
+	PcReserve                            uint64
+	SwapFeeNumerator, SwapFeeDenominator *uint64
 }
 
 // RaydiumAmmV4BuildBuyParams contains parameters for building buy instructions
 type RaydiumAmmV4BuildBuyParams struct {
 	Payer               solana.PublicKey
 	OutputMint          solana.PublicKey
+	InputMint           solana.PublicKey
 	InputAmount         uint64
 	SlippageBasisPoints uint64
 	ProtocolParams      *RaydiumAmmV4Params
@@ -91,284 +95,137 @@ type RaydiumAmmV4BuildSellParams struct {
 
 // ===== Instruction Builders - 100% from Rust =====
 
-func ensureRaydiumAmmV4MarketAccounts(pp *RaydiumAmmV4Params) error {
-	required := []struct {
-		name    string
-		account solana.PublicKey
-	}{
-		{"AmmOpenOrders", pp.AmmOpenOrders},
-		{"AmmTargetOrders", pp.AmmTargetOrders},
-		{"SerumProgram", pp.SerumProgram},
-		{"SerumMarket", pp.SerumMarket},
-		{"SerumBids", pp.SerumBids},
-		{"SerumAsks", pp.SerumAsks},
-		{"SerumEventQueue", pp.SerumEventQueue},
-		{"SerumCoinVaultAccount", pp.SerumCoinVaultAccount},
-		{"SerumPcVaultAccount", pp.SerumPcVaultAccount},
-		{"SerumVaultSigner", pp.SerumVaultSigner},
+func ammV4Pair(pp *RaydiumAmmV4Params, mint solana.PublicKey, buy bool) (solana.PublicKey, solana.PublicKey, bool, error) {
+	if pp == nil || pp.CoinMint == pp.PcMint || pp.Amm.IsZero() || pp.CoinMint.IsZero() || pp.PcMint.IsZero() || pp.TokenCoin.IsZero() || pp.TokenPc.IsZero() {
+		return solana.PublicKey{}, solana.PublicKey{}, false, ErrInvalidPool
 	}
-	for _, item := range required {
-		if item.account.IsZero() {
-			return fmt.Errorf("Raydium AMM v4 requires %s; pass real market accounts from the AMM/market state", item.name)
-		}
+	if mint == constants.SOL_TOKEN_ACCOUNT {
+		mint = constants.WSOL_TOKEN_ACCOUNT
 	}
-	return nil
-}
-
-func raydiumAmmV4MintMatches(requested, expected solana.PublicKey) bool {
-	return requested.Equals(expected) ||
-		(expected.Equals(constants.WSOL_TOKEN_ACCOUNT) && requested.Equals(constants.SOL_TOKEN_ACCOUNT))
-}
-
-func ensureRaydiumAmmV4ExpectedMint(label string, requested, expected solana.PublicKey) error {
-	if !requested.IsZero() && !raydiumAmmV4MintMatches(requested, expected) {
-		return fmt.Errorf("%s must match the Raydium AMM v4 pool side (%s), got %s", label, expected.String(), requested.String())
+	if mint != pp.CoinMint && mint != pp.PcMint {
+		return solana.PublicKey{}, solana.PublicKey{}, false, fmt.Errorf("input/output mint must match the Raydium AMM v4 pool side")
 	}
-	return nil
+	coinIn := mint == pp.CoinMint
+	if buy {
+		coinIn = mint == pp.PcMint
+	}
+	if coinIn {
+		return pp.CoinMint, pp.PcMint, true, nil
+	}
+	return pp.PcMint, pp.CoinMint, false, nil
 }
-
-// RaydiumAmmV4BuildBuyInstructions builds buy instructions for Raydium AMM V4
-// 100% port from Rust: src/instruction/raydium_amm_v4.rs build_buy_instructions
-func RaydiumAmmV4BuildBuyInstructions(params *RaydiumAmmV4BuildBuyParams) ([]solana.Instruction, error) {
-	if params.InputAmount == 0 {
+func ammV4Swap(pp *RaydiumAmmV4Params, payer, im, om solana.PublicKey, amount, slippage uint64, coinIn bool, fixed *uint64) (solana.Instruction, error) {
+	if amount == 0 {
 		return nil, ErrInvalidAmount
 	}
-
-	pp := params.ProtocolParams
-	if err := ensureRaydiumAmmV4MarketAccounts(pp); err != nil {
-		return nil, err
-	}
-
-	// Check if pool contains WSOL or USDC
-	isWsol := pp.CoinMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.PcMint.Equals(constants.WSOL_TOKEN_ACCOUNT)
-	isUsdc := pp.CoinMint.Equals(constants.USDC_TOKEN_ACCOUNT) || pp.PcMint.Equals(constants.USDC_TOKEN_ACCOUNT)
-	if !isWsol && !isUsdc {
-		return nil, ErrInvalidPool
-	}
-
-	// Calculate swap amounts
-	amountIn := params.InputAmount
-	isBaseIn := pp.CoinMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.CoinMint.Equals(constants.USDC_TOKEN_ACCOUNT)
-	var minimumAmountOut uint64
-	if params.FixedOutputAmount != nil {
-		minimumAmountOut = *params.FixedOutputAmount
-	} else {
-		inputReserve := pp.PcReserve
-		outputReserve := pp.CoinReserve
-		if isBaseIn {
-			inputReserve = pp.CoinReserve
-			outputReserve = pp.PcReserve
+	var minimum uint64
+	if fixed != nil {
+		if *fixed == 0 {
+			return nil, ErrInvalidAmount
 		}
-		result := calc.RaydiumAmmV4GetAmountOut(amountIn, inputReserve, outputReserve)
-		minAmountOut, _ := calc.CalculateWithSlippageSell(result, params.SlippageBasisPoints)
-		minimumAmountOut = minAmountOut
+		minimum = *fixed
+	} else {
+		numerator, denominator := uint64(25), uint64(10000)
+		if pp.SwapFeeNumerator != nil {
+			numerator = *pp.SwapFeeNumerator
+		}
+		if pp.SwapFeeDenominator != nil {
+			denominator = *pp.SwapFeeDenominator
+		}
+		if denominator == 0 || numerator >= denominator || pp.CoinReserve == 0 || pp.PcReserve == 0 {
+			return nil, fmt.Errorf("invalid AMM v4 reserves or swap fee")
+		}
+		n := func(a uint64) *big.Int { return new(big.Int).SetUint64(a) }
+		fee := new(big.Int).Quo(new(big.Int).Add(new(big.Int).Mul(n(amount), n(numerator)), n(denominator-1)), n(denominator)).Uint64()
+		net := amount - fee
+		i, o := pp.CoinReserve, pp.PcReserve
+		if !coinIn {
+			i, o = o, i
+		}
+		out := new(big.Int).Quo(new(big.Int).Mul(n(o), n(net)), new(big.Int).Add(n(i), n(net))).Uint64()
+		if slippage > 9999 {
+			slippage = 9999
+		}
+		minimum = new(big.Int).Quo(new(big.Int).Mul(n(out), n(10000-slippage)), n(10000)).Uint64()
 	}
-
-	// Determine input/output mints
-	inputMint := pp.PcMint
-	if isBaseIn {
-		inputMint = pp.CoinMint
+	data := make([]byte, 17)
+	data[0] = 16
+	if fixed != nil {
+		data[0] = 17
 	}
-	outputMint := pp.CoinMint
-	if isBaseIn {
-		outputMint = pp.PcMint
+	binary.LittleEndian.PutUint64(data[1:], amount)
+	binary.LittleEndian.PutUint64(data[9:], minimum)
+	keys := []solana.PublicKey{constants.TOKEN_PROGRAM, pp.Amm, RAYDIUM_AMM_V4_AUTHORITY, pp.TokenCoin, pp.TokenPc, GetAssociatedTokenAddress(payer, im, constants.TOKEN_PROGRAM), GetAssociatedTokenAddress(payer, om, constants.TOKEN_PROGRAM), payer}
+	metas := []solana.AccountMeta{}
+	for i, k := range keys {
+		metas = append(metas, solana.AccountMeta{PublicKey: k, IsSigner: i == 7, IsWritable: i == 1 || i >= 3 && i <= 6})
 	}
-	if err := ensureRaydiumAmmV4ExpectedMint("OutputMint", params.OutputMint, outputMint); err != nil {
-		return nil, err
+	return newInstruction(RAYDIUM_AMM_V4_PROGRAM, metas, data), nil
+}
+
+// Independent V2 buy. Supplied reserves must already exclude pending PnL; no RPC.
+func RaydiumAmmV4BuildBuyInstructions(p *RaydiumAmmV4BuildBuyParams) ([]solana.Instruction, error) {
+	if p == nil {
+		return nil, ErrInvalidAmount
 	}
-
-	// Get user token accounts
-	userSourceTokenAccount := GetAssociatedTokenAddress(params.Payer, inputMint, constants.TOKEN_PROGRAM)
-	userDestinationTokenAccount := GetAssociatedTokenAddress(params.Payer, outputMint, constants.TOKEN_PROGRAM)
-
-	// Build instructions
-	instructions := make([]solana.Instruction, 0, 6)
-
-	// Handle WSOL wrapping if needed
-	if params.CreateInputMintAta {
-		if inputMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
-			instructions = append(instructions, HandleWsol(params.Payer, amountIn)...)
+	im, om, coinIn, e := ammV4Pair(p.ProtocolParams, p.OutputMint, true)
+	if e != nil {
+		return nil, e
+	}
+	if !p.InputMint.IsZero() && p.InputMint != im && !(p.InputMint == constants.SOL_TOKEN_ACCOUNT && im == constants.WSOL_TOKEN_ACCOUNT) {
+		return nil, fmt.Errorf("InputMint must match the Raydium AMM v4 pool side")
+	}
+	swap, e := ammV4Swap(p.ProtocolParams, p.Payer, im, om, p.InputAmount, p.SlippageBasisPoints, coinIn, p.FixedOutputAmount)
+	if e != nil {
+		return nil, e
+	}
+	result := []solana.Instruction{}
+	if p.CreateInputMintAta {
+		if im == constants.WSOL_TOKEN_ACCOUNT {
+			result = append(result, HandleWsol(p.Payer, p.InputAmount)...)
 		} else {
-			instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
-				params.Payer, params.Payer, inputMint, constants.TOKEN_PROGRAM,
-			))
+			result = append(result, CreateAssociatedTokenAccountIdempotent(p.Payer, p.Payer, im, constants.TOKEN_PROGRAM))
 		}
 	}
-
-	// Create output ATA if needed
-	if params.CreateOutputMintAta {
-		instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
-			params.Payer, params.Payer, outputMint, constants.TOKEN_PROGRAM,
-		))
+	if p.CreateOutputMintAta {
+		result = append(result, CreateAssociatedTokenAccountIdempotent(p.Payer, p.Payer, om, constants.TOKEN_PROGRAM))
 	}
-
-	// Build instruction data (17 bytes: 1 byte discriminator + 2x8 bytes amounts)
-	data := make([]byte, 17)
-	if params.FixedOutputAmount != nil {
-		copy(data[0:1], RaydiumAmmV4SwapBaseOutDiscriminator)
-	} else {
-		copy(data[0:1], RaydiumAmmV4SwapBaseInDiscriminator)
+	result = append(result, swap)
+	if p.CloseInputMintAta && im == constants.WSOL_TOKEN_ACCOUNT {
+		result = append(result, CloseWsol(p.Payer))
 	}
-	binary.LittleEndian.PutUint64(data[1:9], amountIn)
-	binary.LittleEndian.PutUint64(data[9:17], minimumAmountOut)
-
-	// Build accounts array (18 accounts)
-	accounts := []solana.AccountMeta{
-		{PublicKey: constants.TOKEN_PROGRAM, IsSigner: false, IsWritable: false},    // 0: Token Program (readonly)
-		{PublicKey: pp.Amm, IsSigner: false, IsWritable: true},                      // 1: Amm
-		{PublicKey: RAYDIUM_AMM_V4_AUTHORITY, IsSigner: false, IsWritable: false},   // 2: Authority (readonly)
-		{PublicKey: pp.AmmOpenOrders, IsSigner: false, IsWritable: true},            // 3: Amm Open Orders
-		{PublicKey: pp.AmmTargetOrders, IsSigner: false, IsWritable: true},          // 4: Amm Target Orders
-		{PublicKey: pp.TokenCoin, IsSigner: false, IsWritable: true},                // 5: Pool Coin Token Account
-		{PublicKey: pp.TokenPc, IsSigner: false, IsWritable: true},                  // 6: Pool Pc Token Account
-		{PublicKey: pp.SerumProgram, IsSigner: false, IsWritable: false},            // 7: Serum Program
-		{PublicKey: pp.SerumMarket, IsSigner: false, IsWritable: true},              // 8: Serum Market
-		{PublicKey: pp.SerumBids, IsSigner: false, IsWritable: true},                // 9: Serum Bids
-		{PublicKey: pp.SerumAsks, IsSigner: false, IsWritable: true},                // 10: Serum Asks
-		{PublicKey: pp.SerumEventQueue, IsSigner: false, IsWritable: true},          // 11: Serum Event Queue
-		{PublicKey: pp.SerumCoinVaultAccount, IsSigner: false, IsWritable: true},    // 12: Serum Coin Vault Account
-		{PublicKey: pp.SerumPcVaultAccount, IsSigner: false, IsWritable: true},      // 13: Serum Pc Vault Account
-		{PublicKey: pp.SerumVaultSigner, IsSigner: false, IsWritable: false},        // 14: Serum Vault Signer
-		{PublicKey: userSourceTokenAccount, IsSigner: false, IsWritable: true},      // 15: User Source Token Account
-		{PublicKey: userDestinationTokenAccount, IsSigner: false, IsWritable: true}, // 16: User Destination Token Account
-		{PublicKey: params.Payer, IsSigner: true, IsWritable: false},                // 17: User Source Owner
-	}
-
-	instructions = append(instructions, newInstruction(RAYDIUM_AMM_V4_PROGRAM, accounts, data))
-
-	// Close WSOL ATA if requested
-	if params.CloseInputMintAta && inputMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
-		instructions = append(instructions, CloseWsol(params.Payer))
-	}
-
-	return instructions, nil
+	return result, nil
 }
 
-// RaydiumAmmV4BuildSellInstructions builds sell instructions for Raydium AMM V4
-// 100% port from Rust: src/instruction/raydium_amm_v4.rs build_sell_instructions
-func RaydiumAmmV4BuildSellInstructions(params *RaydiumAmmV4BuildSellParams) ([]solana.Instruction, error) {
-	if params.InputAmount == 0 {
+// Independent V2 sell for either side, including arbitrary stock/token pairs.
+func RaydiumAmmV4BuildSellInstructions(p *RaydiumAmmV4BuildSellParams) ([]solana.Instruction, error) {
+	if p == nil {
 		return nil, ErrInvalidAmount
 	}
-
-	pp := params.ProtocolParams
-	if err := ensureRaydiumAmmV4MarketAccounts(pp); err != nil {
-		return nil, err
+	im, om, coinIn, e := ammV4Pair(p.ProtocolParams, p.InputMint, false)
+	if e != nil {
+		return nil, e
 	}
-
-	// Check if pool contains WSOL or USDC
-	isWsol := pp.CoinMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.PcMint.Equals(constants.WSOL_TOKEN_ACCOUNT)
-	isUsdc := pp.CoinMint.Equals(constants.USDC_TOKEN_ACCOUNT) || pp.PcMint.Equals(constants.USDC_TOKEN_ACCOUNT)
-	if !isWsol && !isUsdc {
-		return nil, ErrInvalidPool
+	if !p.OutputMint.IsZero() && p.OutputMint != om && !(p.OutputMint == constants.SOL_TOKEN_ACCOUNT && om == constants.WSOL_TOKEN_ACCOUNT) {
+		return nil, fmt.Errorf("OutputMint must match the Raydium AMM v4 pool side")
 	}
-
-	// Calculate swap amounts
-	isBaseIn := pp.PcMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.PcMint.Equals(constants.USDC_TOKEN_ACCOUNT)
-	var minimumAmountOut uint64
-	if params.FixedOutputAmount != nil {
-		minimumAmountOut = *params.FixedOutputAmount
-	} else {
-		inputReserve := pp.PcReserve
-		outputReserve := pp.CoinReserve
-		if isBaseIn {
-			inputReserve = pp.CoinReserve
-			outputReserve = pp.PcReserve
-		}
-		result := calc.RaydiumAmmV4GetAmountOut(params.InputAmount, inputReserve, outputReserve)
-		minAmountOut, _ := calc.CalculateWithSlippageSell(result, params.SlippageBasisPoints)
-		minimumAmountOut = minAmountOut
+	swap, e := ammV4Swap(p.ProtocolParams, p.Payer, im, om, p.InputAmount, p.SlippageBasisPoints, coinIn, p.FixedOutputAmount)
+	if e != nil {
+		return nil, e
 	}
-
-	// Determine output mint
-	outputMint := pp.CoinMint
-	if isBaseIn {
-		outputMint = pp.PcMint
+	result := []solana.Instruction{}
+	if p.CreateOutputMintAta {
+		result = append(result, CreateAssociatedTokenAccountIdempotent(p.Payer, p.Payer, om, constants.TOKEN_PROGRAM))
 	}
-	if err := ensureRaydiumAmmV4ExpectedMint("OutputMint", params.OutputMint, outputMint); err != nil {
-		return nil, err
+	result = append(result, swap)
+	if p.CloseOutputMintAta && om == constants.WSOL_TOKEN_ACCOUNT {
+		result = append(result, CloseWsol(p.Payer))
 	}
-	inputMint := params.InputMint
-	expectedInputMint := pp.PcMint
-	if isBaseIn {
-		expectedInputMint = pp.CoinMint
+	if p.CloseInputMintAta {
+		result = append(result, token.NewCloseAccountInstruction(GetAssociatedTokenAddress(p.Payer, im, constants.TOKEN_PROGRAM), p.Payer, p.Payer, nil).Build())
 	}
-	if err := ensureRaydiumAmmV4ExpectedMint("InputMint", inputMint, expectedInputMint); err != nil {
-		return nil, err
-	}
-	inputMint = expectedInputMint
-
-	// Get user token accounts
-	userSourceTokenAccount := GetAssociatedTokenAddress(params.Payer, inputMint, constants.TOKEN_PROGRAM)
-	userDestinationTokenAccount := GetAssociatedTokenAddress(params.Payer, outputMint, constants.TOKEN_PROGRAM)
-
-	// Build instructions
-	instructions := make([]solana.Instruction, 0, 3)
-
-	// Create WSOL ATA for receiving if needed
-	if params.CreateOutputMintAta {
-		instructions = append(instructions, CreateAssociatedTokenAccountIdempotent(
-			params.Payer, params.Payer, outputMint, constants.TOKEN_PROGRAM,
-		))
-	}
-
-	// Build instruction data (17 bytes: 1 byte discriminator + 2x8 bytes amounts)
-	data := make([]byte, 17)
-	if params.FixedOutputAmount != nil {
-		copy(data[0:1], RaydiumAmmV4SwapBaseOutDiscriminator)
-	} else {
-		copy(data[0:1], RaydiumAmmV4SwapBaseInDiscriminator)
-	}
-	binary.LittleEndian.PutUint64(data[1:9], params.InputAmount)
-	binary.LittleEndian.PutUint64(data[9:17], minimumAmountOut)
-
-	// Build accounts array (18 accounts)
-	accounts := []solana.AccountMeta{
-		{PublicKey: constants.TOKEN_PROGRAM, IsSigner: false, IsWritable: false},    // 0: Token Program (readonly)
-		{PublicKey: pp.Amm, IsSigner: false, IsWritable: true},                      // 1: Amm
-		{PublicKey: RAYDIUM_AMM_V4_AUTHORITY, IsSigner: false, IsWritable: false},   // 2: Authority (readonly)
-		{PublicKey: pp.AmmOpenOrders, IsSigner: false, IsWritable: true},            // 3: Amm Open Orders
-		{PublicKey: pp.AmmTargetOrders, IsSigner: false, IsWritable: true},          // 4: Amm Target Orders
-		{PublicKey: pp.TokenCoin, IsSigner: false, IsWritable: true},                // 5: Pool Coin Token Account
-		{PublicKey: pp.TokenPc, IsSigner: false, IsWritable: true},                  // 6: Pool Pc Token Account
-		{PublicKey: pp.SerumProgram, IsSigner: false, IsWritable: false},            // 7: Serum Program
-		{PublicKey: pp.SerumMarket, IsSigner: false, IsWritable: true},              // 8: Serum Market
-		{PublicKey: pp.SerumBids, IsSigner: false, IsWritable: true},                // 9: Serum Bids
-		{PublicKey: pp.SerumAsks, IsSigner: false, IsWritable: true},                // 10: Serum Asks
-		{PublicKey: pp.SerumEventQueue, IsSigner: false, IsWritable: true},          // 11: Serum Event Queue
-		{PublicKey: pp.SerumCoinVaultAccount, IsSigner: false, IsWritable: true},    // 12: Serum Coin Vault Account
-		{PublicKey: pp.SerumPcVaultAccount, IsSigner: false, IsWritable: true},      // 13: Serum Pc Vault Account
-		{PublicKey: pp.SerumVaultSigner, IsSigner: false, IsWritable: false},        // 14: Serum Vault Signer
-		{PublicKey: userSourceTokenAccount, IsSigner: false, IsWritable: true},      // 15: User Source Token Account
-		{PublicKey: userDestinationTokenAccount, IsSigner: false, IsWritable: true}, // 16: User Destination Token Account
-		{PublicKey: params.Payer, IsSigner: true, IsWritable: false},                // 17: User Source Owner
-	}
-
-	instructions = append(instructions, newInstruction(RAYDIUM_AMM_V4_PROGRAM, accounts, data))
-
-	// Close WSOL ATA if requested
-	if params.CloseOutputMintAta && outputMint.Equals(constants.WSOL_TOKEN_ACCOUNT) {
-		instructions = append(instructions, CloseWsol(params.Payer))
-	}
-
-	// Close input token account if requested
-	if params.CloseInputMintAta {
-		closeIx := token.NewCloseAccountInstruction(
-			userSourceTokenAccount,
-			params.Payer,
-			params.Payer,
-			[]solana.PublicKey{},
-		).Build()
-		instructions = append(instructions, closeIx)
-	}
-
-	return instructions, nil
+	return result, nil
 }
-
-// Raydium AMM V4 error definitions
-var (
-	ErrRaydiumAmmV4InvalidPool = fmt.Errorf("raydium amm v4: invalid pool configuration")
-)
 
 // ===== AMM Info Decoder - from Rust: src/instruction/utils/raydium_amm_v4_types.rs =====
 
@@ -396,11 +253,11 @@ type RaydiumAmmOutputData struct {
 	PunishPcAmount      uint64
 	PunishCoinAmount    uint64
 	OrderbookToInitTime uint64
-	SwapCoinInAmount    uint64
-	SwapPcOutAmount     uint64
+	SwapCoinInAmount    *big.Int
+	SwapPcOutAmount     *big.Int
 	SwapTakePcFee       uint64
-	SwapPcInAmount      uint64
-	SwapCoinOutAmount   uint64
+	SwapPcInAmount      *big.Int
+	SwapCoinOutAmount   *big.Int
 	SwapTakeCoinFee     uint64
 }
 
@@ -454,6 +311,15 @@ func DecodeAmmInfo(data []byte) *RaydiumAmmInfo {
 		val := binary.LittleEndian.Uint64(data[offset:])
 		offset += 8
 		return val
+	}
+
+	readU128 := func() *big.Int {
+		raw := append([]byte{}, data[offset:offset+16]...)
+		for i, j := 0, 15; i < j; i, j = i+1, j-1 {
+			raw[i], raw[j] = raw[j], raw[i]
+		}
+		offset += 16
+		return new(big.Int).SetBytes(raw)
 	}
 
 	// status: u64
@@ -511,11 +377,11 @@ func DecodeAmmInfo(data []byte) *RaydiumAmmInfo {
 		PunishPcAmount:      readU64(),
 		PunishCoinAmount:    readU64(),
 		OrderbookToInitTime: readU64(),
-		SwapCoinInAmount:    readU64(),
-		SwapPcOutAmount:     readU64(),
+		SwapCoinInAmount:    readU128(),
+		SwapPcOutAmount:     readU128(),
 		SwapTakePcFee:       readU64(),
-		SwapPcInAmount:      readU64(),
-		SwapCoinOutAmount:   readU64(),
+		SwapPcInAmount:      readU128(),
+		SwapCoinOutAmount:   readU128(),
 		SwapTakeCoinFee:     readU64(),
 	}
 

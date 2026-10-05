@@ -212,8 +212,8 @@ func TestBondingCurve_GetBuyPrice(t *testing.T) {
 	}
 
 	// Buy with 0.001 SOL
-	tokens := curve.GetBuyPrice(1000000)
-	if tokens == 0 {
+	tokens, err := curve.GetBuyPrice(1000000)
+	if err != nil || tokens == 0 {
 		t.Error("expected non-zero token output")
 	}
 }
@@ -227,13 +227,13 @@ func TestBondingCurve_GetSellPrice(t *testing.T) {
 	}
 
 	// Sell 1 million tokens
-	sol := curve.GetSellPrice(1000000000, 100)
-	if sol == 0 {
+	sol, err := curve.GetSellPrice(1000000000, 100)
+	if err != nil || sol == 0 {
 		t.Error("expected non-zero SOL output")
 	}
 }
 
-func TestBondingCurve_CompleteCurveReturnsZero(t *testing.T) {
+func TestBondingCurve_CompleteCurveReturnsError(t *testing.T) {
 	curve := &common.BondingCurveAccount{
 		VirtualTokenReserves: 1073000000000000,
 		VirtualSolReserves:   30000000000,
@@ -241,14 +241,14 @@ func TestBondingCurve_CompleteCurveReturnsZero(t *testing.T) {
 		Complete:             true,
 	}
 
-	tokens := curve.GetBuyPrice(1000000)
-	if tokens != 0 {
-		t.Error("expected zero tokens for complete curve")
+	tokens, err := curve.GetBuyPrice(1000000)
+	if err == nil || tokens != 0 {
+		t.Error("expected completed-curve error")
 	}
 
-	sol := curve.GetSellPrice(1000000000, 100)
-	if sol != 0 {
-		t.Error("expected zero SOL for complete curve")
+	sol, err := curve.GetSellPrice(1000000000, 100)
+	if err == nil || sol != 0 {
+		t.Error("expected completed-curve error")
 	}
 }
 
@@ -298,10 +298,10 @@ func TestTradingFactoryExecutorsDoNotReturnFakeSuccess(t *testing.T) {
 			if result != nil {
 				t.Fatalf("expected no fake success result, got %+v", result)
 			}
-			if !errors.Is(err, soltradesdk.ErrTradingExecutionUnavailable) {
-				t.Fatalf("expected ErrTradingExecutionUnavailable, got %v", err)
+			if !errors.Is(err, soltradesdk.ErrInvalidProtocolParams) {
+				t.Fatalf("expected ErrInvalidProtocolParams, got %v", err)
 			}
-			if !strings.Contains(err.Error(), "does not build or submit protocol trades") {
+			if !strings.Contains(err.Error(), "provide TradeExecutionRequest") {
 				t.Fatalf("error should document execution boundary, got %v", err)
 			}
 		})
@@ -310,10 +310,10 @@ func TestTradingFactoryExecutorsDoNotReturnFakeSuccess(t *testing.T) {
 			if result != nil {
 				t.Fatalf("expected no fake success result, got %+v", result)
 			}
-			if !errors.Is(err, soltradesdk.ErrTradingExecutionUnavailable) {
-				t.Fatalf("expected ErrTradingExecutionUnavailable, got %v", err)
+			if !errors.Is(err, soltradesdk.ErrInvalidProtocolParams) {
+				t.Fatalf("expected ErrInvalidProtocolParams, got %v", err)
 			}
-			if !strings.Contains(err.Error(), "does not build or submit protocol trades") {
+			if !strings.Contains(err.Error(), "provide TradeExecutionRequest") {
 				t.Fatalf("error should document execution boundary, got %v", err)
 			}
 		})

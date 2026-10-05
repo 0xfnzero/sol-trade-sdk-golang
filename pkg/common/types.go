@@ -2,6 +2,8 @@ package common
 
 import (
 	"encoding/binary"
+	"fmt"
+	"math/big"
 	"sync"
 	"sync/atomic"
 
@@ -27,6 +29,8 @@ const (
 	SwqosTypeSpeedlanding = soltradesdk.SwqosTypeSpeedlanding
 	SwqosTypeHelius       = soltradesdk.SwqosTypeHelius
 	SwqosTypeSolami       = soltradesdk.SwqosTypeSolami
+	SwqosTypeLunarLander  = soltradesdk.SwqosTypeLunarLander
+	SwqosTypeGlaive       = soltradesdk.SwqosTypeGlaive
 	SwqosTypeDefault      = soltradesdk.SwqosTypeDefault
 
 	TradeTypeBuy  = soltradesdk.TradeTypeBuy
@@ -50,6 +54,8 @@ func GetAllSwqosTypes() []SwqosType {
 		SwqosTypeSpeedlanding,
 		SwqosTypeHelius,
 		SwqosTypeSolami,
+		SwqosTypeLunarLander,
+		SwqosTypeGlaive,
 		SwqosTypeDefault,
 	}
 }
@@ -287,157 +293,142 @@ type BondingCurveAccount struct {
 	Creator              [32]byte
 	IsMayhemMode         bool
 	IsCashbackCoin       bool
+	QuoteMint            [32]byte
 }
 
 // Constants for bonding curve calculations
 const (
 	InitialVirtualTokenReserves uint64 = 1073000000000000
 	InitialVirtualSolReserves   uint64 = 30000000000
-	InitialRealTokenReserves    uint64 = 793000000000000
+	InitialRealTokenReserves    uint64 = 793100000000000
 	TokenTotalSupply            uint64 = 1000000000000000
-	FeeBasisPoints              uint64 = 100 // 1%
-	CreatorFee                  uint64 = 50  // 0.5%
+	FeeBasisPoints              uint64 = 95 // Pinned fallback; not current fee discovery.
+	CreatorFee                  uint64 = 30
 )
 
-// GetBuyPrice calculates the amount of tokens received for a given SOL amount
-func (b *BondingCurveAccount) GetBuyPrice(amount uint64) uint64 {
-	if b.Complete || amount == 0 {
-		return 0
-	}
+// Curve price math uses wide intermediates, as in the pinned Rust u128 methods.
+func curveInt(n uint64) *big.Int { return new(big.Int).SetUint64(n) }
 
-	n := uint128(uint64(b.VirtualSolReserves) * uint64(b.VirtualTokenReserves))
-	i := uint128(uint64(b.VirtualSolReserves) + uint64(amount))
-	r := n/i + 1
-	s := uint128(uint64(b.VirtualTokenReserves)) - r
-
-	if uint64(s) < b.RealTokenReserves {
-		return uint64(s)
+// Checked entries preserve Rust's error on completed or invalid curves.
+func (b *BondingCurveAccount) GetBuyPriceChecked(amount uint64) (uint64, error) {
+	if b.Complete {
+		return 0, fmt.Errorf("Curve is complete")
 	}
-	return b.RealTokenReserves
+	if amount == 0 {
+		return 0, nil
+	}
+	product := new(big.Int).Mul(curveInt(b.VirtualSolReserves), curveInt(b.VirtualTokenReserves))
+	denominator := new(big.Int).Add(curveInt(b.VirtualSolReserves), curveInt(amount))
+	reserve := new(big.Int).Add(new(big.Int).Quo(product, denominator), big.NewInt(1))
+	if reserve.Cmp(curveInt(b.VirtualTokenReserves)) > 0 {
+		return 0, fmt.Errorf("Invalid curve reserves")
+	}
+	out := new(big.Int).Sub(curveInt(b.VirtualTokenReserves), reserve).Uint64()
+	if out > b.RealTokenReserves {
+		out = b.RealTokenReserves
+	}
+	return out, nil
 }
-
-// GetSellPrice calculates the amount of SOL received for selling tokens
-func (b *BondingCurveAccount) GetSellPrice(amount uint64, feeBasisPoints uint64) uint64 {
-	if b.Complete || amount == 0 {
-		return 0
-	}
-
-	n := (uint128(amount) * uint128(b.VirtualSolReserves)) / (uint128(b.VirtualTokenReserves) + uint128(amount))
-	a := (n * uint128(feeBasisPoints)) / 10000
-
-	return uint64(n - a)
+func (b *BondingCurveAccount) GetBuyPrice(amount uint64) (uint64, error) {
+	return b.GetBuyPriceChecked(amount)
 }
-
-// GetMarketCapSol calculates the current market cap in SOL
+func (b *BondingCurveAccount) GetSellPriceChecked(amount, feeBasisPoints uint64) (uint64, error) {
+	if b.Complete {
+		return 0, fmt.Errorf("Curve is complete")
+	}
+	if amount == 0 {
+		return 0, nil
+	}
+	gross := new(big.Int).Quo(new(big.Int).Mul(curveInt(amount), curveInt(b.VirtualSolReserves)), new(big.Int).Add(curveInt(b.VirtualTokenReserves), curveInt(amount)))
+	fee := new(big.Int).Quo(new(big.Int).Mul(new(big.Int).Set(gross), curveInt(feeBasisPoints)), big.NewInt(10000))
+	if fee.Cmp(gross) > 0 {
+		return 0, fmt.Errorf("Fee exceeds output")
+	}
+	return new(big.Int).Sub(gross, fee).Uint64(), nil
+}
+func (b *BondingCurveAccount) GetSellPrice(amount, feeBasisPoints uint64) (uint64, error) {
+	return b.GetSellPriceChecked(amount, feeBasisPoints)
+}
 func (b *BondingCurveAccount) GetMarketCapSol() uint64 {
 	if b.VirtualTokenReserves == 0 {
 		return 0
 	}
-	return uint64((uint128(b.TokenTotalSupply) * uint128(b.VirtualSolReserves)) / uint128(b.VirtualTokenReserves))
+	return new(big.Int).Quo(new(big.Int).Mul(curveInt(b.TokenTotalSupply), curveInt(b.VirtualSolReserves)), curveInt(b.VirtualTokenReserves)).Uint64()
 }
-
-// GetTokenPrice calculates the token price in SOL
 func (b *BondingCurveAccount) GetTokenPrice() float64 {
-	if b.VirtualTokenReserves == 0 {
-		return 0
+	return (float64(b.VirtualSolReserves) / 100_000_000.0) / (float64(b.VirtualTokenReserves) / 100_000.0)
+}
+func (b *BondingCurveAccount) GetBuyOutPriceChecked(amount, feeBasisPoints uint64) (uint64, error) {
+	tokens := amount
+	if tokens < b.RealSolReserves {
+		tokens = b.RealSolReserves
 	}
-	vSol := float64(b.VirtualSolReserves) / 100_000_000.0
-	vTokens := float64(b.VirtualTokenReserves) / 100_000.0
-	return vSol / vTokens
+	if tokens >= b.VirtualTokenReserves {
+		return 0, fmt.Errorf("Invalid buyout reserves")
+	}
+	value := new(big.Int).Add(new(big.Int).Quo(new(big.Int).Mul(curveInt(tokens), curveInt(b.VirtualSolReserves)), curveInt(b.VirtualTokenReserves-tokens)), big.NewInt(1))
+	fee := new(big.Int).Quo(new(big.Int).Mul(new(big.Int).Set(value), curveInt(feeBasisPoints)), big.NewInt(10000))
+	return new(big.Int).Add(value, fee).Uint64(), nil
+}
+func (b *BondingCurveAccount) GetBuyOutPrice(amount, feeBasisPoints uint64) (uint64, error) {
+	return b.GetBuyOutPriceChecked(amount, feeBasisPoints)
+}
+func (b *BondingCurveAccount) GetFinalMarketCapSolChecked(feeBasisPoints uint64) (uint64, error) {
+	value, err := b.GetBuyOutPriceChecked(b.RealTokenReserves, feeBasisPoints)
+	if err != nil {
+		return 0, err
+	}
+	if b.RealTokenReserves > b.VirtualTokenReserves {
+		return 0, fmt.Errorf("Invalid curve reserves")
+	}
+	tokens := b.VirtualTokenReserves - b.RealTokenReserves
+	if tokens == 0 {
+		return 0, nil
+	}
+	virtualValue := new(big.Int).Add(curveInt(b.VirtualSolReserves), curveInt(value))
+	return new(big.Int).Quo(new(big.Int).Mul(curveInt(b.TokenTotalSupply), virtualValue), curveInt(tokens)).Uint64(), nil
+}
+func (b *BondingCurveAccount) GetFinalMarketCapSol(feeBasisPoints uint64) (uint64, error) {
+	return b.GetFinalMarketCapSolChecked(feeBasisPoints)
 }
 
-// GetFinalMarketCapSol calculates the final market cap in SOL after all tokens are sold.
-// 100% from Rust: src/common/bonding_curve.rs get_final_market_cap_sol
-func (b *BondingCurveAccount) GetFinalMarketCapSol(feeBasisPoints uint64) uint64 {
-	totalSellValue := b.getBuyOutPriceInternal(b.RealTokenReserves, feeBasisPoints)
-	totalVirtualValue := b.VirtualSolReserves + totalSellValue
-	totalVirtualTokens := b.VirtualTokenReserves - b.RealTokenReserves
+// BondingCurveAccountSize includes the discriminator and the V2 quote mint.
+const BondingCurveAccountSize = 115
 
-	if totalVirtualTokens == 0 {
-		return 0
-	}
-
-	return (b.TokenTotalSupply * totalVirtualValue) / totalVirtualTokens
-}
-
-func (b *BondingCurveAccount) getBuyOutPriceInternal(amount uint64, feeBasisPoints uint64) uint64 {
-	solTokens := amount
-	if amount < b.RealSolReserves {
-		solTokens = b.RealSolReserves
-	}
-
-	if b.VirtualTokenReserves <= solTokens {
-		return 0
-	}
-
-	totalSellValue := (solTokens*b.VirtualSolReserves)/(b.VirtualTokenReserves-solTokens) + 1
-	fee := (totalSellValue * feeBasisPoints) / 10000
-
-	return totalSellValue + fee
-}
-
-// BondingCurveAccountSize is the size of bonding curve account data (after discriminator)
-const BondingCurveAccountSize = 8 + 8 + 8 + 8 + 8 + 8 + 1 + 32 + 1 + 1 // 77 bytes
-
-// DecodeBondingCurveAccount decodes a BondingCurveAccount from on-chain account data.
-// 100% from Rust: src/common/bonding_curve.rs
+// DecodeBondingCurveAccount accepts discriminator-prefixed accounts and exact
+// legacy/V2 Borsh bodies. Legacy bodies have no quote mint (zero means native).
+// Reject partial quote keys and malformed Borsh booleans.
 func DecodeBondingCurveAccount(data []byte, account [32]byte) *BondingCurveAccount {
-	if len(data) < BondingCurveAccountSize {
-		return nil
-	}
-
 	offset := 0
-
-	// Check if data starts with discriminator (8 bytes)
-	if len(data) >= 8+BondingCurveAccountSize {
-		// Skip discriminator
+	if (len(data) == 75 || len(data) == 107) && string(data[:8]) != string([]byte{23, 183, 248, 55, 96, 216, 172, 96}) {
+		// Explicit-size Borsh body.
+	} else {
+		if len(data) < 83 || (len(data) > 83 && len(data) < 115) || string(data[:8]) != string([]byte{23, 183, 248, 55, 96, 216, 172, 96}) {
+			return nil
+		}
 		offset = 8
 	}
-
-	curve := &BondingCurveAccount{
-		Account: account,
+	body := data[offset:]
+	for _, index := range []int{40, 73, 74} {
+		if body[index] > 1 {
+			return nil
+		}
 	}
-
-	// virtual_token_reserves: u64
-	curve.VirtualTokenReserves = binary.LittleEndian.Uint64(data[offset:])
-	offset += 8
-
-	// virtual_sol_reserves: u64
-	curve.VirtualSolReserves = binary.LittleEndian.Uint64(data[offset:])
-	offset += 8
-
-	// real_token_reserves: u64
-	curve.RealTokenReserves = binary.LittleEndian.Uint64(data[offset:])
-	offset += 8
-
-	// real_sol_reserves: u64
-	curve.RealSolReserves = binary.LittleEndian.Uint64(data[offset:])
-	offset += 8
-
-	// token_total_supply: u64
-	curve.TokenTotalSupply = binary.LittleEndian.Uint64(data[offset:])
-	offset += 8
-
-	// complete: bool
-	curve.Complete = data[offset] == 1
-	offset += 1
-
-	// creator: Pubkey (32 bytes)
-	copy(curve.Creator[:], data[offset:offset+32])
-	offset += 32
-
-	// is_mayhem_mode: bool
-	curve.IsMayhemMode = data[offset] == 1
-	offset += 1
-
-	// is_cashback_coin: bool
-	curve.IsCashbackCoin = data[offset] == 1
-
+	curve := &BondingCurveAccount{Account: account}
+	curve.VirtualTokenReserves = binary.LittleEndian.Uint64(body[0:8])
+	curve.VirtualSolReserves = binary.LittleEndian.Uint64(body[8:16])
+	curve.RealTokenReserves = binary.LittleEndian.Uint64(body[16:24])
+	curve.RealSolReserves = binary.LittleEndian.Uint64(body[24:32])
+	curve.TokenTotalSupply = binary.LittleEndian.Uint64(body[32:40])
+	curve.Complete = body[40] == 1
+	copy(curve.Creator[:], body[41:73])
+	curve.IsMayhemMode = body[73] == 1
+	curve.IsCashbackCoin = body[74] == 1
+	if len(body) >= 107 {
+		copy(curve.QuoteMint[:], body[75:107])
+	}
 	return curve
 }
-
-// uint128 represents a 128-bit unsigned integer (simplified)
-type uint128 = uint64 // Simplified for Go implementation
 
 // ===== Clock =====
 

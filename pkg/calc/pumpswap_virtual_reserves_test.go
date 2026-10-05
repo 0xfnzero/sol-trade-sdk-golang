@@ -3,6 +3,7 @@ package calc
 import (
 	"math"
 	"math/big"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -17,7 +18,7 @@ func TestEffectiveQuoteReservesSignedRange(t *testing.T) {
 	}{
 		{name: "positive", raw: 1_000, virtual: big.NewInt(250), want: 1_250},
 		{name: "negative", raw: 1_000, virtual: big.NewInt(-250), want: 750},
-		{name: "zero", raw: 1_000, virtual: big.NewInt(-1_000), wantErr: true},
+		{name: "zero", raw: 1_000, virtual: big.NewInt(-1_000), want: 0},
 		{name: "negative result", raw: 100, virtual: big.NewInt(-101), wantErr: true},
 		{name: "u64 overflow", raw: math.MaxUint64, virtual: big.NewInt(1), wantErr: true},
 	}
@@ -106,5 +107,48 @@ func TestPumpSwapSellRejectsVirtualLiquidityBeyondVaultBalance(t *testing.T) {
 	)
 	if err == nil {
 		t.Fatal("expected real quote reserve error")
+	}
+}
+
+func TestNegativeVirtualReservesAllQuoteModes(t *testing.T) {
+	fees := PumpSwapFeeBasisPoints{LPFeeBasisPoints: 20, ProtocolFeeBasisPoints: 5, CoinCreatorFeeBasisPoints: 30}
+	modes := []struct {
+		name  string
+		quote func(uint64, *big.Int) (any, error)
+	}{
+		{"buy base", func(raw uint64, virtual *big.Int) (any, error) {
+			return BuyBaseInputInternalWithFees(10000, 125, 1000000, raw, virtual, fees)
+		}},
+		{"buy quote", func(raw uint64, virtual *big.Int) (any, error) {
+			return BuyQuoteInputInternalWithFees(10000, 125, 1000000, raw, virtual, fees)
+		}},
+		{"sell base", func(raw uint64, virtual *big.Int) (any, error) {
+			return SellBaseInputInternalWithFees(10000, 125, 1000000, raw, virtual, fees)
+		}},
+		{"sell quote", func(raw uint64, virtual *big.Int) (any, error) {
+			return SellQuoteInputInternalWithFees(10000, 125, 1000000, raw, virtual, fees)
+		}},
+	}
+	for _, mode := range modes {
+		t.Run(mode.name, func(t *testing.T) {
+			virtual := big.NewInt(-500000)
+			got, err := mode.quote(1000000, virtual)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, err := mode.quote(500000, big.NewInt(0))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("negative offset = %+v, effective vault = %+v", got, want)
+			}
+			if virtual.Int64() != -500000 {
+				t.Fatal("quote mutated virtual reserves")
+			}
+			if _, err := mode.quote(1000000, big.NewInt(-1000000)); err == nil {
+				t.Fatal("quoted depleted effective reserves")
+			}
+		})
 	}
 }

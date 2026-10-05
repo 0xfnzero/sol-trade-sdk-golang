@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -29,6 +30,8 @@ type SubscriptionHandle struct {
 	cancel      context.CancelFunc
 	active      atomic.Bool
 	subscribed  atomic.Bool
+	serverID    atomic.Uint64
+	awaiting    atomic.Bool
 	mu          sync.RWMutex
 }
 
@@ -41,7 +44,7 @@ func NewSubscriptionHandle(
 	errCallback func(error),
 ) *SubscriptionHandle {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &SubscriptionHandle{
+	h := &SubscriptionHandle{
 		id:          id,
 		method:      method,
 		params:      params,
@@ -50,6 +53,8 @@ func NewSubscriptionHandle(
 		ctx:         ctx,
 		cancel:      cancel,
 	}
+	h.active.Store(true)
+	return h
 }
 
 // ID returns the subscription ID
@@ -84,15 +89,22 @@ func (h *SubscriptionHandle) Context() context.Context {
 
 // Unsubscribe cancels the subscription
 func (h *SubscriptionHandle) Unsubscribe() {
-	if h.active.CompareAndSwap(true, false) {
-		h.cancel()
-	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.active.Store(false)
+	h.cancel()
+
 }
 
 // setSubscribed marks the subscription as successfully subscribed
-func (h *SubscriptionHandle) setSubscribed() {
+func (h *SubscriptionHandle) setSubscribed() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.ctx.Err() != nil || !h.active.Load() {
+		return false
+	}
 	h.subscribed.Store(true)
-	h.active.Store(true)
+	return true
 }
 
 // notify calls the callback with data
@@ -154,6 +166,10 @@ type SubscriptionManager struct {
 	subIDToHandleID sync.Map // map[uint64]SubscriptionID (server sub ID -> local handle ID)
 	nextID          atomic.Uint64
 	requestID       atomic.Uint64
+	pending         sync.Map // request ID -> handle; kept until acknowledgment
+	responseMu      sync.Mutex
+	writeMu         sync.Mutex
+	stopOnce        sync.Once
 
 	// Connection management
 	connected    atomic.Bool
@@ -246,11 +262,25 @@ func NewSubscriptionManager(endpoint string, opts ...SubscriptionManagerOption) 
 		opt(m)
 	}
 
+	if m.pingInterval <= 0 {
+		m.pingInterval = 30 * time.Second
+	}
+	if m.reconnectDelay <= 0 {
+		m.reconnectDelay = 5 * time.Second
+	}
+	if m.writeTimeout <= 0 {
+		m.writeTimeout = 10 * time.Second
+	}
 	return m
 }
 
 // Connect establishes the WebSocket connection
 func (m *SubscriptionManager) Connect(ctx context.Context) error {
+	select {
+	case <-m.stopCh:
+		return errors.New("subscription manager closed")
+	default:
+	}
 	if m.connected.Load() {
 		return nil
 	}
@@ -265,51 +295,62 @@ func (m *SubscriptionManager) Connect(ctx context.Context) error {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
 
+	m.writeMu.Lock()
 	m.mu.Lock()
+	select {
+	case <-m.stopCh:
+		m.mu.Unlock()
+		m.writeMu.Unlock()
+		conn.Close()
+		return errors.New("subscription manager closed")
+	default:
+	}
+	m.responseMu.Lock()
+	m.subIDToHandleID.Range(func(k, v interface{}) bool { m.subIDToHandleID.Delete(k); return true })
+	m.pending.Range(func(k, v interface{}) bool { m.pending.Delete(k); return true })
+	m.subscriptions.Range(func(k, v interface{}) bool {
+		h := v.(*SubscriptionHandle)
+		h.subscribed.Store(false)
+		h.awaiting.Store(false)
+		return true
+	})
+	m.responseMu.Unlock()
 	m.conn = conn
-	m.mu.Unlock()
-
 	m.connected.Store(true)
+	m.mu.Unlock()
+	m.writeMu.Unlock()
 
 	// Start goroutines
-	go m.readLoop()
-	go m.pingLoop()
+	go m.readLoop(conn)
+	go m.pingLoop(conn)
 
+	m.resubscribeAll()
 	if m.onConnect != nil {
 		m.onConnect()
 	}
-
-	// Resubscribe to existing subscriptions
-	m.resubscribeAll()
 
 	return nil
 }
 
 // Disconnect closes the WebSocket connection
 func (m *SubscriptionManager) Disconnect() error {
-	close(m.stopCh)
-
-	m.connected.Store(false)
-
+	m.stopOnce.Do(func() { close(m.stopCh) })
+	m.writeMu.Lock()
+	defer m.writeMu.Unlock()
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.conn != nil {
-		// Unsubscribe all
-		m.subscriptions.Range(func(key, value interface{}) bool {
-			handle := value.(*SubscriptionHandle)
-			handle.Unsubscribe()
-			return true
-		})
-
-		err := m.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-		if err != nil {
-			m.conn.Close()
-			return err
-		}
-		return m.conn.Close()
+	conn := m.conn
+	m.conn = nil
+	m.connected.Store(false)
+	m.mu.Unlock()
+	m.subscriptions.Range(func(k, v interface{}) bool {
+		v.(*SubscriptionHandle).Unsubscribe()
+		m.subscriptions.Delete(k)
+		return true
+	})
+	if conn != nil {
+		_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(m.writeTimeout))
+		return conn.Close()
 	}
-
 	return nil
 }
 
@@ -349,17 +390,17 @@ func (m *SubscriptionManager) Unsubscribe(handle *SubscriptionHandle) error {
 	if handle == nil {
 		return nil
 	}
-
+	m.responseMu.Lock()
 	handle.Unsubscribe()
-
-	// Send unsubscribe if subscribed
-	if handle.IsSubscribed() {
-		if err := m.sendUnsubscribe(handle); err != nil {
-			return err
-		}
-	}
-
+	subscribed := handle.IsSubscribed()
 	m.subscriptions.Delete(handle.ID())
+	if subscribed {
+		m.subIDToHandleID.Delete(handle.serverID.Load())
+	}
+	m.responseMu.Unlock()
+	if subscribed {
+		return m.sendUnsubscribe(handle)
+	}
 	return nil
 }
 
@@ -379,7 +420,30 @@ func (m *SubscriptionManager) sendSubscribe(handle *SubscriptionHandle) error {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	return m.write(data)
+	m.writeMu.Lock()
+	defer m.writeMu.Unlock()
+	m.mu.RLock()
+	conn := m.conn
+	m.mu.RUnlock()
+	if conn == nil {
+		return ErrNotConnected
+	}
+	if !handle.IsActive() || handle.IsSubscribed() || !handle.awaiting.CompareAndSwap(false, true) {
+		return nil
+	}
+	m.responseMu.Lock()
+	m.pending.Store(reqID, handle)
+	m.responseMu.Unlock()
+	err = conn.SetWriteDeadline(time.Now().Add(m.writeTimeout))
+	if err == nil {
+		err = conn.WriteMessage(websocket.TextMessage, data)
+	}
+	if err != nil {
+		m.pending.Delete(reqID)
+		handle.awaiting.Store(false)
+		return err
+	}
+	return nil
 }
 
 // sendUnsubscribe sends an unsubscribe request
@@ -399,6 +463,10 @@ func (m *SubscriptionManager) sendUnsubscribe(handle *SubscriptionHandle) error 
 		method = "slotUnsubscribe"
 	case "blockSubscribe":
 		method = "blockUnsubscribe"
+	case "rootSubscribe":
+		method = "rootUnsubscribe"
+	case "voteSubscribe":
+		method = "voteUnsubscribe"
 	default:
 		return nil // Unknown method, skip unsubscribe
 	}
@@ -408,7 +476,7 @@ func (m *SubscriptionManager) sendUnsubscribe(handle *SubscriptionHandle) error 
 		JSONRPC: "2.0",
 		ID:      reqID,
 		Method:  method,
-		Params:  []interface{}{handle.ID()},
+		Params:  []interface{}{handle.serverID.Load()},
 	}
 
 	data, err := json.Marshal(req)
@@ -424,7 +492,10 @@ func (m *SubscriptionManager) resubscribeAll() {
 	m.subscriptions.Range(func(key, value interface{}) bool {
 		handle := value.(*SubscriptionHandle)
 		if handle.IsActive() {
-			m.sendSubscribe(handle)
+			if err := m.sendSubscribe(handle); err != nil {
+				handle.notifyError(err)
+				m.handleError(err)
+			}
 		}
 		return true
 	})
@@ -432,23 +503,25 @@ func (m *SubscriptionManager) resubscribeAll() {
 
 // write sends data over the WebSocket
 func (m *SubscriptionManager) write(data []byte) error {
+	m.writeMu.Lock()
+	defer m.writeMu.Unlock()
 	m.mu.RLock()
 	conn := m.conn
 	m.mu.RUnlock()
-
 	if conn == nil {
-		return errors.New("not connected")
+		return ErrNotConnected
 	}
-
-	conn.SetWriteDeadline(time.Now().Add(m.writeTimeout))
+	if err := conn.SetWriteDeadline(time.Now().Add(m.writeTimeout)); err != nil {
+		return err
+	}
 	return conn.WriteMessage(websocket.TextMessage, data)
 }
 
 // readLoop reads messages from the WebSocket
-func (m *SubscriptionManager) readLoop() {
+func (m *SubscriptionManager) readLoop(conn *websocket.Conn) {
 	defer func() {
 		if r := recover(); r != nil {
-			m.handleError(fmt.Errorf("panic in read loop: %v", r))
+			m.handleDisconnect(conn, fmt.Errorf("panic in read loop: %v", r))
 		}
 	}()
 
@@ -459,17 +532,9 @@ func (m *SubscriptionManager) readLoop() {
 		default:
 		}
 
-		m.mu.RLock()
-		conn := m.conn
-		m.mu.RUnlock()
-
-		if conn == nil {
-			return
-		}
-
 		_, data, err := conn.ReadMessage()
 		if err != nil {
-			m.handleDisconnect(err)
+			m.handleDisconnect(conn, err)
 			return
 		}
 
@@ -478,29 +543,23 @@ func (m *SubscriptionManager) readLoop() {
 }
 
 // pingLoop sends periodic ping messages
-func (m *SubscriptionManager) pingLoop() {
+func (m *SubscriptionManager) pingLoop(conn *websocket.Conn) {
 	ticker := time.NewTicker(m.pingInterval)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-m.stopCh:
 			return
 		case <-ticker.C:
-			if !m.connected.Load() {
+			m.mu.RLock()
+			current := m.conn == conn
+			m.mu.RUnlock()
+			if !current {
 				return
 			}
-
-			m.mu.RLock()
-			conn := m.conn
-			m.mu.RUnlock()
-
-			if conn != nil {
-				conn.SetWriteDeadline(time.Now().Add(m.writeTimeout))
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-					m.handleDisconnect(err)
-					return
-				}
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(m.writeTimeout)); err != nil {
+				m.handleDisconnect(conn, err)
+				return
 			}
 		}
 	}
@@ -510,7 +569,7 @@ func (m *SubscriptionManager) pingLoop() {
 func (m *SubscriptionManager) handleMessage(data []byte) {
 	// Try to parse as notification first
 	var notification WSNotification
-	if err := json.Unmarshal(data, &notification); err == nil && notification.Method == "subscription" {
+	if err := json.Unmarshal(data, &notification); err == nil && strings.HasSuffix(notification.Method, "Notification") {
 		m.handleNotification(data)
 		return
 	}
@@ -553,34 +612,93 @@ func (m *SubscriptionManager) handleNotification(data []byte) {
 		return // Handle not found
 	}
 
-	handle.(*SubscriptionHandle).notify(notif.Params.Result)
+	h := handle.(*SubscriptionHandle)
+	if notif.Method != strings.TrimSuffix(h.Method(), "Subscribe")+"Notification" {
+		return
+	}
+	h.notify(notif.Params.Result)
+	if h.Method() == "signatureSubscribe" {
+		var received struct {
+			Value json.RawMessage `json:"value"`
+		}
+		_ = json.Unmarshal(notif.Params.Result, &received)
+		var value string
+		// receivedSignature is carried inside the contextual notification value.
+		if json.Unmarshal(received.Value, &value) != nil || value != "receivedSignature" {
+			h.Unsubscribe()
+			m.subscriptions.Delete(h.ID())
+			m.subIDToHandleID.Delete(notif.Params.Subscription)
+		}
+	}
 }
 
 // handleResponse processes RPC responses
 func (m *SubscriptionManager) handleResponse(resp *WSResponse) {
+	m.responseMu.Lock()
+	value, ok := m.pending.LoadAndDelete(resp.ID)
+	if !ok {
+		m.responseMu.Unlock()
+		return
+	}
+	h := value.(*SubscriptionHandle)
+	h.awaiting.Store(false)
 	if resp.Error != nil {
+		m.subscriptions.Delete(h.ID())
+		m.responseMu.Unlock()
+		h.notifyError(resp.Error)
+		h.Unsubscribe()
 		m.handleError(resp.Error)
 		return
 	}
-
-	// For subscription responses, the result is the subscription ID
 	var subID uint64
-	if err := json.Unmarshal(resp.Result, &subID); err == nil {
-		// Map server subscription ID to local handle ID
-		// In a real implementation, we'd track pending subscriptions
-		_ = subID
+	if err := json.Unmarshal(resp.Result, &subID); err != nil || string(resp.Result) == "null" {
+		m.subscriptions.Delete(h.ID())
+		m.responseMu.Unlock()
+		h.notifyError(ErrSubscriptionFailed)
+		h.Unsubscribe()
+		m.handleError(ErrSubscriptionFailed)
+		return
 	}
+	h.serverID.Store(subID)
+	if !h.setSubscribed() {
+		m.subscriptions.Delete(h.ID())
+		m.responseMu.Unlock()
+		if err := m.sendUnsubscribe(h); err != nil {
+			m.handleError(err)
+		}
+		return
+	}
+	m.subIDToHandleID.Store(subID, h.ID())
+	m.responseMu.Unlock()
 }
 
 // handleDisconnect handles disconnection
-func (m *SubscriptionManager) handleDisconnect(err error) {
+func (m *SubscriptionManager) handleDisconnect(conn *websocket.Conn, err error) {
+	m.writeMu.Lock()
+	m.mu.Lock()
+	if m.conn != conn {
+		m.mu.Unlock()
+		m.writeMu.Unlock()
+		return
+	}
+	m.conn = nil
 	m.connected.Store(false)
-
+	m.mu.Unlock()
+	_ = conn.Close()
+	m.responseMu.Lock()
+	m.subIDToHandleID.Range(func(k, v interface{}) bool { m.subIDToHandleID.Delete(k); return true })
+	m.pending.Range(func(k, v interface{}) bool { m.pending.Delete(k); return true })
+	m.subscriptions.Range(func(k, v interface{}) bool {
+		h := v.(*SubscriptionHandle)
+		h.subscribed.Store(false)
+		h.awaiting.Store(false)
+		return true
+	})
+	m.responseMu.Unlock()
+	m.writeMu.Unlock()
 	if m.onDisconnect != nil {
 		m.onDisconnect(err)
 	}
-
-	// Attempt reconnection if not explicitly stopped
 	select {
 	case <-m.stopCh:
 		return
@@ -596,11 +714,12 @@ func (m *SubscriptionManager) reconnect() {
 	}
 	defer m.reconnecting.Store(false)
 
+	delay := m.reconnectDelay
 	for {
 		select {
 		case <-m.stopCh:
 			return
-		case <-time.After(m.reconnectDelay):
+		case <-time.After(delay):
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -612,9 +731,9 @@ func (m *SubscriptionManager) reconnect() {
 		}
 
 		// Exponential backoff
-		m.reconnectDelay *= 2
-		if m.reconnectDelay > 60*time.Second {
-			m.reconnectDelay = 60 * time.Second
+		delay *= 2
+		if delay > 60*time.Second {
+			delay = 60 * time.Second
 		}
 	}
 }

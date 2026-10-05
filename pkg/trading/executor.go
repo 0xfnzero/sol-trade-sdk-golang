@@ -63,13 +63,14 @@ func (e *TradeExecutor) ensureDefaultRpcClient() {
 
 // ExecuteResult represents the result of a trade execution
 type ExecuteResult struct {
-	Signature      solana.Signature
-	Success        bool
-	Error          error
-	ConfirmationMs int64
-	SubmittedAt    time.Time
-	ConfirmedAt    time.Time
-	SwqosType      soltradesdk.SwqosType
+	Submitted, Confirmed bool
+	Signature            solana.Signature
+	Success              bool
+	Error                error
+	ConfirmationMs       int64
+	SubmittedAt          time.Time
+	ConfirmedAt          time.Time
+	SwqosType            soltradesdk.SwqosType
 }
 
 // ExecuteOptions represents options for trade execution

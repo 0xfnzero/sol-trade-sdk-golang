@@ -64,6 +64,8 @@ const (
 	SwqosTypeSpeedlanding = soltradesdk.SwqosTypeSpeedlanding
 	SwqosTypeHelius       = soltradesdk.SwqosTypeHelius
 	SwqosTypeSolami       = soltradesdk.SwqosTypeSolami
+	SwqosTypeLunarLander  = soltradesdk.SwqosTypeLunarLander
+	SwqosTypeGlaive       = soltradesdk.SwqosTypeGlaive
 	SwqosTypeDefault      = soltradesdk.SwqosTypeDefault
 
 	SwqosRegionNewYork    = soltradesdk.SwqosRegionNewYork
@@ -100,6 +102,8 @@ const (
 	MinTipSpeedlanding = 0.001
 	MinTipHelius       = 0.000005 // SWQOS-only mode
 	MinTipSolami       = 0.0001
+	MinTipLunarLander  = 0.001
+	MinTipGlaive       = 0.0001
 	MinTipDefault      = 0.00001
 )
 
@@ -269,6 +273,28 @@ var solamiTipAccounts = []string{
 	"sV72TY66T1RfmDSeHPPbwX6wwJ3bBv5hd4ehJ8tbeam",
 	"swf8MyEeLo7gtRUo27UuJj6naCASUrypU7dbteSbeam",
 	"uiuaQsxA47JybQAVN4FTfYuoEDkMiXV1r591Aewbeam",
+}
+
+var lunarLanderTipAccounts = []string{
+	"moon17L6BgxXRX5uHKudAmqVF96xia9h8ygcmG2sL3F",
+	"moon26Sek222Md7ZydcAGxoKG832DK36CkLrS3PQY4c",
+	"moon7fwyajcVstMoBnVy7UBcTx87SBtNoGGAaH2Cb8V",
+	"moonBtH9HvLHjLqi9ivyrMVKgFUsSfrz9BwQ9khhn1u",
+	"moonCJg8476LNFLptX1qrK8PdRsA1HD1R6XWyu9MB93",
+	"moonF2sz7qwAtdETnrgxNbjonnhGGjd6r4W4UC9284s",
+	"moonKfftMiGSak3cezvhEqvkPSzwrmQxQHXuspC96yj",
+	"moonQBUKBpkifLcTd78bfxxt4PYLwmJ5admLW6cBBs8",
+	"moonXwpKwoVkMegt5Bc776cSW793X1irL5hHV1vJ3JA",
+	"moonZ6u9E2fgk6eWd82621eLPHt9zuJuYECXAYjMY1C",
+}
+
+var glaiveTipAccounts = []string{
+	"GLaiv4GMRYQmthatDS98uQT4HoucgxWT8NeJz6oSwxeU",
+	"GLaivL5uPrDpvd1wTtvat38KGqb5WLhEdqQfnmNd3oNr",
+	"GLaivinAWh21NaJMhtExtD5G2gZs1xnvaYVZmwqobWZL",
+	"GLaivJSUL71FcocYa8tks5vpVyYzvaDMHtyrzfQF2ABr",
+	"GLaivRU6eDKrta3p3psFAWPEFLzCjeMHGpPUuQqTjtyv",
+	"GLaivq5dU8qHayz9Qf13LjPfVy3SmUhbmickfGiZdmfh",
 }
 
 var heliusTipAccounts = []string{
@@ -479,6 +505,58 @@ var solamiEndpoints = map[SwqosRegion]string{
 	SwqosRegionLondon:     "beam.solami.dev:11000",
 	SwqosRegionLosAngeles: "beam.solami.dev:11000",
 	SwqosRegionDefault:    "beam.solami.dev:11000",
+}
+
+var lunarLanderEndpoints = map[SwqosRegion]string{
+	SwqosRegionNewYork:    "http://nyc-1.prod.lunar-lander.hellomoon.io",
+	SwqosRegionFrankfurt:  "http://fra-1.prod.lunar-lander.hellomoon.io",
+	SwqosRegionAmsterdam:  "http://ams-1.prod.lunar-lander.hellomoon.io",
+	SwqosRegionDublin:     "http://ams-1.prod.lunar-lander.hellomoon.io",
+	SwqosRegionSLC:        "http://ash-2.prod.lunar-lander.hellomoon.io",
+	SwqosRegionTokyo:      "http://tyo-1.prod.lunar-lander.hellomoon.io",
+	SwqosRegionSingapore:  "http://tyo-1.prod.lunar-lander.hellomoon.io",
+	SwqosRegionLondon:     "http://fra-1.prod.lunar-lander.hellomoon.io",
+	SwqosRegionLosAngeles: "http://nyc-1.prod.lunar-lander.hellomoon.io",
+	SwqosRegionDefault:    "http://nyc-1.prod.lunar-lander.hellomoon.io",
+}
+
+var lunarLanderQuicEndpoints = map[SwqosRegion]string{
+	SwqosRegionNewYork:    "nyc-1.prod.lunar-lander.hellomoon.io:16888",
+	SwqosRegionFrankfurt:  "fra-1.prod.lunar-lander.hellomoon.io:16888",
+	SwqosRegionAmsterdam:  "ams-1.prod.lunar-lander.hellomoon.io:16888",
+	SwqosRegionDublin:     "ams-1.prod.lunar-lander.hellomoon.io:16888",
+	SwqosRegionSLC:        "ash-2.prod.lunar-lander.hellomoon.io:16888",
+	SwqosRegionTokyo:      "tyo-1.prod.lunar-lander.hellomoon.io:16888",
+	SwqosRegionSingapore:  "tyo-1.prod.lunar-lander.hellomoon.io:16888",
+	SwqosRegionLondon:     "fra-1.prod.lunar-lander.hellomoon.io:16888",
+	SwqosRegionLosAngeles: "nyc-1.prod.lunar-lander.hellomoon.io:16888",
+	SwqosRegionDefault:    "nyc-1.prod.lunar-lander.hellomoon.io:16888",
+}
+
+var glaiveEndpoints = map[SwqosRegion]string{
+	SwqosRegionNewYork:    "http://ny.glaive.trade",
+	SwqosRegionFrankfurt:  "http://fra.glaive.trade",
+	SwqosRegionAmsterdam:  "http://ams1.glaive.trade",
+	SwqosRegionDublin:     "http://lon.glaive.trade",
+	SwqosRegionSLC:        "http://ny.glaive.trade",
+	SwqosRegionTokyo:      "http://ams1.glaive.trade",
+	SwqosRegionSingapore:  "http://fra.glaive.trade",
+	SwqosRegionLondon:     "http://lon.glaive.trade",
+	SwqosRegionLosAngeles: "http://ny.glaive.trade",
+	SwqosRegionDefault:    "http://ams1.glaive.trade",
+}
+
+var glaiveQuicEndpoints = map[SwqosRegion]string{
+	SwqosRegionNewYork:    "ny.glaive.trade:4000",
+	SwqosRegionFrankfurt:  "fra.glaive.trade:4000",
+	SwqosRegionAmsterdam:  "ams1.glaive.trade:4000",
+	SwqosRegionDublin:     "lon.glaive.trade:4000",
+	SwqosRegionSLC:        "ny.glaive.trade:4000",
+	SwqosRegionTokyo:      "ams1.glaive.trade:4000",
+	SwqosRegionSingapore:  "fra.glaive.trade:4000",
+	SwqosRegionLondon:     "lon.glaive.trade:4000",
+	SwqosRegionLosAngeles: "ny.glaive.trade:4000",
+	SwqosRegionDefault:    "ams1.glaive.trade:4000",
 }
 
 // ===== Helper =====
@@ -1739,10 +1817,71 @@ func sendViaQUICWithTLS(ctx context.Context, addr string, tlsCfg *tls.Config, tx
 }
 
 func signatureFromSerializedTransaction(txBytes []byte) (solana.Signature, error) {
-	if len(txBytes) < 65 || txBytes[0] != 1 {
-		return solana.Signature{}, fmt.Errorf("only single-signature versioned transactions are supported for SWQOS submit")
-	}
 	var sig solana.Signature
+	invalid := fmt.Errorf("malformed or non-single-signature V1 transaction")
+	if len(txBytes) > 0 && txBytes[0] == 129 {
+		if len(txBytes) < 106 || len(txBytes) > 4096 || txBytes[1] != 1 {
+			return sig, invalid
+		}
+		mask := binary.LittleEndian.Uint32(txBytes[4:8])
+		count, instructions := int(txBytes[41]), int(txBytes[40])
+		if mask & ^uint32(31) != 0 || mask&3 == 1 || mask&3 == 2 || count < 1 || count > 64 || instructions > 64 || txBytes[2] != 0 || int(txBytes[3]) > count-1 {
+			return sig, invalid
+		}
+		offset := 42 + count*32
+		if mask&3 != 0 {
+			offset += 8
+		}
+		for _, bit := range []uint32{4, 8, 16} {
+			if mask&bit != 0 {
+				offset += 4
+			}
+		}
+		headers := offset
+		offset += instructions * 4
+		end := len(txBytes) - 64
+		if offset > end {
+			return sig, invalid
+		}
+		unique := map[string]bool{}
+		for i := 0; i < count; i++ {
+			key := string(txBytes[42+32*i : 74+32*i])
+			if unique[key] {
+				return sig, invalid
+			}
+			unique[key] = true
+		}
+		if mask&16 != 0 {
+			heap := binary.LittleEndian.Uint32(txBytes[headers-4 : headers])
+			if heap < 32768 || heap > 262144 || heap%1024 != 0 {
+				return sig, invalid
+			}
+		}
+		for i := 0; i < instructions; i++ {
+			h := headers + i*4
+			accounts := int(txBytes[h+1])
+			if txBytes[h] == 0 || int(txBytes[h]) >= count || offset+accounts > end {
+				return sig, invalid
+			}
+			for _, index := range txBytes[offset : offset+accounts] {
+				if int(index) >= count {
+					return sig, invalid
+				}
+			}
+			offset += accounts + int(binary.LittleEndian.Uint16(txBytes[h+2:h+4]))
+			if offset > end {
+				return sig, invalid
+			}
+		}
+		if offset != end {
+			return sig, invalid
+		}
+		copy(sig[:], txBytes[offset:])
+		return sig, nil
+	}
+	if len(txBytes) < 65 || txBytes[0] != 1 {
+		return sig, fmt.Errorf("only single-signature transactions are supported for SWQOS submit")
+	}
 	copy(sig[:], txBytes[1:65])
 	return sig, nil
 }
@@ -2114,7 +2253,7 @@ func (c *SpeedlandingClient) MinTipSol() float64      { return MinTipSpeedlandin
 // ===== Solami Client =====
 
 // SolamiClient submits transactions via QUIC (Solana TPU ALPN "solana-tpu").
-// Rust v4.0.21 uses endpoint beam.solami.dev:11000 and SNI "solami-beam".
+// Rust v5.0.2 uses endpoint beam.solami.dev:11000 and SNI "solami-beam".
 type SolamiClient struct {
 	endpoint   string
 	serverName string
@@ -2300,6 +2439,441 @@ func (c *DefaultClient) GetTipAccount() string   { return "" }
 func (c *DefaultClient) GetSwqosType() SwqosType { return SwqosTypeDefault }
 func (c *DefaultClient) MinTipSol() float64      { return MinTipDefault }
 
+// ===== LunarLander Client =====
+
+// LunarLanderClient submits binary txs via HTTP POST /send-bin or QUIC (port 16888).
+// Rust defaults to QUIC when transport is unset.
+type LunarLanderClient struct {
+	endpoint  string
+	authToken string
+}
+
+func NewLunarLanderClient(endpoint, authToken string) *LunarLanderClient {
+	return &LunarLanderClient{endpoint: strings.TrimRight(endpoint, "/"), authToken: authToken}
+}
+
+func (c *LunarLanderClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	url := c.endpoint + "/send-bin"
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(transaction))
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("x-api-key", c.authToken)
+	resp, err := getHTTPClient().Do(req)
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
+	signature, err := signatureFromSerializedTransaction(transaction)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 400, Message: err.Error()}
+	}
+	return signature, nil
+}
+
+func (c *LunarLanderClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	sigs := make([]solana.Signature, 0, len(transactions))
+	for _, tx := range transactions {
+		sig, err := c.SendTransaction(ctx, tradeType, tx, waitConfirmation)
+		if err != nil {
+			return sigs, err
+		}
+		sigs = append(sigs, sig)
+	}
+	return sigs, nil
+}
+
+func (c *LunarLanderClient) GetTipAccount() string   { return randomTipAccount(lunarLanderTipAccounts) }
+func (c *LunarLanderClient) GetSwqosType() SwqosType { return SwqosTypeLunarLander }
+func (c *LunarLanderClient) MinTipSol() float64      { return MinTipLunarLander }
+
+func newLunarLanderQuicTLSConfig(apiKey string) (*tls.Config, error) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("generate ecdsa key: %w", err)
+	}
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 62))
+	if err != nil {
+		return nil, fmt.Errorf("generate serial: %w", err)
+	}
+	tmpl := &x509.Certificate{
+		Version:            3,
+		SerialNumber:       serial,
+		Subject:            pkix.Name{CommonName: apiKey},
+		Issuer:             pkix.Name{CommonName: apiKey},
+		SignatureAlgorithm: x509.ECDSAWithSHA256,
+		NotBefore:          time.Now().Add(-time.Hour),
+		NotAfter:           time.Now().Add(365 * 24 * time.Hour),
+		KeyUsage:           x509.KeyUsageDigitalSignature,
+	}
+	derBytes, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &priv.PublicKey, priv)
+	if err != nil {
+		return nil, fmt.Errorf("create certificate: %w", err)
+	}
+	privBytes, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		return nil, fmt.Errorf("marshal private key: %w", err)
+	}
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return nil, fmt.Errorf("X509KeyPair: %w", err)
+	}
+	return &tls.Config{
+		InsecureSkipVerify: true, //nolint:gosec // LunarLander uses client-cert CN auth; matches Rust SDK.
+		NextProtos:         []string{"lunar-lander-tpu"},
+		Certificates:       []tls.Certificate{cert},
+		MinVersion:         tls.VersionTLS13,
+	}, nil
+}
+
+type LunarLanderQuicClient struct {
+	endpoint string
+	apiKey   string
+	mev      bool
+	mu       sync.Mutex
+	conn     *quic.Conn
+	tlsCfg   *tls.Config
+	tlsErr   error
+	tlsOnce  sync.Once
+}
+
+func NewLunarLanderQuicClient(endpoint, apiKey string, mevProtection bool) *LunarLanderQuicClient {
+	return &LunarLanderQuicClient{endpoint: endpoint, apiKey: apiKey, mev: mevProtection}
+}
+
+func (c *LunarLanderQuicClient) connectLocked(ctx context.Context) error {
+	if c.conn != nil && c.conn.Context().Err() == nil {
+		return nil
+	}
+	c.tlsOnce.Do(func() {
+		c.tlsCfg, c.tlsErr = newLunarLanderQuicTLSConfig(c.apiKey)
+	})
+	if c.tlsErr != nil {
+		return c.tlsErr
+	}
+	conn, err := quic.DialAddr(ctx, c.endpoint, c.tlsCfg.Clone(), &quic.Config{
+		MaxIdleTimeout:  30 * time.Second,
+		KeepAlivePeriod: 10 * time.Second,
+	})
+	if err != nil {
+		return fmt.Errorf("LunarLander QUIC dial %s: %w", c.endpoint, err)
+	}
+	c.conn = conn
+	return nil
+}
+
+func (c *LunarLanderQuicClient) sendLocked(ctx context.Context, transaction []byte) error {
+	if err := c.connectLocked(ctx); err != nil {
+		return err
+	}
+	stream, err := c.conn.OpenUniStreamSync(ctx)
+	if err == nil {
+		_, err = stream.Write(transaction)
+	}
+	if err == nil {
+		err = stream.Close()
+	}
+	if err != nil {
+		_ = c.conn.CloseWithError(0, "reconnect")
+		c.conn = nil
+	}
+	return err
+}
+
+func (c *LunarLanderQuicClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	if len(transaction) > 1232 {
+		return solana.Signature{}, &TradeError{Code: 400, Message: fmt.Sprintf("LunarLander QUIC transaction too large: %d > 1232", len(transaction))}
+	}
+	c.mu.Lock()
+	err := c.sendLocked(ctx, transaction)
+	if err != nil {
+		err = c.sendLocked(ctx, transaction)
+	}
+	c.mu.Unlock()
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 503, Message: fmt.Sprintf("LunarLander QUIC send failed: %v", err)}
+	}
+	signature, err := signatureFromSerializedTransaction(transaction)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 400, Message: err.Error()}
+	}
+	return signature, nil
+}
+
+func (c *LunarLanderQuicClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	sigs := make([]solana.Signature, 0, len(transactions))
+	for _, tx := range transactions {
+		sig, err := c.SendTransaction(ctx, tradeType, tx, waitConfirmation)
+		if err != nil {
+			return sigs, err
+		}
+		sigs = append(sigs, sig)
+	}
+	return sigs, nil
+}
+
+func (c *LunarLanderQuicClient) GetTipAccount() string {
+	return randomTipAccount(lunarLanderTipAccounts)
+}
+func (c *LunarLanderQuicClient) GetSwqosType() SwqosType { return SwqosTypeLunarLander }
+func (c *LunarLanderQuicClient) MinTipSol() float64      { return MinTipLunarLander }
+
+// ===== Glaive Client =====
+
+func buildGlaiveBinaryURL(endpoint, apiKey string, mevProtection bool) (string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", fmt.Errorf("Glaive HTTP endpoint must be an absolute http(s) URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("Glaive HTTP endpoint must use http or https")
+	}
+	path := strings.TrimRight(u.Path, "/")
+	if !strings.HasSuffix(path, "/binary") {
+		if path == "" {
+			path = "/binary"
+		} else {
+			path = path + "/binary"
+		}
+	}
+	u.Path = path
+	q := u.Query()
+	q.Del("api-key")
+	q.Del("mev-protect")
+	q.Set("api-key", strings.TrimSpace(apiKey))
+	if mevProtection {
+		q.Set("mev-protect", "true")
+	}
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
+func validateGlaiveAPIKey(apiKey string) error {
+	parsed, err := uuid.Parse(strings.TrimSpace(apiKey))
+	if err != nil {
+		return fmt.Errorf("Glaive API key must be a valid UUID v4: %w", err)
+	}
+	if parsed.Version() != 4 {
+		return fmt.Errorf("Glaive API key must be a UUID v4")
+	}
+	return nil
+}
+
+func buildGlaiveAuthFrame(apiKey string, mevProtection bool) ([17]byte, error) {
+	var frame [17]byte
+	parsed, err := uuid.Parse(strings.TrimSpace(apiKey))
+	if err != nil {
+		return frame, fmt.Errorf("Glaive API key must be a valid UUID v4: %w", err)
+	}
+	if parsed.Version() != 4 {
+		return frame, fmt.Errorf("Glaive API key must be a UUID v4")
+	}
+	copy(frame[:16], parsed[:])
+	// UUID wire form is already big-endian layout in google/uuid bytes.
+	if mevProtection {
+		frame[16] = 1 << 0
+	}
+	return frame, nil
+}
+
+type GlaiveClient struct {
+	submitURL     string
+	authToken     string
+	mevProtection bool
+}
+
+func NewGlaiveClient(endpoint, apiKey string, mevProtection bool) (*GlaiveClient, error) {
+	if err := validateGlaiveAPIKey(apiKey); err != nil {
+		return nil, err
+	}
+	submitURL, err := buildGlaiveBinaryURL(endpoint, apiKey, mevProtection)
+	if err != nil {
+		return nil, err
+	}
+	return &GlaiveClient{submitURL: submitURL, authToken: apiKey, mevProtection: mevProtection}, nil
+}
+
+func (c *GlaiveClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", c.submitURL, bytes.NewReader(transaction))
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	resp, err := getHTTPClient().Do(req)
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	expected, err := signatureFromSerializedTransaction(transaction)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 400, Message: err.Error()}
+	}
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return solana.Signature{}, &TradeError{Code: 500, Message: fmt.Sprintf("Glaive returned invalid JSON: %s", string(body))}
+	}
+	if errObj, ok := parsed["error"]; ok {
+		switch e := errObj.(type) {
+		case map[string]interface{}:
+			msg, _ := e["message"].(string)
+			if msg == "" {
+				msg = "unknown Glaive error"
+			}
+			if code, ok := e["code"].(float64); ok {
+				return solana.Signature{}, &TradeError{Code: uint32(code), Message: fmt.Sprintf("Glaive rejected transaction: code=%d message=%s", int(code), msg)}
+			}
+			return solana.Signature{}, &TradeError{Code: 500, Message: "Glaive rejected transaction: " + msg}
+		case string:
+			return solana.Signature{}, &TradeError{Code: 500, Message: "Glaive rejected transaction: " + e}
+		}
+	}
+	if err := checkHTTPStatus(resp, body); err != nil {
+		return solana.Signature{}, err
+	}
+	result, _ := parsed["result"].(string)
+	if result == "" {
+		return solana.Signature{}, &TradeError{Code: 500, Message: "Glaive response missing result signature"}
+	}
+	returned, err := solana.SignatureFromBase58(result)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 500, Message: "Glaive returned an invalid signature"}
+	}
+	if returned != expected {
+		return solana.Signature{}, &TradeError{Code: 500, Message: "Glaive returned a signature that does not match the submitted transaction"}
+	}
+	return expected, nil
+}
+
+func (c *GlaiveClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	sigs := make([]solana.Signature, 0, len(transactions))
+	for _, tx := range transactions {
+		sig, err := c.SendTransaction(ctx, tradeType, tx, waitConfirmation)
+		if err != nil {
+			return sigs, err
+		}
+		sigs = append(sigs, sig)
+	}
+	return sigs, nil
+}
+
+func (c *GlaiveClient) GetTipAccount() string   { return randomTipAccount(glaiveTipAccounts) }
+func (c *GlaiveClient) GetSwqosType() SwqosType { return SwqosTypeGlaive }
+func (c *GlaiveClient) MinTipSol() float64      { return MinTipGlaive }
+
+func newGlaiveQuicTLSConfig() *tls.Config {
+	return &tls.Config{
+		InsecureSkipVerify: true, //nolint:gosec // Glaive QUIC uses SkipServerVerification; matches Rust SDK.
+		NextProtos:         []string{"solana-tpu"},
+		MinVersion:         tls.VersionTLS13,
+		ServerName:         "glaive-intake",
+	}
+}
+
+type GlaiveQuicClient struct {
+	endpoint  string
+	authFrame [17]byte
+	mu        sync.Mutex
+	conn      *quic.Conn
+}
+
+func NewGlaiveQuicClient(endpoint, apiKey string, mevProtection bool) (*GlaiveQuicClient, error) {
+	frame, err := buildGlaiveAuthFrame(apiKey, mevProtection)
+	if err != nil {
+		return nil, err
+	}
+	return &GlaiveQuicClient{endpoint: endpoint, authFrame: frame}, nil
+}
+
+func (c *GlaiveQuicClient) connectLocked(ctx context.Context) error {
+	if c.conn != nil && c.conn.Context().Err() == nil {
+		return nil
+	}
+	conn, err := quic.DialAddr(ctx, c.endpoint, newGlaiveQuicTLSConfig(), &quic.Config{
+		MaxIdleTimeout:  30 * time.Second,
+		KeepAlivePeriod: 10 * time.Second,
+	})
+	if err != nil {
+		return fmt.Errorf("Glaive QUIC dial %s: %w", c.endpoint, err)
+	}
+	stream, err := conn.OpenUniStreamSync(ctx)
+	if err != nil {
+		_ = conn.CloseWithError(1, "auth stream failed")
+		return fmt.Errorf("Glaive QUIC auth open stream: %w", err)
+	}
+	if _, err = stream.Write(c.authFrame[:]); err != nil {
+		_ = conn.CloseWithError(1, "auth write failed")
+		return fmt.Errorf("Glaive QUIC auth write: %w", err)
+	}
+	if err = stream.Close(); err != nil {
+		_ = conn.CloseWithError(1, "auth close failed")
+		return fmt.Errorf("Glaive QUIC auth close: %w", err)
+	}
+	c.conn = conn
+	return nil
+}
+
+func (c *GlaiveQuicClient) sendLocked(ctx context.Context, transaction []byte) error {
+	if err := c.connectLocked(ctx); err != nil {
+		return err
+	}
+	stream, err := c.conn.OpenUniStreamSync(ctx)
+	if err == nil {
+		_, err = stream.Write(transaction)
+	}
+	if err == nil {
+		err = stream.Close()
+	}
+	if err != nil {
+		_ = c.conn.CloseWithError(0, "reconnect")
+		c.conn = nil
+	}
+	return err
+}
+
+func (c *GlaiveQuicClient) SendTransaction(ctx context.Context, tradeType TradeType, transaction []byte, waitConfirmation bool) (solana.Signature, error) {
+	if len(transaction) > 1232 {
+		return solana.Signature{}, &TradeError{Code: 400, Message: fmt.Sprintf("Glaive QUIC transaction too large: %d > 1232", len(transaction))}
+	}
+	c.mu.Lock()
+	err := c.sendLocked(ctx, transaction)
+	if err != nil {
+		err = c.sendLocked(ctx, transaction)
+	}
+	c.mu.Unlock()
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 503, Message: fmt.Sprintf("Glaive QUIC send failed: %v", err)}
+	}
+	signature, err := signatureFromSerializedTransaction(transaction)
+	if err != nil {
+		return solana.Signature{}, &TradeError{Code: 400, Message: err.Error()}
+	}
+	return signature, nil
+}
+
+func (c *GlaiveQuicClient) SendTransactions(ctx context.Context, tradeType TradeType, transactions [][]byte, waitConfirmation bool) ([]solana.Signature, error) {
+	sigs := make([]solana.Signature, 0, len(transactions))
+	for _, tx := range transactions {
+		sig, err := c.SendTransaction(ctx, tradeType, tx, waitConfirmation)
+		if err != nil {
+			return sigs, err
+		}
+		sigs = append(sigs, sig)
+	}
+	return sigs, nil
+}
+
+func (c *GlaiveQuicClient) GetTipAccount() string   { return randomTipAccount(glaiveTipAccounts) }
+func (c *GlaiveQuicClient) GetSwqosType() SwqosType { return SwqosTypeGlaive }
+func (c *GlaiveQuicClient) MinTipSol() float64      { return MinTipGlaive }
+
 // ===== GetAllSwqosTypes =====
 
 // GetAllSwqosTypes returns all SWQOS types
@@ -2308,7 +2882,8 @@ func GetAllSwqosTypes() []SwqosType {
 		SwqosTypeJito, SwqosTypeNextBlock, SwqosTypeZeroSlot, SwqosTypeTemporal,
 		SwqosTypeBloxroute, SwqosTypeNode1, SwqosTypeFlashBlock, SwqosTypeBlockRazor,
 		SwqosTypeAstralane, SwqosTypeStellium, SwqosTypeLightspeed, SwqosTypeSoyas,
-		SwqosTypeSpeedlanding, SwqosTypeHelius, SwqosTypeSolami, SwqosTypeDefault,
+		SwqosTypeSpeedlanding, SwqosTypeHelius, SwqosTypeSolami, SwqosTypeLunarLander,
+		SwqosTypeGlaive, SwqosTypeDefault,
 	}
 }
 
@@ -2320,7 +2895,7 @@ type ClientFactory struct{}
 // CreateClient creates a SWQOS client from config
 func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL string) (SwqosClient, error) {
 	if soltradesdk.IsSwqosTypeBlacklisted(config.Type) {
-		return nil, fmt.Errorf("SWQOS type is blacklisted by Rust v4.0.21 parity: %v", config.Type)
+		return nil, fmt.Errorf("SWQOS type is blacklisted by Rust v5.0.2 parity: %v", config.Type)
 	}
 	switch config.Type {
 	case SwqosTypeJito:
@@ -2541,6 +3116,62 @@ func (f *ClientFactory) CreateClient(config soltradesdk.SwqosConfig, rpcURL stri
 			endpoint = config.CustomURL
 		}
 		return NewSolamiClient(endpoint, config.APIKey), nil
+
+	case SwqosTypeLunarLander:
+		useQuic := config.Transport == nil || *config.Transport == soltradesdk.SwqosTransportQUIC
+		if config.Transport != nil && *config.Transport == soltradesdk.SwqosTransportGRPC {
+			return nil, &TradeError{Code: 400, Message: "LunarLander does not support the gRPC transport"}
+		}
+		if useQuic {
+			endpoint := config.CustomURL
+			if endpoint == "" {
+				endpoint = lunarLanderQuicEndpoints[config.Region]
+				if endpoint == "" {
+					endpoint = lunarLanderQuicEndpoints[SwqosRegionDefault]
+				}
+			} else if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
+				endpoint = hostPortFromHTTP(endpoint, "16888")
+			}
+			return NewLunarLanderQuicClient(endpoint, config.APIKey, config.MEVProtection), nil
+		}
+		endpoint, ok := lunarLanderEndpoints[config.Region]
+		if !ok {
+			endpoint = lunarLanderEndpoints[SwqosRegionDefault]
+		}
+		if config.CustomURL != "" {
+			endpoint = config.CustomURL
+		}
+		return NewLunarLanderClient(endpoint, config.APIKey), nil
+
+	case SwqosTypeGlaive:
+		transport := soltradesdk.SwqosTransportQUIC
+		if config.Transport != nil {
+			transport = *config.Transport
+		}
+		switch transport {
+		case soltradesdk.SwqosTransportQUIC:
+			endpoint := config.CustomURL
+			if endpoint == "" {
+				endpoint = glaiveQuicEndpoints[config.Region]
+				if endpoint == "" {
+					endpoint = glaiveQuicEndpoints[SwqosRegionDefault]
+				}
+			} else if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
+				endpoint = hostPortFromHTTP(endpoint, "4000")
+			}
+			return NewGlaiveQuicClient(endpoint, config.APIKey, config.MEVProtection)
+		case soltradesdk.SwqosTransportHTTP:
+			endpoint, ok := glaiveEndpoints[config.Region]
+			if !ok {
+				endpoint = glaiveEndpoints[SwqosRegionDefault]
+			}
+			if config.CustomURL != "" {
+				endpoint = config.CustomURL
+			}
+			return NewGlaiveClient(endpoint, config.APIKey, config.MEVProtection)
+		default:
+			return nil, &TradeError{Code: 400, Message: "Glaive does not support the gRPC transport"}
+		}
 
 	case SwqosTypeHelius:
 		endpoint, ok := heliusEndpoints[config.Region]

@@ -1,0 +1,204 @@
+{
+  "date": "2026-10-05",
+  "baseline": {
+    "trade": "5.0.6",
+    "parser": "0.7.7"
+  },
+  "broadcasts": 0,
+  "rpc_calls_in_preparation": 0,
+  "full_parity_accepted": false,
+  "clmm_discovery": {
+    "transport": "Yellowstone gRPC",
+    "observations": [
+      {
+        "pool": "8sLbNZoA1cfnvMJLPfp98ZLAnFSYCFApfJKMbiXNLwxj",
+        "owner": "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+        "observed_slot": "453329502"
+      },
+      {
+        "pool": "3ucNos4NbumPLZNWztqGHNFFgkHeRMBQAVemeeomsUxv",
+        "owner": "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+        "observed_slot": "453329503"
+      }
+    ]
+  },
+  "validation": {
+    "trade_node_tests": 3347,
+    "trade_python_tests": 3429,
+    "parser_node_tests": 234,
+    "parser_node_network_tests_skipped": 8,
+    "parser_python_tests": 220,
+    "go_full_suites": "passed",
+    "go_vet": "passed",
+    "go_trade_trading_subscription_race": "passed",
+    "go_parser_race": "passed",
+    "node_types_examples_build": "passed",
+    "parser_node_build": "passed",
+    "offline_example_replay": "six fixtures x three native languages passed"
+  },
+  "records": [
+    {
+      "fixture": "pumpfun_whirlpool_usdc_sell_20261005.json",
+      "wire_sha256": "e23a34ef47b6907c14d7f3f291eb2a88bd806ecc61c0b38d4b906d9dc620399f",
+      "wire_bytes": 1407,
+      "simulation_slot": "453328561",
+      "err": null,
+      "verified_balances": {
+        "input_debit": "100000000",
+        "output_credit": "898",
+        "wsol_delta": "0",
+        "wallet_lamports_delta": "-1493050",
+        "minimum_out": "853"
+      },
+      "expected": {
+        "wire_sha256": "e23a34ef47b6907c14d7f3f291eb2a88bd806ecc61c0b38d4b906d9dc620399f",
+        "estimated_out": "898",
+        "minimum_out": "853",
+        "estimated_native_residual_lamports": "390",
+        "estimated_intermediate_residuals": [
+          {
+            "mint": "So11111111111111111111111111111111111111112",
+            "amount": "0"
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "pumpfun_whirlpool_usdc_buy_20261005.json",
+      "wire_sha256": "1c45ad035a019fc65fdc6802cefe89c289e27d75925f1f53fcc9c342e32459ed",
+      "wire_bytes": 1610,
+      "simulation_slot": "453328569",
+      "err": null,
+      "verified_balances": {
+        "input_debit": "1000",
+        "output_credit": "97279759",
+        "wsol_delta": "410",
+        "wallet_lamports_delta": "-2865040",
+        "minimum_out": "92415771"
+      },
+      "expected": {
+        "wire_sha256": "1c45ad035a019fc65fdc6802cefe89c289e27d75925f1f53fcc9c342e32459ed",
+        "estimated_out": "97279759",
+        "minimum_out": "92415771",
+        "estimated_native_residual_lamports": "0",
+        "estimated_intermediate_residuals": [
+          {
+            "mint": "So11111111111111111111111111111111111111112",
+            "amount": "410"
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "pumpfun_dlmm_usdc_sell_20261005.json",
+      "wire_sha256": "03e5eec12d6bd74988ba90f55511f2fa1e8ea2987bceb2118126d38bff0f8e21",
+      "wire_bytes": 1426,
+      "simulation_slot": "453328596",
+      "err": null,
+      "verified_balances": {
+        "input_debit": "100000000",
+        "output_credit": "900",
+        "wsol_delta": "0",
+        "wallet_lamports_delta": "-1493050",
+        "minimum_out": "855"
+      },
+      "expected": {
+        "wire_sha256": "03e5eec12d6bd74988ba90f55511f2fa1e8ea2987bceb2118126d38bff0f8e21",
+        "estimated_out": "900",
+        "minimum_out": "855",
+        "estimated_native_residual_lamports": "390",
+        "estimated_intermediate_residuals": [
+          {
+            "mint": "So11111111111111111111111111111111111111112",
+            "amount": "0"
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "pumpfun_dlmm_usdc_buy_20261005.json",
+      "wire_sha256": "7e8302aba4ea39ca406653b6a2b2242827ea233d5ebd2a35927510a380bfe9c0",
+      "wire_bytes": 1629,
+      "simulation_slot": "453328603",
+      "err": null,
+      "verified_balances": {
+        "input_debit": "1000",
+        "output_credit": "97532993",
+        "wsol_delta": "411",
+        "wallet_lamports_delta": "-2865040",
+        "minimum_out": "92668371"
+      },
+      "expected": {
+        "wire_sha256": "7e8302aba4ea39ca406653b6a2b2242827ea233d5ebd2a35927510a380bfe9c0",
+        "estimated_out": "97545654",
+        "minimum_out": "92668371",
+        "estimated_native_residual_lamports": "0",
+        "estimated_intermediate_residuals": [
+          {
+            "mint": "So11111111111111111111111111111111111111112",
+            "amount": "411"
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "pumpfun_clmm_usdc_sell_20261005.json",
+      "wire_sha256": "1fefd899ecc8c5e71eac9e1e74ffcc7fe432bef5956483e9af42a076127af03d",
+      "wire_bytes": 1436,
+      "simulation_slot": "453329825",
+      "err": null,
+      "verified_balances": {
+        "input_debit": "100000000",
+        "output_credit": "900",
+        "wsol_delta": "0",
+        "wallet_lamports_delta": "-1493050",
+        "minimum_out": "855"
+      },
+      "expected": {
+        "wire_sha256": "1fefd899ecc8c5e71eac9e1e74ffcc7fe432bef5956483e9af42a076127af03d",
+        "estimated_out": "900",
+        "minimum_out": "855",
+        "estimated_native_residual_lamports": "390",
+        "estimated_intermediate_residuals": [
+          {
+            "mint": "So11111111111111111111111111111111111111112",
+            "amount": "0"
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "pumpfun_clmm_usdc_buy_20261005.json",
+      "wire_sha256": "7d88d2f8d28ac4c74d55c639114112e01376c1f2bd02507a9089130d148c28ac",
+      "wire_bytes": 1639,
+      "simulation_slot": "453329829",
+      "err": null,
+      "verified_balances": {
+        "input_debit": "1000",
+        "output_credit": "97596251",
+        "wsol_delta": "411",
+        "wallet_lamports_delta": "-2865040",
+        "minimum_out": "92728466"
+      },
+      "expected": {
+        "wire_sha256": "7d88d2f8d28ac4c74d55c639114112e01376c1f2bd02507a9089130d148c28ac",
+        "estimated_out": "97608912",
+        "minimum_out": "92728466",
+        "estimated_native_residual_lamports": "0",
+        "estimated_intermediate_residuals": [
+          {
+            "mint": "So11111111111111111111111111111111111111112",
+            "amount": "411"
+          }
+        ]
+      }
+    }
+  ],
+  "settlement_consistency_fixes": [
+    "single-hop wallet and native PumpFun protocol validation",
+    "quoted instructions and ordered account flag binding for every hop",
+    "exact-in V2 anchor amount/protection/pool/mint/wallet binding",
+    "positive u64 protected amounts",
+    "Go nil setup instruction/account rejection"
+  ]
+}

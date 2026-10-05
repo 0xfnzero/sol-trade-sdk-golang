@@ -64,85 +64,42 @@ func checkAddOverflow(a, b uint64) error {
 // ComputeFee calculates transaction fee based on amount and fee basis points
 // Includes overflow protection
 func ComputeFee(amount uint64, feeBasisPoints uint64) (uint64, error) {
-	if err := validateAmount(amount, "amount"); err != nil {
-		return 0, err
+	product := new(big.Int).Mul(new(big.Int).SetUint64(amount), new(big.Int).SetUint64(feeBasisPoints))
+	product.Add(product, big.NewInt(9999)).Div(product, big.NewInt(10000))
+	if !product.IsUint64() {
+		return 0, ErrOverflow
 	}
-	if err := validateBasisPoints(feeBasisPoints); err != nil {
-		return 0, err
-	}
-	if err := checkMulOverflow(amount, feeBasisPoints); err != nil {
-		return 0, err
-	}
-	return CeilDiv(amount*feeBasisPoints, 10000)
+	return product.Uint64(), nil
 }
 
-// CeilDiv performs ceiling division with zero check
+// CeilDiv uses quotient and remainder, avoiding addition overflow.
 func CeilDiv(a, b uint64) (uint64, error) {
 	if b == 0 {
 		return 0, ErrDivisionByZero
 	}
-	if err := validateAmount(a, "dividend"); err != nil {
-		return 0, err
+	result := a / b
+	if a%b != 0 {
+		result++
 	}
-	if err := validateAmount(b, "divisor"); err != nil {
-		return 0, err
-	}
-	if err := checkAddOverflow(a, b-1); err != nil {
-		return 0, err
-	}
-	return (a + b - 1) / b, nil
+	return result, nil
 }
 
-// CalculateWithSlippageBuy calculates buy amount with slippage protection
-// Includes overflow protection
-//
-// Note: Basis points are clamped to MaxSlippageBasisPoints (9999 = 99.99%)
-// to prevent the amount from doubling when basisPoints = 10000.
+// CalculateWithSlippageBuy matches Rust's clamped, saturating u64 budget.
 func CalculateWithSlippageBuy(amount uint64, basisPoints uint64) (uint64, error) {
-	if err := validateAmount(amount, "amount"); err != nil {
-		return 0, err
+	bps := ClampSlippageBasisPoints(basisPoints)
+	result := new(big.Int).Mul(new(big.Int).SetUint64(amount), new(big.Int).SetUint64(bps))
+	result.Div(result, big.NewInt(10000)).Add(result, new(big.Int).SetUint64(amount))
+	if !result.IsUint64() {
+		return math.MaxUint64, nil
 	}
-
-	// Clamp basis points to max 9999 (99.99%) to prevent amount doubling at 100%
-	bps := basisPoints
-	if bps > MaxSlippageBasisPoints {
-		bps = MaxSlippageBasisPoints
-	}
-
-	if err := checkMulOverflow(amount, bps); err != nil {
-		return 0, err
-	}
-	slippageAmount := (amount * bps) / 10000
-	if err := checkAddOverflow(amount, slippageAmount); err != nil {
-		return 0, err
-	}
-	return amount + slippageAmount, nil
+	return result.Uint64(), nil
 }
 
-// CalculateWithSlippageSell calculates sell amount with slippage protection.
-// Includes underflow protection.
-//
-// 100% from Rust: src/utils/calc/common.rs calculate_with_slippage_sell
-//
-// Note: Returns 1 if amount <= basisPoints / 10000 to ensure minimum output.
+// CalculateWithSlippageSell matches Rust: zero remains zero, slippage is clamped.
 func CalculateWithSlippageSell(amount uint64, basisPoints uint64) (uint64, error) {
-	if err := validateAmount(amount, "amount"); err != nil {
-		return 0, err
-	}
-	if err := validateBasisPoints(basisPoints); err != nil {
-		return 0, err
-	}
-
-	// Rust: if amount <= basis_points / 10000 { 1 } else { ... }
-	if amount <= basisPoints/10000 {
-		return 1, nil
-	}
-
-	if err := checkMulOverflow(amount, basisPoints); err != nil {
-		return 0, err
-	}
-	slippageAmount := (amount * basisPoints) / 10000
-	return amount - slippageAmount, nil
+	product := new(big.Int).Mul(new(big.Int).SetUint64(amount), new(big.Int).SetUint64(ClampSlippageBasisPoints(basisPoints)))
+	product.Div(product, big.NewInt(10000))
+	return amount - product.Uint64(), nil
 }
 
 // ===== PumpFun Calculations =====
@@ -165,34 +122,8 @@ func GetBuyTokenAmountFromSolAmount(
 	hasCreator bool,
 	amount uint64,
 ) uint64 {
-	if amount == 0 || virtualTokenReserves == 0 {
-		return 0
-	}
-
-	totalFeeBasisPoints := PumpFunFeeBasisPoints
-	if hasCreator {
-		totalFeeBasisPoints += PumpFunCreatorFee
-	}
-
-	inputAmount := (uint64(amount) * 10000) / (totalFeeBasisPoints + 10000)
-	denominator := virtualSolReserves + inputAmount
-
-	tokensReceived := (inputAmount * virtualTokenReserves) / denominator
-
-	if tokensReceived > realTokenReserves {
-		tokensReceived = realTokenReserves
-	}
-
-	// Minimum token protection
-	if tokensReceived <= 100*1000000 {
-		if amount > 10000000 { // > 0.01 SOL
-			tokensReceived = 25547619 * 1000000
-		} else {
-			tokensReceived = 255476 * 1000000
-		}
-	}
-
-	return tokensReceived
+	result, _ := GetBuyTokenAmountFromSolAmountU128(new(big.Int).SetUint64(virtualTokenReserves), new(big.Int).SetUint64(virtualSolReserves), new(big.Int).SetUint64(realTokenReserves), hasCreator, amount)
+	return result
 }
 
 // GetSellSolAmountFromTokenAmount calculates SOL received for token input on PumpFun
@@ -202,29 +133,8 @@ func GetSellSolAmountFromTokenAmount(
 	hasCreator bool,
 	amount uint64,
 ) uint64 {
-	if amount == 0 || virtualTokenReserves == 0 {
-		return 0
-	}
-
-	numerator := uint64(amount) * uint64(virtualSolReserves)
-	denominator := uint64(virtualTokenReserves) + uint64(amount)
-
-	solCost := numerator / denominator
-
-	totalFeeBasisPoints := PumpFunFeeBasisPoints
-	if hasCreator {
-		totalFeeBasisPoints += PumpFunCreatorFee
-	}
-
-	fee, err := ComputeFee(solCost, totalFeeBasisPoints)
-	if err != nil {
-		return 0
-	}
-
-	if solCost < fee {
-		return 0
-	}
-	return solCost - fee
+	result, _ := GetSellSolAmountFromTokenAmountU128(new(big.Int).SetUint64(virtualTokenReserves), new(big.Int).SetUint64(virtualSolReserves), hasCreator, amount)
+	return result
 }
 
 // ===== PumpSwap Calculations =====
@@ -289,6 +199,7 @@ type SellQuoteInputResult struct {
 
 // EffectiveQuoteReserves returns the PumpSwap reserves used for pricing.
 // virtualQuoteReserves is a signed i128 on chain; nil is treated as zero.
+// Zero is a valid reserve snapshot; trade quotes reject depleted effective reserves.
 func EffectiveQuoteReserves(quoteVaultBalance uint64, virtualQuoteReserves *big.Int) (uint64, error) {
 	effective := new(big.Int).SetUint64(quoteVaultBalance)
 	if virtualQuoteReserves != nil {
@@ -297,7 +208,7 @@ func EffectiveQuoteReserves(quoteVaultBalance uint64, virtualQuoteReserves *big.
 		}
 		effective.Add(effective, virtualQuoteReserves)
 	}
-	if effective.Sign() <= 0 || !effective.IsUint64() {
+	if effective.Sign() < 0 || !effective.IsUint64() {
 		virtual := "0"
 		if virtualQuoteReserves != nil {
 			virtual = virtualQuoteReserves.String()
@@ -328,43 +239,30 @@ func BuyBaseInputInternalWithFees(
 	virtualQuoteReserves *big.Int,
 	feeBasisPoints PumpSwapFeeBasisPoints,
 ) (*BuyBaseInputResult, error) {
-	if baseReserve == 0 || quoteReserve == 0 {
-		return nil, ErrInvalidReserves
-	}
-	effectiveQuoteReserve, err := EffectiveQuoteReserves(quoteReserve, virtualQuoteReserves)
+	effective, err := pumpSwapReserves(baseReserve, quoteReserve, virtualQuoteReserves)
 	if err != nil {
 		return nil, err
 	}
-	if base > baseReserve {
-		return nil, ErrInsufficientReserves
-	}
-
-	// Use 128-bit multiplication to avoid overflow
-	numerator := mul128(effectiveQuoteReserve, base)
-	denominator := baseReserve - base
-
-	if denominator == 0 {
+	if base >= baseReserve {
 		return nil, ErrPoolDepleted
 	}
-
-	quoteAmountIn := div128(numerator, denominator)
-	// Add 1 for ceiling division
-	if numerator.Lo%denominator != 0 || numerator.Hi != 0 {
-		quoteAmountIn++
+	raw, err := pumpSwapDiv(new(big.Int).Mul(pumpSwapInt(effective), pumpSwapInt(base)), pumpSwapInt(baseReserve-base), true)
+	if err != nil {
+		return nil, err
 	}
-
-	lpFee, _ := ComputeFee(quoteAmountIn, feeBasisPoints.LPFeeBasisPoints)
-	protocolFee, _ := ComputeFee(quoteAmountIn, feeBasisPoints.ProtocolFeeBasisPoints)
-	coinCreatorFee, _ := ComputeFee(quoteAmountIn, feeBasisPoints.CoinCreatorFeeBasisPoints)
-
-	totalQuote := quoteAmountIn + lpFee + protocolFee + coinCreatorFee
-	maxQuote, _ := CalculateWithSlippageBuy(totalQuote, slippageBasisPoints)
-
-	return &BuyBaseInputResult{
-		InternalQuoteAmount: quoteAmountIn,
-		UIQuote:             totalQuote,
-		MaxQuote:            maxQuote,
-	}, nil
+	fees, _, err := pumpSwapFees(raw, feeBasisPoints)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkAddOverflow(raw, fees); err != nil {
+		return nil, err
+	}
+	total := raw + fees
+	maxQuote, err := CalculateWithSlippageBuy(total, slippageBasisPoints)
+	if err != nil {
+		return nil, err
+	}
+	return &BuyBaseInputResult{InternalQuoteAmount: raw, UIQuote: total, MaxQuote: maxQuote}, nil
 }
 
 // BuyQuoteInputInternal calculates base tokens received for quote input on PumpSwap
@@ -388,51 +286,46 @@ func BuyQuoteInputInternalWithFees(
 	virtualQuoteReserves *big.Int,
 	feeBasisPoints PumpSwapFeeBasisPoints,
 ) (*BuyQuoteInputResult, error) {
-	if baseReserve == 0 || quoteReserve == 0 {
-		return nil, ErrInvalidReserves
-	}
-	effectiveQuoteReserve, err := EffectiveQuoteReserves(quoteReserve, virtualQuoteReserves)
+	effective, err := pumpSwapReserves(baseReserve, quoteReserve, virtualQuoteReserves)
 	if err != nil {
 		return nil, err
 	}
-
-	totalFeeBps := feeBasisPoints.LPFeeBasisPoints + feeBasisPoints.ProtocolFeeBasisPoints + feeBasisPoints.CoinCreatorFeeBasisPoints
-	denominator := 10000 + totalFeeBps
-
-	// Use 128-bit arithmetic
-	effectiveQuote := div128(mul128(quote, 10000), uint64(denominator))
-	lpFee, _ := ComputeFee(effectiveQuote, feeBasisPoints.LPFeeBasisPoints)
-	protocolFee, _ := ComputeFee(effectiveQuote, feeBasisPoints.ProtocolFeeBasisPoints)
-	coinCreatorFee, _ := ComputeFee(effectiveQuote, feeBasisPoints.CoinCreatorFeeBasisPoints)
-	totalWithFees := effectiveQuote + lpFee + protocolFee + coinCreatorFee
-	if totalWithFees > quote {
-		effectiveQuote -= totalWithFees - quote
+	sum, err := pumpSwapFeeSum(feeBasisPoints)
+	if err != nil {
+		return nil, err
 	}
-	inputAmount := uint64(0)
-	if effectiveQuote > 0 {
-		inputAmount = effectiveQuote - 1
+	if err := checkAddOverflow(sum, 10000); err != nil {
+		return nil, err
 	}
-
-	// numerator = baseReserve * effectiveQuote
-	numerator := mul128(baseReserve, inputAmount)
-	// denominatorEffective = quoteReserve + effectiveQuote
-	denominatorEffective := effectiveQuoteReserve + inputAmount
-	if denominatorEffective < effectiveQuoteReserve {
-		return nil, ErrOverflow
+	net, err := pumpSwapDiv(new(big.Int).Mul(pumpSwapInt(quote), big.NewInt(10000)), pumpSwapInt(sum+10000), false)
+	if err != nil {
+		return nil, err
 	}
-
-	if denominatorEffective == 0 {
-		return nil, ErrPoolDepleted
+	fees, _, err := pumpSwapFees(net, feeBasisPoints)
+	if err != nil {
+		return nil, err
 	}
-
-	baseAmountOut := div128(numerator, denominatorEffective)
-	maxQuote, _ := CalculateWithSlippageBuy(quote, slippageBasisPoints)
-
-	return &BuyQuoteInputResult{
-		Base:                     baseAmountOut,
-		InternalQuoteWithoutFees: effectiveQuote,
-		MaxQuote:                 maxQuote,
-	}, nil
+	total := new(big.Int).Add(pumpSwapInt(net), pumpSwapInt(fees))
+	if total.Cmp(pumpSwapInt(quote)) > 0 {
+		over := new(big.Int).Sub(total, pumpSwapInt(quote))
+		if over.Cmp(pumpSwapInt(net)) > 0 {
+			return nil, ErrFeesExceedOutput
+		}
+		net -= over.Uint64()
+	}
+	if net == 0 {
+		return nil, ErrInvalidInput
+	}
+	input := net - 1
+	output, err := pumpSwapDiv(new(big.Int).Mul(pumpSwapInt(baseReserve), pumpSwapInt(input)), new(big.Int).Add(pumpSwapInt(effective), pumpSwapInt(input)), false)
+	if err != nil {
+		return nil, err
+	}
+	maxQuote, err := CalculateWithSlippageBuy(quote, slippageBasisPoints)
+	if err != nil {
+		return nil, err
+	}
+	return &BuyQuoteInputResult{Base: output, InternalQuoteWithoutFees: net, MaxQuote: maxQuote}, nil
 }
 
 // SellBaseInputInternal calculates quote received for selling base tokens on PumpSwap
@@ -456,42 +349,30 @@ func SellBaseInputInternalWithFees(
 	virtualQuoteReserves *big.Int,
 	feeBasisPoints PumpSwapFeeBasisPoints,
 ) (*SellBaseInputResult, error) {
-	if baseReserve == 0 || quoteReserve == 0 {
-		return nil, ErrInvalidReserves
-	}
-	effectiveQuoteReserve, err := EffectiveQuoteReserves(quoteReserve, virtualQuoteReserves)
+	effective, err := pumpSwapReserves(baseReserve, quoteReserve, virtualQuoteReserves)
 	if err != nil {
 		return nil, err
 	}
-
-	// Use 128-bit arithmetic: (quoteReserve * base) / (baseReserve + base)
-	numerator := mul128(effectiveQuoteReserve, base)
-	denominator := baseReserve + base
-	if denominator == 0 {
-		return nil, ErrPoolDepleted
+	raw, err := pumpSwapDiv(new(big.Int).Mul(pumpSwapInt(effective), pumpSwapInt(base)), new(big.Int).Add(pumpSwapInt(baseReserve), pumpSwapInt(base)), false)
+	if err != nil {
+		return nil, err
 	}
-	quoteAmountOutUint := div128(numerator, denominator)
-
-	lpFee, _ := ComputeFee(quoteAmountOutUint, feeBasisPoints.LPFeeBasisPoints)
-	protocolFee, _ := ComputeFee(quoteAmountOutUint, feeBasisPoints.ProtocolFeeBasisPoints)
-	coinCreatorFee, _ := ComputeFee(quoteAmountOutUint, feeBasisPoints.CoinCreatorFeeBasisPoints)
-
-	totalFees := lpFee + protocolFee + coinCreatorFee
-	if totalFees > quoteAmountOutUint {
+	fees, lpFee, err := pumpSwapFees(raw, feeBasisPoints)
+	if err != nil {
+		return nil, err
+	}
+	if fees > raw {
 		return nil, ErrFeesExceedOutput
 	}
-	quoteVaultOutflow := quoteAmountOutUint - lpFee
-	if quoteVaultOutflow > quoteReserve {
+	if raw-lpFee > quoteReserve {
 		return nil, errors.New("insufficient real quote reserves to cover the sell output")
 	}
-	finalQuote := quoteAmountOutUint - totalFees
-	minQuote, _ := CalculateWithSlippageSell(finalQuote, slippageBasisPoints)
-
-	return &SellBaseInputResult{
-		UIQuote:                finalQuote,
-		MinQuote:               minQuote,
-		InternalQuoteAmountOut: quoteAmountOutUint,
-	}, nil
+	final := raw - fees
+	minQuote, err := CalculateWithSlippageSell(final, slippageBasisPoints)
+	if err != nil {
+		return nil, err
+	}
+	return &SellBaseInputResult{UIQuote: final, MinQuote: minQuote, InternalQuoteAmountOut: raw}, nil
 }
 
 // SellQuoteInputInternal calculates base needed to receive quote amount on PumpSwap
@@ -515,72 +396,47 @@ func SellQuoteInputInternalWithFees(
 	virtualQuoteReserves *big.Int,
 	feeBasisPoints PumpSwapFeeBasisPoints,
 ) (*SellQuoteInputResult, error) {
-	if baseReserve == 0 || quoteReserve == 0 {
-		return nil, ErrInvalidReserves
+	effective, err := pumpSwapReserves(baseReserve, quoteReserve, virtualQuoteReserves)
+	if err != nil {
+		return nil, err
 	}
 	if quote > quoteReserve {
 		return nil, ErrInsufficientReserves
 	}
-	effectiveQuoteReserve, err := EffectiveQuoteReserves(quoteReserve, virtualQuoteReserves)
+	sum, err := pumpSwapFeeSum(feeBasisPoints)
 	if err != nil {
 		return nil, err
 	}
-
-	rawQuote := calculateQuoteAmountOut(
-		quote,
-		feeBasisPoints.LPFeeBasisPoints,
-		feeBasisPoints.ProtocolFeeBasisPoints,
-		feeBasisPoints.CoinCreatorFeeBasisPoints,
-	)
-
-	lpFee, err := ComputeFee(rawQuote, feeBasisPoints.LPFeeBasisPoints)
+	if sum >= 10000 {
+		return nil, ErrInvalidInput
+	}
+	raw, err := pumpSwapDiv(new(big.Int).Mul(pumpSwapInt(quote), big.NewInt(10000)), pumpSwapInt(10000-sum), true)
 	if err != nil {
 		return nil, err
 	}
-	if rawQuote < lpFee || rawQuote-lpFee > quoteReserve {
-		return nil, errors.New("insufficient real quote reserves to cover the sell output")
+	lpFee, err := ComputeFee(raw, feeBasisPoints.LPFeeBasisPoints)
+	if err != nil {
+		return nil, err
 	}
-
-	if rawQuote >= effectiveQuoteReserve {
-		return nil, ErrInvalidInputCalc
+	if lpFee > raw || raw-lpFee > quoteReserve {
+		return nil, ErrInsufficientReserves
 	}
-
-	// Use 128-bit arithmetic for ceiling division
-	numerator := mul128(baseReserve, rawQuote)
-	denominator := effectiveQuoteReserve - rawQuote
-	baseAmountIn := div128(numerator, denominator)
-	// Add 1 for ceiling division
-	if numerator.Lo%denominator != 0 || numerator.Hi != 0 {
-		baseAmountIn++
+	if raw >= effective {
+		return nil, ErrInvalidInput
 	}
-	minQuote, _ := CalculateWithSlippageSell(quote, slippageBasisPoints)
-
-	return &SellQuoteInputResult{
-		InternalRawQuote: rawQuote,
-		Base:             baseAmountIn,
-		MinQuote:         minQuote,
-	}, nil
-}
-
-func calculateQuoteAmountOut(
-	userQuoteAmountOut uint64,
-	lpFeeBasisPoints uint64,
-	protocolFeeBasisPoints uint64,
-	coinCreatorFeeBasisPoints uint64,
-) uint64 {
-	totalFeeBasisPoints := lpFeeBasisPoints + protocolFeeBasisPoints + coinCreatorFeeBasisPoints
-	denominator := 10000 - totalFeeBasisPoints
-	// Use 128-bit arithmetic
-	numerator := mul128(userQuoteAmountOut, 10000)
-	result := div128(numerator, denominator)
-	// Add 1 for ceiling division
-	if numerator.Lo%denominator != 0 || numerator.Hi != 0 {
-		result++
+	base, err := pumpSwapDiv(new(big.Int).Mul(pumpSwapInt(baseReserve), pumpSwapInt(raw)), pumpSwapInt(effective-raw), true)
+	if err != nil {
+		return nil, err
 	}
-	return result
+	minQuote, err := CalculateWithSlippageSell(quote, slippageBasisPoints)
+	if err != nil {
+		return nil, err
+	}
+	return &SellQuoteInputResult{InternalRawQuote: raw, Base: base, MinQuote: minQuote}, nil
 }
 
 // ===== Bonk Calculations =====
+// 100% from Rust: src/utils/calc/bonk.rs + src/instruction/utils/bonk.rs accounts
 
 // Bonk Constants - 100% from Rust: src/instruction/utils/bonk.rs accounts
 const (
@@ -591,7 +447,102 @@ const (
 	BonkDefaultVirtualQuote uint64 = 30000852951
 )
 
-// GetBonkAmountOut calculates output amount for Bonk
+// ClampSlippageBasisPoints caps slippage at MaxSlippageBasisPoints (9999).
+// 100% from Rust: src/utils/calc/common.rs clamp_slippage_basis_points
+func ClampSlippageBasisPoints(basisPoints uint64) uint64 {
+	if basisPoints > MaxSlippageBasisPoints {
+		return MaxSlippageBasisPoints
+	}
+	return basisPoints
+}
+
+func bonkU128(v uint64) *big.Int {
+	return new(big.Int).SetUint64(v)
+}
+
+func bonkFee(amount *big.Int, rate uint64) *big.Int {
+	return new(big.Int).Div(new(big.Int).Mul(amount, bonkU128(rate)), bonkU128(10000))
+}
+
+// GetBonkBuyTokenAmountFromSolAmount calculates min tokens received when buying with SOL.
+// 100% from Rust: src/utils/calc/bonk.rs get_buy_token_amount_from_sol_amount
+func GetBonkBuyTokenAmountFromSolAmount(
+	amountIn uint64,
+	virtualBase uint64,
+	virtualQuote uint64,
+	realBase uint64,
+	realQuote uint64,
+	slippageBasisPoints uint64,
+) uint64 {
+	bps := ClampSlippageBasisPoints(slippageBasisPoints)
+	amountInU128 := bonkU128(amountIn)
+
+	protocolFee := bonkFee(amountInU128, BonkProtocolFeeRate)
+	platformFee := bonkFee(amountInU128, BonkPlatformFeeRate)
+	shareFee := bonkFee(amountInU128, BonkShareFeeRate)
+
+	amountInNet := new(big.Int).Sub(amountInU128, protocolFee)
+	amountInNet.Sub(amountInNet, platformFee)
+	amountInNet.Sub(amountInNet, shareFee)
+
+	inputReserve := new(big.Int).Add(bonkU128(virtualQuote), bonkU128(realQuote))
+	outputReserve := new(big.Int).Sub(bonkU128(virtualBase), bonkU128(realBase))
+
+	numerator := new(big.Int).Mul(amountInNet, outputReserve)
+	denominator := new(big.Int).Add(inputReserve, amountInNet)
+	if denominator.Sign() == 0 {
+		return 0
+	}
+	amountOut := new(big.Int).Div(numerator, denominator)
+	slip := new(big.Int).Div(new(big.Int).Mul(amountOut, bonkU128(bps)), bonkU128(10000))
+	amountOut.Sub(amountOut, slip)
+	if amountOut.Sign() < 0 {
+		return 0
+	}
+	return amountOut.Uint64()
+}
+
+// GetBonkSellSolAmountFromTokenAmount calculates min SOL received when selling tokens.
+// 100% from Rust: src/utils/calc/bonk.rs get_sell_sol_amount_from_token_amount
+func GetBonkSellSolAmountFromTokenAmount(
+	amountIn uint64,
+	virtualBase uint64,
+	virtualQuote uint64,
+	realBase uint64,
+	realQuote uint64,
+	slippageBasisPoints uint64,
+) uint64 {
+	bps := ClampSlippageBasisPoints(slippageBasisPoints)
+	amountInU128 := bonkU128(amountIn)
+
+	inputReserve := new(big.Int).Sub(bonkU128(virtualBase), bonkU128(realBase))
+	outputReserve := new(big.Int).Add(bonkU128(virtualQuote), bonkU128(realQuote))
+
+	numerator := new(big.Int).Mul(amountInU128, outputReserve)
+	denominator := new(big.Int).Add(inputReserve, amountInU128)
+	if denominator.Sign() == 0 {
+		return 0
+	}
+	solAmountOut := new(big.Int).Div(numerator, denominator)
+
+	protocolFee := bonkFee(solAmountOut, BonkProtocolFeeRate)
+	platformFee := bonkFee(solAmountOut, BonkPlatformFeeRate)
+	shareFee := bonkFee(solAmountOut, BonkShareFeeRate)
+
+	solAmountNet := new(big.Int).Sub(solAmountOut, protocolFee)
+	solAmountNet.Sub(solAmountNet, platformFee)
+	solAmountNet.Sub(solAmountNet, shareFee)
+
+	slip := new(big.Int).Div(new(big.Int).Mul(solAmountNet, bonkU128(bps)), bonkU128(10000))
+	solAmountNet.Sub(solAmountNet, slip)
+	if solAmountNet.Sign() < 0 {
+		return 0
+	}
+	return solAmountNet.Uint64()
+}
+
+// GetBonkAmountOut is kept for compatibility; prefers buy-path semantics with clamped slippage.
+// Prefer GetBonkBuyTokenAmountFromSolAmount / GetBonkSellSolAmountFromTokenAmount.
 func GetBonkAmountOut(
 	amountIn uint64,
 	protocolFeeRate uint64,
@@ -601,16 +552,18 @@ func GetBonkAmountOut(
 	virtualQuote uint64,
 	realBase uint64,
 	realQuote uint64,
-	feeDirection int, // 0 = fee on output, 1 = fee on input
+	slippageBasisPoints int,
 ) uint64 {
-	// Simplified Bonk calculation
-	if virtualBase == 0 || virtualQuote == 0 {
-		return 0
+	_ = protocolFeeRate
+	_ = platformFeeRate
+	_ = shareFeeRate
+	bps := uint64(0)
+	if slippageBasisPoints > 0 {
+		bps = uint64(slippageBasisPoints)
 	}
-
-	// Use 128-bit arithmetic
-	amountOut := div128(mul128(amountIn, virtualQuote), virtualBase)
-	return amountOut
+	return GetBonkBuyTokenAmountFromSolAmount(
+		amountIn, virtualBase, virtualQuote, realBase, realQuote, bps,
+	)
 }
 
 // GetBonkAmountIn calculates input amount needed for desired output on Bonk
@@ -624,12 +577,16 @@ func GetBonkAmountIn(
 	realBase uint64,
 	realQuote uint64,
 ) uint64 {
+	_ = realBase
+	_ = realQuote
 	if virtualBase == 0 || virtualQuote == 0 {
 		return 0
 	}
 
 	totalFeeRate := protocolFeeRate + platformFeeRate + shareFeeRate
-	// Use 128-bit arithmetic
+	if totalFeeRate >= 10000 {
+		return 0
+	}
 	amountIn := div128(mul128(amountOut, 10000), 10000-totalFeeRate)
 	amountIn = div128(mul128(amountIn, virtualBase), virtualQuote)
 
@@ -778,120 +735,57 @@ type MeteoraSwapResult struct {
 }
 
 // MeteoraDammV2ComputeSwapAmount calculates swap amount for Meteora DAMM V2
-func MeteoraDammV2ComputeSwapAmount(
-	tokenAReserve uint64,
-	tokenBReserve uint64,
-	isAToB bool,
-	amountIn uint64,
-	slippageBasisPoints uint64,
-) *MeteoraSwapResult {
-	if amountIn == 0 {
-		return &MeteoraSwapResult{AmountOut: 0, MinAmountOut: 0}
+// Compatibility constant-product estimate only, not a DAMM v2 fee/sqrt-price quote.
+func MeteoraDammV2ComputeSwapAmount(tokenAReserve, tokenBReserve uint64, isAToB bool, amountIn, slippageBasisPoints uint64) *MeteoraSwapResult {
+	input, output := tokenAReserve, tokenBReserve
+	if !isAToB {
+		input, output = output, input
 	}
-
-	var amountOut uint64
-
-	if isAToB {
-		// Swapping token A for token B
-		if tokenAReserve == 0 {
-			return &MeteoraSwapResult{AmountOut: 0, MinAmountOut: 0}
-		}
-
-		// Constant product: b_out = (b_reserve * a_in) / (a_reserve + a_in)
-		// Use 128-bit arithmetic
-		numerator := mul128(tokenBReserve, amountIn)
-		denominator := tokenAReserve + amountIn
-
-		if denominator == 0 {
-			return &MeteoraSwapResult{AmountOut: 0, MinAmountOut: 0}
-		}
-
-		amountOut = div128(numerator, denominator)
-	} else {
-		// Swapping token B for token A
-		if tokenBReserve == 0 {
-			return &MeteoraSwapResult{AmountOut: 0, MinAmountOut: 0}
-		}
-
-		// Constant product: a_out = (a_reserve * b_in) / (b_reserve + b_in)
-		// Use 128-bit arithmetic
-		numerator := mul128(tokenAReserve, amountIn)
-		denominator := tokenBReserve + amountIn
-
-		if denominator == 0 {
-			return &MeteoraSwapResult{AmountOut: 0, MinAmountOut: 0}
-		}
-
-		amountOut = div128(numerator, denominator)
-	}
-
-	// Apply slippage
-	minAmountOut, _ := CalculateWithSlippageSell(amountOut, slippageBasisPoints)
-
-	return &MeteoraSwapResult{
-		AmountOut:    amountOut,
-		MinAmountOut: minAmountOut,
-	}
+	out := MeteoraDammV2GetAmountOut(amountIn, input, output, 0)
+	minimum, _ := CalculateWithSlippageSell(out, slippageBasisPoints)
+	return &MeteoraSwapResult{AmountOut: out, MinAmountOut: minimum}
 }
 
-// MeteoraDammV2CalculatePrice calculates current price (token B per token A)
-func MeteoraDammV2CalculatePrice(tokenAReserve uint64, tokenBReserve uint64) float64 {
+func MeteoraDammV2CalculatePrice(tokenAReserve, tokenBReserve uint64) float64 {
 	if tokenAReserve == 0 {
-		return 0.0
+		return 0
 	}
 	return float64(tokenBReserve) / float64(tokenAReserve)
 }
 
-// MeteoraDammV2CalculateLiquidity calculates liquidity (geometric mean of reserves)
-func MeteoraDammV2CalculateLiquidity(tokenAReserve uint64, tokenBReserve uint64) uint64 {
-	if tokenAReserve == 0 || tokenBReserve == 0 {
-		return 0
-	}
-	return uint64(math.Sqrt(float64(tokenAReserve) * float64(tokenBReserve)))
+// Exact floor sqrt of a u128 product; float64 cannot represent u64 balances.
+func MeteoraDammV2CalculateLiquidity(tokenAReserve, tokenBReserve uint64) uint64 {
+	product := new(big.Int).Mul(new(big.Int).SetUint64(tokenAReserve), new(big.Int).SetUint64(tokenBReserve))
+	return product.Sqrt(product).Uint64()
 }
 
-// MeteoraDammV2GetAmountOut calculates output amount with fee consideration
-func MeteoraDammV2GetAmountOut(
-	amountIn uint64,
-	inputReserve uint64,
-	outputReserve uint64,
-	feeBasisPoints uint64,
-) uint64 {
-	if inputReserve == 0 || outputReserve == 0 || amountIn == 0 {
+// Compatibility estimates return zero for invalid fees or unrepresentable input.
+func MeteoraDammV2GetAmountOut(amountIn, inputReserve, outputReserve, feeBasisPoints uint64) uint64 {
+	if inputReserve == 0 || outputReserve == 0 || amountIn == 0 || feeBasisPoints >= 10000 {
 		return 0
 	}
-
-	// Apply fee - use 128-bit arithmetic
-	amountInAfterFee := amountIn * (10000 - feeBasisPoints) / 10000
-
-	// numerator = amountInAfterFee * outputReserve
-	numerator := mul128(amountInAfterFee, outputReserve)
-	denominator := inputReserve + amountInAfterFee
-
-	return div128(numerator, denominator)
+	net := new(big.Int).Mul(new(big.Int).SetUint64(amountIn), new(big.Int).SetUint64(10000-feeBasisPoints))
+	net.Quo(net, big.NewInt(10000))
+	numerator := new(big.Int).Mul(net, new(big.Int).SetUint64(outputReserve))
+	denominator := new(big.Int).Add(new(big.Int).SetUint64(inputReserve), net)
+	return numerator.Quo(numerator, denominator).Uint64()
 }
 
-// MeteoraDammV2GetAmountIn calculates input amount needed for desired output
-func MeteoraDammV2GetAmountIn(
-	amountOut uint64,
-	inputReserve uint64,
-	outputReserve uint64,
-	feeBasisPoints uint64,
-) uint64 {
-	if inputReserve == 0 || outputReserve == 0 || amountOut >= outputReserve {
+func MeteoraDammV2GetAmountIn(amountOut, inputReserve, outputReserve, feeBasisPoints uint64) uint64 {
+	if inputReserve == 0 || outputReserve == 0 || amountOut >= outputReserve || feeBasisPoints >= 10000 {
 		return 0
 	}
-
-	// Use 128-bit arithmetic
-	// numerator = inputReserve * amountOut * 10000
-	numeratorStep1 := mul128(inputReserve, amountOut)
-	numerator := mul128(div128(numeratorStep1, 1), 10000)
-	denominator := (outputReserve - amountOut) * (10000 - feeBasisPoints)
-
-	result := div128(numerator, denominator)
-	// Add 1 for ceiling division
-	if numerator.Lo%denominator != 0 || numerator.Hi != 0 {
-		result++
+	numerator := new(big.Int).Mul(new(big.Int).SetUint64(inputReserve), new(big.Int).SetUint64(amountOut))
+	net, err := pumpSwapDiv(numerator, new(big.Int).SetUint64(outputReserve-amountOut), true)
+	if err != nil {
+		return 0
+	}
+	// First round the required net input, then invert the floored input fee.
+	// Combining these ceilings can underfund the swap by one unit.
+	numerator.Mul(new(big.Int).SetUint64(net), big.NewInt(10000))
+	result, err := pumpSwapDiv(numerator, new(big.Int).SetUint64(10000-feeBasisPoints), true)
+	if err != nil {
+		return 0
 	}
 	return result
 }

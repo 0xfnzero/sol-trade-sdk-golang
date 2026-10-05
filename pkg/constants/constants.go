@@ -35,22 +35,22 @@ var (
 
 // PumpFun program
 var (
-	PUMPFUN_PROGRAM_ID = solana.MustPublicKeyFromBase58("6EF8rrecthR5Dkzon8Nwu78hRvfCKopJFfWcCzNfXt3D")
+	PUMPFUN_PROGRAM_ID = solana.MustPublicKeyFromBase58("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P")
 )
 
 // PumpSwap (Pump AMM) program
 var (
-	PUMPSWAP_PROGRAM_ID = solana.MustPublicKeyFromBase58("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwq52pCSbAhL")
+	PUMPSWAP_PROGRAM_ID = solana.MustPublicKeyFromBase58("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA")
 )
 
 // Bonk program
 var (
-	BONK_PROGRAM_ID = solana.MustPublicKeyFromBase58("bonk2zCzQaobPKMKsM5Rut46yHp3zQD1ntUk8Ld8ARq")
+	BONK_PROGRAM_ID = solana.MustPublicKeyFromBase58("LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj")
 )
 
 // Raydium CPMM program
 var (
-	RAYDIUM_CPMM_PROGRAM_ID = solana.MustPublicKeyFromBase58("CPMMoo8L3F4NbTUBBfMTm5L2AhwDtLd6P4VeXvgQA2Po")
+	RAYDIUM_CPMM_PROGRAM_ID = solana.MustPublicKeyFromBase58("CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C")
 )
 
 // Raydium AMM V4 program
@@ -60,7 +60,7 @@ var (
 
 // Meteora DAMM v2 program
 var (
-	METEORA_DAMM_V2_PROGRAM_ID = solana.MustPublicKeyFromBase58("Eo7WjKq67rjJQSZxSbzmZ8p2UA3LJi5y6vZr3rP5L8k1")
+	METEORA_DAMM_V2_PROGRAM_ID = solana.MustPublicKeyFromBase58("cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG")
 )
 
 // PumpFun constants
@@ -71,9 +71,9 @@ const (
 
 // PumpFun instruction discriminators
 var (
-	BUY_DISCRIMINATOR              = [8]byte{102, 6, 141, 196, 242, 95, 28, 167}
-	SELL_DISCRIMINATOR             = [8]byte{187, 75, 56, 100, 133, 176, 22, 141}
-	BUY_EXACT_SOL_IN_DISCRIMINATOR = [8]byte{133, 104, 247, 38, 153, 106, 73, 253}
+	BUY_DISCRIMINATOR              = [8]byte{102, 6, 61, 18, 1, 218, 235, 234}
+	SELL_DISCRIMINATOR             = [8]byte{51, 230, 133, 164, 1, 127, 131, 173}
+	BUY_EXACT_SOL_IN_DISCRIMINATOR = [8]byte{56, 252, 116, 8, 158, 223, 205, 95}
 )
 
 // Compute budget constants
