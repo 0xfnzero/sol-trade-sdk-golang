@@ -99,3 +99,7 @@ Public native-quote settlement helpers accept complete prepared cached routes, n
 ## 2026-10-05：连续性及冲突失效修复
 
 新增依赖不会解除连续性中断。同版本账户冲突会使来源缓存及此前冻结快照失效，必须明确选择 fork、建立新缓存并重新验证；仅重置 readiness 无法恢复旧缓存。详见 [缓存修复与迁移说明](NATIVE_CACHE_CONTINUITY_ALIGNMENT_20261005.md)。本项是本地状态机验收，完整实时重连／重组及新数组发现仍待验收。
+
+## v0.1.7：CPMM creator-fee（2026-10-06）
+
+现已对齐 Rust 5.0.7 的 creator 签名/permissionless 领取、share PDA、config/share 解码、收益拆分、同快照冷 RPC 读取与缓存准备/重验。缓存必须显式观察 share PDA（不存在/关闭用空数据 tombstone 表示），不能把未收到 gRPC 更新当作不存在。提交前重验账户版本和连续性；估算不含 Token-2022 转账税。
