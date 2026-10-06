@@ -132,8 +132,8 @@ func (t *TradingUtils) TransferSOL(
 		SetLamports(amount).
 		Build()
 
-	// Get recent blockhash
-	recentBlockhash, err := t.client.GetRecentBlockhash(ctx, rpc.CommitmentConfirmed)
+	// Get latest blockhash
+	latestBlockhash, err := t.client.GetLatestBlockhash(ctx, rpc.CommitmentConfirmed)
 	if err != nil {
 		return solana.Signature{}, err
 	}
@@ -141,7 +141,7 @@ func (t *TradingUtils) TransferSOL(
 	// Build transaction
 	tx, err := solana.NewTransaction(
 		[]solana.Instruction{transferIx},
-		recentBlockhash.Value.Blockhash,
+		latestBlockhash.Value.Blockhash,
 		solana.TransactionPayer(payer.PublicKey()),
 	)
 	if err != nil {
@@ -190,8 +190,8 @@ func (t *TradingUtils) CloseTokenAccount(
 	builder := NewTokenInstructionBuilder()
 	closeIx := builder.BuildCloseAccount(ata, payer.PublicKey(), payer.PublicKey())
 
-	// Get recent blockhash
-	recentBlockhash, err := t.client.GetRecentBlockhash(ctx, rpc.CommitmentConfirmed)
+	// Get latest blockhash
+	latestBlockhash, err := t.client.GetLatestBlockhash(ctx, rpc.CommitmentConfirmed)
 	if err != nil {
 		return solana.Signature{}, err
 	}
@@ -199,7 +199,7 @@ func (t *TradingUtils) CloseTokenAccount(
 	// Build transaction
 	tx, err := solana.NewTransaction(
 		[]solana.Instruction{closeIx},
-		recentBlockhash.Value.Blockhash,
+		latestBlockhash.Value.Blockhash,
 		solana.TransactionPayer(payer.PublicKey()),
 	)
 	if err != nil {

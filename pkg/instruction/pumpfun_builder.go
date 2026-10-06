@@ -10,7 +10,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
@@ -175,9 +174,11 @@ type BondingCurve struct {
 
 // PumpFunParams contains parameters for PumpFun operations
 type PumpFunParams struct {
-	BondingCurve              *BondingCurve
-	CreatorVault              solana.PublicKey
-	AssociatedBondingCurve    solana.PublicKey
+	BondingCurve           *BondingCurve
+	CreatorVault           solana.PublicKey
+	AssociatedBondingCurve solana.PublicKey
+	// TokenProgram is the mint owner supplied by a parser event or RPC lookup.
+	// When omitted, it defaults to Token-2022 for compatibility.
 	TokenProgram              solana.PublicKey
 	CloseTokenAccountWhenSell *bool
 	ObservedTradeCreator      solana.PublicKey
@@ -255,10 +256,7 @@ func pumpFunResolveCreatorVaultForSellV2(pp *PumpFunParams, mint solana.PublicKe
 	return solana.PublicKey{}, fmt.Errorf("creator_vault PDA derivation failed for sell_v2 mint %s", mint.String())
 }
 
-func pumpFunEffectiveMintTokenProgram(mint solana.PublicKey, pp *PumpFunParams) solana.PublicKey {
-	if strings.HasSuffix(mint.String(), "pump") {
-		return constants.TOKEN_PROGRAM_2022
-	}
+func pumpFunEffectiveMintTokenProgram(pp *PumpFunParams) solana.PublicKey {
 	if pumpFunUsablePubkey(pp.TokenProgram) {
 		return pp.TokenProgram
 	}
@@ -363,7 +361,7 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 	}
 
 	// Get token program
-	tokenProgram := pumpFunEffectiveMintTokenProgram(params.OutputMint, pp)
+	tokenProgram := pumpFunEffectiveMintTokenProgram(pp)
 
 	// Get associated bonding curve
 	associatedBondingCurve := pp.AssociatedBondingCurve
@@ -494,7 +492,7 @@ func PumpFunBuildSellInstructions(params *PumpFunBuildSellParams) ([]solana.Inst
 	}
 
 	// Get token program
-	tokenProgram := pumpFunEffectiveMintTokenProgram(params.InputMint, pp)
+	tokenProgram := pumpFunEffectiveMintTokenProgram(pp)
 
 	// Get associated bonding curve
 	associatedBondingCurve := pp.AssociatedBondingCurve
@@ -588,7 +586,7 @@ func PumpFunBuildBuyV2Instructions(params *PumpFunBuildBuyParams) ([]solana.Inst
 	if bondingCurveAddr.IsZero() {
 		bondingCurveAddr = GetBondingCurvePDA(params.OutputMint)
 	}
-	baseTokenProgram := pumpFunEffectiveMintTokenProgram(params.OutputMint, pp)
+	baseTokenProgram := pumpFunEffectiveMintTokenProgram(pp)
 	quoteMint := pumpFunEffectiveQuoteMint(pp)
 	if err := pumpFunValidateV2BuyQuoteMint(params.InputMint, quoteMint); err != nil {
 		return nil, err
@@ -713,7 +711,7 @@ func PumpFunBuildSellV2Instructions(params *PumpFunBuildSellParams) ([]solana.In
 	if bondingCurveAddr.IsZero() {
 		bondingCurveAddr = GetBondingCurvePDA(params.InputMint)
 	}
-	baseTokenProgram := pumpFunEffectiveMintTokenProgram(params.InputMint, pp)
+	baseTokenProgram := pumpFunEffectiveMintTokenProgram(pp)
 	quoteMint := pumpFunEffectiveQuoteMint(pp)
 	if err := pumpFunValidateV2SellQuoteMint(params.OutputMint, quoteMint); err != nil {
 		return nil, err

@@ -71,13 +71,19 @@
 | DEX 协议 | PumpFun、PumpSwap、Bonk、Meteora DAMM v2、Raydium AMM v4、Raydium CPMM |
 | 提交通道 | 默认 Solana RPC，以及 Jito、ZeroSlot、Temporal、Bloxroute、FlashBlock、BlockRazor、Node1、Astralane、Stellium、Lightspeed、Soyas、Speedlanding、Helius、Solami；NextBlock 默认仍按 Rust 黑名单跳过 |
 | 交易流程 | `BuySimple` / `SellSimple`、旧版 buy/sell 参数、跟单交易、狙击交易、地址查找表、durable nonce、中间件、预构建交易执行 |
-| 运行环境 | Go 1.24+、后端服务、worker 和低延迟 Bot 基础设施 |
+| 运行环境 | Go 1.25+、后端服务、worker 和低延迟 Bot 基础设施 |
 
 ## 🔖 当前版本
 
-**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.7`
+**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.8`
 
-本版本刷新 PumpFun V2 与 USDC quote 池处理逻辑，确保默认 RPC 提交通道会和 SWQoS 通道一起发出，并将 Raydium CPMM fixed-output 交易对齐到链上 `swap_base_out` 指令。交易执行必须由调用方传入 recent blockhash 或 durable nonce；热路径不会查询 RPC 获取 blockhash、账户或余额数据。
+本版本修复 PumpFun token program 选择，并将 SOL 转账和关闭 token 账户工具迁移到 `getLatestBlockhash`。`solana-go` 升级到 v1.24.0，最低要求 Go 1.25+。交易执行仍需由调用方传入 recent blockhash 或 durable nonce；热路径不会查询 RPC 获取 blockhash、账户或余额数据。
+
+## v0.1.8 — Token program 与 RPC 修复
+
+PumpFun legacy/V2 买卖构建器使用解析事件或 mint-owner RPC 查询提供的显式 `TokenProgram`，不再根据 mint 后缀判断。ATA 创建与交易账户派生统一使用该 program。未传入时保留 Token-2022 默认值；SPL Token mint 请显式传入 mint owner。
+
+`TransferSOL` 与 `CloseTokenAccount` 改用 `getLatestBlockhash`。回归测试覆盖 mint 后缀、两种 token program、legacy/V2 买卖、ATA 派生，以及本地模拟 RPC 下的交易签名。`go test ./...` 与 `go vet ./...` 已通过。
 
 ## v0.1.7 — CPMM creator-fee 对齐
 
@@ -121,7 +127,7 @@ git clone https://github.com/0xfnzero/sol-trade-sdk-golang
 
 ```go
 // 添加到您的 go.mod
-require github.com/0xfnzero/sol-trade-sdk-golang v0.1.7
+require github.com/0xfnzero/sol-trade-sdk-golang v0.1.8
 
 replace github.com/0xfnzero/sol-trade-sdk-golang => ./sol-trade-sdk-golang
 ```
@@ -135,7 +141,7 @@ go mod tidy
 ### 使用 Go Modules
 
 ```bash
-go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.7
+go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.8
 ```
 
 ## 🛠️ 使用示例

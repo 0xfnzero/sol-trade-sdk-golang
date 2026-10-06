@@ -71,13 +71,19 @@ This SDK is available in multiple languages:
 | DEX protocols | PumpFun, PumpSwap, Bonk, Meteora DAMM v2, Raydium AMM v4, Raydium CPMM |
 | Submit lanes | Default Solana RPC plus Jito, ZeroSlot, Temporal, Bloxroute, FlashBlock, BlockRazor, Node1, Astralane, Stellium, Lightspeed, Soyas, Speedlanding, Helius, and Solami; NextBlock remains Rust-blacklisted by default |
 | Trading workflows | `BuySimple` / `SellSimple`, legacy buy/sell params, copy trading, sniper trading, address lookup tables, durable nonce, middleware, prebuilt transaction execution |
-| Runtime | Go 1.24+, backend services, workers, and latency-sensitive bot infrastructure |
+| Runtime | Go 1.25+, backend services, workers, and latency-sensitive bot infrastructure |
 
 ## 🔖 Current Release
 
-**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.7`
+**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.8`
 
-This release refreshes PumpFun V2 and USDC quote-pool handling, keeps the default RPC submit lane active alongside SWQoS lanes, and aligns Raydium CPMM fixed-output swaps with the on-chain `swap_base_out` instruction. Trade execution requires a caller-supplied recent blockhash or durable nonce; hot-path execution does not query RPC for blockhash, account, or balance data.
+This release fixes PumpFun token-program selection and migrates the SOL transfer/token-account close helpers to `getLatestBlockhash`. It upgrades `solana-go` to v1.24.0 and requires Go 1.25+. Trade execution still requires a caller-supplied recent blockhash or durable nonce; hot-path execution does not query RPC for blockhash, account, or balance data.
+
+## v0.1.8 — Token-program and RPC fixes
+
+PumpFun legacy/V2 buy and sell builders now honor the explicit `TokenProgram` from a parser event or mint-owner RPC lookup, regardless of the mint suffix. ATA creation and swap account derivation use that program consistently. Omitting it retains the Token-2022 default; supply the mint owner explicitly for SPL Token mints.
+
+`TransferSOL` and `CloseTokenAccount` now use `getLatestBlockhash`. Regression tests cover mint suffixes, both token programs, legacy/V2 buys and sells, ATA derivation, and signed transactions against a local mock RPC. `go test ./...` and `go vet ./...` passed.
 
 ## v0.1.7 — CPMM creator-fee parity
 
@@ -123,7 +129,7 @@ Add the dependency to your `go.mod`:
 
 ```go
 // Add to your go.mod
-require github.com/0xfnzero/sol-trade-sdk-golang v0.1.7
+require github.com/0xfnzero/sol-trade-sdk-golang v0.1.8
 
 replace github.com/0xfnzero/sol-trade-sdk-golang => ./sol-trade-sdk-golang
 ```
@@ -137,7 +143,7 @@ go mod tidy
 ### Use Go Modules
 
 ```bash
-go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.7
+go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.8
 ```
 
 ## 🛠️ Usage Examples
