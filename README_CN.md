@@ -422,9 +422,6 @@ MIT License
 4. 监控余额和交易费用
 5. 遵守相关法律法规
 
-## Native alignment status
+## API 兼容性
 
-See [NATIVE_ALIGNMENT.md](NATIVE_ALIGNMENT.md) for implemented native APIs, Rust golden tests, mainnet simulation evidence, examples, and remaining parity gaps. Full cross-language parity is still in progress.
-
-
-[本轮原生对齐 API 迁移](NATIVE_MIGRATION.md)（实施中，尚未发布）。
+完整跨语言 API 对齐仍在进行；公开行为和支持边界见 [API 迁移说明](NATIVE_MIGRATION.md)，使用方法见 examples 目录。

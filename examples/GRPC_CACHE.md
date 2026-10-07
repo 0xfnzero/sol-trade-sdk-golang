@@ -46,7 +46,7 @@ parser 刷新读取 GRPC_URL / GRPC_TOKEN，保留没更新账户的原 slot，�
 
 显式 `--simulate` 使用 RPC_URL 调用模拟，不发送交易。历史卖出使用已核实余额的公开账户且不持有私钥；更换钱包时必须确认真实 token ATA、余额及租金，不能把余额不足模拟记为成功。完整 parser 输出可用各语言 parser 的 simulation_routes 示例读取 `fixtures/pumpswap_mainnet_simulations_20261004.json`，无需网络。
 
-cashback、非零转账费明确拒绝准备；本例未验收既有 WSOL 输入、USDC/股票端点或自动重组恢复。详细证据见仓库 NATIVE_PUMPSWAP_ALIGNMENT_20261004.md。
+cashback、非零转账费明确拒绝准备；本例未验收既有 WSOL 输入、USDC/股票端点或自动重组恢复。
 
 
 ## DAMM v2 显式保护参数示例

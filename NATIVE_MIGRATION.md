@@ -52,22 +52,22 @@ const receipt = await executor.executeBuy({request, signers: [wallet], submit});
 - 合法大额计算使用宽整数中间值；最终报价仍需满足 u64，溢出/缺失储备/费用不足返回错误。Python 不再以零值结果表示这些错误，字典接口使用同一个原生核心。
 - 公共卖出滑点零输入返回零，滑点钳制到9999；买入预算饱和到u64上限。
 - 可显式传入 protocol fee recipient override，调用方应从经过验证的当前 GlobalConfig 获取收款人。
-- 新增 PumpSwap 冻结缓存状态及统一 factory/route 独立 exact-in 准备入口；cashback 和非零转账费仍明确拒绝。详见 NATIVE_PUMPSWAP_ALIGNMENT_20261004.md。
+- 新增 PumpSwap 冻结缓存状态及统一 factory/route 独立 exact-in 准备入口；cashback 和非零转账费仍明确拒绝。
 
 
 ## PumpSwap 缓存交易与模拟更新（2026-10-04）
 
-三语言已接入真实 cached factory/route；当前费用与收款人由冻结快照提供，报价/构建不联网。独立 SOL 买入、meme 卖出 SOL 的 V1 字节完全一致，六次主网模拟成功；对应快照、模拟响应和 parser 重放见 `NATIVE_PUMPSWAP_ALIGNMENT_20261004.md`。旧状态入口“尚未接入准备”的记录已被本次覆盖。cashback、非零转账费和其它资产矩阵仍未完成，不能据此宣称全量对齐。
+三语言已接入真实 cached factory/route；当前费用与收款人由冻结快照提供，报价/构建不联网。独立 SOL 买入、meme 卖出 SOL 的 V1 字节完全一致，六次主网模拟成功；旧状态入口“尚未接入准备”的记录已被本次覆盖。cashback、非零转账费和其它资产矩阵仍未完成，不能据此宣称全量对齐。
 
 
 ## PumpFun / DAMM v2 更新（2026-10-04）
 
-PumpFun 现在从 pool quote 与本次 SOL/WSOL 支付或收款选择 legacy/V2；非 native 资产不能误走消费 SOL 的布局。Node fromTrade 保留 quote/fee recipient/observed creator。DAMM v2 修复 248→160 费用结构偏移、referral None 固定槽位、payer 权限、Node idempotent ATA 与 bigint funding，以及 Go 非法 mode 默认成功。三语言完整账户布局通过固定 Rust Borsh oracle；新增冻结 cache 状态与显式下限准备示例，三次真实买入模拟成功、完整 V1 字节相同。此入口不提供自动报价或完整 cached route/factory。Python Pool 结构新增保留区及奖励字段，建议使用关键词构造；Go u128 原始 16 字节表示不变。详见 NATIVE_PUMPFUN_DAMM_ALIGNMENT_20261004.md。
+PumpFun 现在从 pool quote 与本次 SOL/WSOL 支付或收款选择 legacy/V2；非 native 资产不能误走消费 SOL 的布局。Node fromTrade 保留 quote/fee recipient/observed creator。DAMM v2 修复 248→160 费用结构偏移、referral None 固定槽位、payer 权限、Node idempotent ATA 与 bigint funding，以及 Go 非法 mode 默认成功。三语言完整账户布局通过固定 Rust Borsh oracle；新增冻结 cache 状态与显式下限准备示例，三次真实买入模拟成功、完整 V1 字节相同。此入口不提供自动报价或完整 cached route/factory。Python Pool 结构新增保留区及奖励字段，建议使用关键词构造；Go u128 原始 16 字节表示不变。
 
 
 ## 公共曲线、参数、PDA 和独立安装更新（2026-10-04）
 
-修复曲线账户公式与 Rust 的差异、Go 宽整数溢出、Node 精确储备、完整 V2 quote 解码、quote 切换和重复公共类；统一错误 program ID / discriminator / Mayhem 默认列表。修复 Node/Python 简化 PDA 派生，PumpSwap 通用池要求完整 seeds，无法确认身份的旧 helper 明确拒绝。Go 曲线计算返回 `(uint64,error)`；Python 已完成曲线抛错，运行最低 3.10，移除未使用的 anchorpy。详细 API 迁移、9 组固定源码 oracle 与验收边界见 NATIVE_CURVE_PUBLIC_API_ALIGNMENT_20261004.md。没有把这些入口认定为已完成当前费用缓存准备，整体对齐仍未完成。
+修复曲线账户公式与 Rust 的差异、Go 宽整数溢出、Node 精确储备、完整 V2 quote 解码、quote 切换和重复公共类；统一错误 program ID / discriminator / Mayhem 默认列表。修复 Node/Python 简化 PDA 派生，PumpSwap 通用池要求完整 seeds，无法确认身份的旧 helper 明确拒绝。Go 曲线计算返回 `(uint64,error)`；Python 已完成曲线抛错，运行最低 3.10，移除未使用的 anchorpy。没有把这些入口认定为已完成当前费用缓存准备，整体对齐仍未完成。
 
 ### 公共参数与曲线默认值补充
 
@@ -84,13 +84,13 @@ PumpFun 现在从 pool quote 与本次 SOL/WSOL 支付或收款选择 legacy/V2�
 新增 Node cachedPumpFunConfiguration / Python cached_pumpfun_configuration / Go AccountCacheSnapshot.PumpFunConfiguration，要求当前 Global 与有效 SharingConfig 账户均在冻结缓存中。缺失配置表示未确认，不是未激活；返回 fee recipient 与可空的激活分成 vault。这不是费用报价或 cached factory。Node fromMintByRpc 现在还读取 Global 与可选分成配置，调用方 mock 需要提供 Global，仍仅可冷初始化使用。
 
 
-当前 PumpFun 费用、SOL/WSOL 结算与验证边界：[2026-10-04 对齐记录](NATIVE_PUMPFUN_SETTLEMENT_ALIGNMENT_20261004.md)。整体对齐仍未全部验收。
+整体对齐仍未全部验收。
 
 
-持币卖出已补真实模拟；WSOL 仍为 minimum + SOL 残余：[最新卖出验收](NATIVE_PUMPFUN_FUNDED_SELL_ALIGNMENT_20261004.md)。
+持币卖出已补真实模拟；WSOL 仍为 minimum + SOL 残余。
 
 
-Native quote 多跳现已接入，USDC/WSOL 路径通过双向真实模拟：[最新多跳验收](NATIVE_PUMPFUN_MULTIHOP_ALIGNMENT_20261004.md)。旧的全部多跳拒绝状态已被替代，完整组合矩阵仍未全部验收。
+Native quote 多跳现已接入，USDC/WSOL 路径通过双向真实模拟。旧的全部多跳拒绝状态已被替代，完整组合矩阵仍未全部验收。
 
 ## 2026-10-05: PumpFun settlement consistency
 
@@ -98,7 +98,7 @@ Public native-quote settlement helpers accept complete prepared cached routes, n
 
 ## 2026-10-05：连续性及冲突失效修复
 
-新增依赖不会解除连续性中断。同版本账户冲突会使来源缓存及此前冻结快照失效，必须明确选择 fork、建立新缓存并重新验证；仅重置 readiness 无法恢复旧缓存。详见 [缓存修复与迁移说明](NATIVE_CACHE_CONTINUITY_ALIGNMENT_20261005.md)。本项是本地状态机验收，完整实时重连／重组及新数组发现仍待验收。
+新增依赖不会解除连续性中断。同版本账户冲突会使来源缓存及此前冻结快照失效，必须明确选择 fork、建立新缓存并重新验证；仅重置 readiness 无法恢复旧缓存。本项是本地状态机验收，完整实时重连／重组及新数组发现仍待验收。
 
 ## v0.1.7：CPMM creator-fee（2026-10-06）
 

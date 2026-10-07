@@ -426,15 +426,12 @@ MIT License
 4. Monitor balances and transaction fees
 5. Comply with relevant laws and regulations
 
-## Native alignment status
+## API compatibility
 
-See [NATIVE_ALIGNMENT.md](NATIVE_ALIGNMENT.md) for implemented native APIs, Rust golden tests, mainnet simulation evidence, examples, and remaining parity gaps. Full cross-language parity is still in progress.
+Full cross-language API parity is still in progress. See the [API migration guide](NATIVE_MIGRATION.md) for public behavior and support boundaries, and the examples directory for usage.
 
 
 实时 parser → trade 接入使用 Yellowstone **gRPC**；见 [gRPC 缓存接入与三语言示例](examples/GRPC_CACHE.md)。此路径不使用 WebSocket，报价和构建热路径不调用 RPC。
 
 
-[本轮原生对齐 API 迁移](NATIVE_MIGRATION.md)（实施中，尚未发布）。
-
-
-DAMM v2 单跳缓存准备与显式模拟见 [cached_damm_v2](examples/cached_damm_v2/main.go)，完整范围及真实成功/失败记录见 [验收记录](NATIVE_DAMM_FACTORY_ALIGNMENT_20261004.md)。当前要求调用方显式最低输出，预计到账未知；SOL 与已有 WSOL 使用不同账户结算。PumpFun 当前配置读取见 [配置缓存记录](NATIVE_PUMPFUN_CONFIG_ALIGNMENT_20261004.md)，尚不代表完整费用报价或 cached factory。
+DAMM v2 单跳缓存准备与显式模拟见 [cached_damm_v2](examples/cached_damm_v2/main.go)。当前要求调用方显式最低输出，预计到账未知；SOL 与已有 WSOL 使用不同账户结算。PumpFun 当前配置读取尚不代表完整费用报价或 cached factory。
