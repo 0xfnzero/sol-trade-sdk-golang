@@ -426,4 +426,4 @@ MIT License
 
 ## API 兼容性
 
-完整跨语言 API 对齐仍在进行；公开行为和支持边界见 [API 迁移说明](NATIVE_MIGRATION.md)，使用方法见 examples 目录。
+完整跨语言 API 对齐仍在进行；公开行为和支持边界见 [API 迁移说明](docs/USAGE.md#api-compatibility)，使用方法见 examples 目录。

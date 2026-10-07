@@ -41,7 +41,7 @@
   - [⚙️ SWQoS Service Configuration](#️-swqos-service-configuration)
   - [🔧 Middleware System](#-middleware-system)
   - [🔍 Address Lookup Tables](#-address-lookup-tables)
-  - [🔍 Nonce Cache](#-nonce-cache)
+  - [🔍 Nonce Cache](#-durable-nonce)
 - [💰 Cashback Support (PumpFun / PumpSwap)](#-cashback-support-pumpfun--pumpswap)
 - [🛡️ MEV Protection Services](#️-mev-protection-services)
 - [📁 Project Structure](#-project-structure)
@@ -91,7 +91,7 @@ PumpFun legacy/V2 buy and sell builders now honor the explicit `TokenProgram` fr
 
 Aligns the CPMM creator-fee collection surface with Rust 5.0.7: creator-signed (15 accounts) and permissionless (16 accounts) builders, mandatory share PDA, 236-byte AmmConfig and 145-byte CreatorFeeShare decoders, same-bank cold RPC rate reads, exact integer payout splitting, and RPC-free cached preparation with version/freshness/continuity revalidation. Uses shared mainnet simulation fixtures for direct account/byte/payout comparisons, including Token-2022 and a zero-rate override. PoolState and swap/LP behavior are unchanged. Estimates exclude Token-2022 transfer taxes; rates are read by the program at collection time.
 
-See [CPMM example](examples/cpmm_creator_fee_replay/main.go) and [migration guide](NATIVE_MIGRATION.md).
+See [CPMM example](examples/cpmm_creator_fee_replay/main.go) and [migration guide](docs/USAGE.md#api-compatibility).
 
 ## v0.1.6
 
@@ -430,10 +430,10 @@ MIT License
 
 ## API compatibility
 
-Full cross-language API parity is still in progress. See the [API migration guide](NATIVE_MIGRATION.md) for public behavior and support boundaries, and the examples directory for usage.
+Full cross-language API parity is still in progress. See the [API migration guide](docs/USAGE.md#api-compatibility) for public behavior and support boundaries, and the examples directory for usage.
 
 
-实时 parser → trade 接入使用 Yellowstone **gRPC**；见 [gRPC 缓存接入与三语言示例](examples/GRPC_CACHE.md)。此路径不使用 WebSocket，报价和构建热路径不调用 RPC。
+实时 parser → trade 接入使用 Yellowstone **gRPC**；见 [gRPC 缓存接入与三语言示例](docs/USAGE.md#grpc-cache)。此路径不使用 WebSocket，报价和构建热路径不调用 RPC。
 
 
 DAMM v2 单跳缓存准备与显式模拟见 [cached_damm_v2](examples/cached_damm_v2/main.go)。当前要求调用方显式最低输出，预计到账未知；SOL 与已有 WSOL 使用不同账户结算。PumpFun 当前配置读取尚不代表完整费用报价或 cached factory。

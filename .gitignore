@@ -41,3 +41,6 @@ build/
 
 # Debug
 __debug_bin
+
+# Generated reports and local tooling outputs
+/NATIVE_*EVIDENCE*.json
