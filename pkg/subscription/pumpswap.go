@@ -109,7 +109,10 @@ func (s *AccountCacheSnapshot) PumpSwap(h PoolTradeHint, c CacheReadContext) (Ca
 	if e != nil {
 		return CachedPumpSwapState{}, e
 	}
-	state.FeeBasisPoints = instruction.ComputePumpSwapFeeBasisPoints(config, p.Creator, p.BaseMint, &state.BaseMintSupply, state.BaseReserve, effectiveQuoteReserve)
+	state.FeeBasisPoints = instruction.ComputePumpSwapFeeBasisPoints(config, p.Creator, p.BaseMint, &state.BaseMintSupply, state.BaseReserve, effectiveQuoteReserve, p.QuoteMint)
+	if len(g.Data) > 940 && g.Data[940] == 1 && p.CreatorFeeBps > 0 {
+		state.FeeBasisPoints.CoinCreatorFeeBasisPoints = p.CreatorFeeBps
+	}
 	keys := func(start, n int) []solana.PublicKey {
 		out := make([]solana.PublicKey, n)
 		for i := range out {

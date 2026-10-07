@@ -783,19 +783,23 @@ const (
 
 // PumpSwapPool represents a decoded PumpSwap pool
 type PumpSwapPool struct {
-	PoolBump              uint8
-	Index                 uint16
-	Creator               solana.PublicKey
-	BaseMint              solana.PublicKey
-	QuoteMint             solana.PublicKey
-	LpMint                solana.PublicKey
-	PoolBaseTokenAccount  solana.PublicKey
-	PoolQuoteTokenAccount solana.PublicKey
-	LpSupply              uint64
-	CoinCreator           solana.PublicKey
-	IsMayhemMode          bool
-	IsCashbackCoin        bool
-	VirtualQuoteReserves  *big.Int
+	CreatorFeeBps                     uint64
+	CanEditCreatorFee, IsHolderReward bool
+	ProtocolFees                      uint64
+	CreatorFees                       uint64
+	PoolBump                          uint8
+	Index                             uint16
+	Creator                           solana.PublicKey
+	BaseMint                          solana.PublicKey
+	QuoteMint                         solana.PublicKey
+	LpMint                            solana.PublicKey
+	PoolBaseTokenAccount              solana.PublicKey
+	PoolQuoteTokenAccount             solana.PublicKey
+	LpSupply                          uint64
+	CoinCreator                       solana.PublicKey
+	IsMayhemMode                      bool
+	IsCashbackCoin                    bool
+	VirtualQuoteReserves              *big.Int
 }
 
 type PumpSwapFeeTier struct {
@@ -807,6 +811,7 @@ type PumpSwapFeeConfig struct {
 	FlatFees       calc.PumpSwapFeeBasisPoints
 	FeeTiers       []PumpSwapFeeTier
 	StableFeeTiers []PumpSwapFeeTier
+	ExoticFlatFees calc.PumpSwapFeeBasisPoints
 }
 
 // DecodePool decodes a PumpSwap pool from account data
@@ -873,6 +878,21 @@ func DecodePool(data []byte) *PumpSwapPool {
 		pool.VirtualQuoteReserves = new(big.Int)
 	}
 
+	if len(data) >= 261 {
+		pool.CreatorFeeBps = binary.LittleEndian.Uint64(data[253:261])
+	}
+	if len(data) >= 262 {
+		pool.CanEditCreatorFee = data[261] == 1
+	}
+	if len(data) >= 263 {
+		pool.IsHolderReward = data[262] == 1
+	}
+	if len(data) >= 271 {
+		pool.ProtocolFees = binary.LittleEndian.Uint64(data[263:271])
+	}
+	if len(data) >= 279 {
+		pool.CreatorFees = binary.LittleEndian.Uint64(data[271:279])
+	}
 	return pool
 }
 
@@ -972,11 +992,20 @@ func DecodeFeeConfig(data []byte) *PumpSwapFeeConfig {
 		return nil
 	}
 	offset = next
-	stableFeeTiers, _, ok := decodePumpSwapFeeTiers(data, offset)
+	stableFeeTiers, next, ok := decodePumpSwapFeeTiers(data, offset)
 	if !ok {
 		return nil
 	}
+	var exotic calc.PumpSwapFeeBasisPoints
+	if next < len(data) {
+		var ok bool
+		exotic, ok = decodePumpSwapFees(data, next)
+		if !ok {
+			return nil
+		}
+	}
 	return &PumpSwapFeeConfig{
+		ExoticFlatFees: exotic,
 		FlatFees:       flatFees,
 		FeeTiers:       feeTiers,
 		StableFeeTiers: stableFeeTiers,
@@ -1034,6 +1063,7 @@ func ComputePumpSwapFeeBasisPoints(
 	poolCreator, baseMint solana.PublicKey,
 	baseMintSupply *uint64,
 	baseReserve, quoteReserve uint64,
+	quoteMints ...solana.PublicKey,
 ) calc.PumpSwapFeeBasisPoints {
 	if feeConfig == nil {
 		return calc.LegacyPumpSwapFeeBasisPoints(true)
@@ -1048,7 +1078,22 @@ func ComputePumpSwapFeeBasisPoints(
 	if !ok {
 		return calc.LegacyPumpSwapFeeBasisPoints(true)
 	}
-	if fees, ok := CalculateFeeTier(feeConfig.FeeTiers, marketCap); ok {
+	quote := compactWSOL
+	if len(quoteMints) > 0 {
+		quote = quoteMints[0]
+	}
+	native := quote == compactWSOL || quote == (solana.PublicKey{}) || quote == solana.MustPublicKeyFromBase58("9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdXejP")
+	if !native && quote != solana.MustPublicKeyFromBase58("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v") {
+		if feeConfig.ExoticFlatFees != (calc.PumpSwapFeeBasisPoints{}) {
+			return feeConfig.ExoticFlatFees
+		}
+		return feeConfig.FlatFees
+	}
+	tiers := feeConfig.FeeTiers
+	if !native && len(feeConfig.StableFeeTiers) > 0 {
+		tiers = feeConfig.StableFeeTiers
+	}
+	if fees, ok := CalculateFeeTier(tiers, marketCap); ok {
 		return *fees
 	}
 	return feeConfig.FlatFees
@@ -1436,4 +1481,17 @@ func FindByQuoteMint(fetcher ProgramAccountsFetcher, quoteMint solana.PublicKey)
 	}
 
 	return pools[0].pool, pools[0].pubkey, nil
+}
+
+func IsPumpSwapPoolBoosted(pool *PumpSwapPool) bool {
+	if pool == nil {
+		return false
+	}
+	n := new(big.Int)
+	if pool.VirtualQuoteReserves != nil {
+		n.Set(pool.VirtualQuoteReserves)
+	}
+	n.Add(n, new(big.Int).SetUint64(pool.ProtocolFees))
+	n.Add(n, new(big.Int).SetUint64(pool.CreatorFees))
+	return n.Sign() != 0
 }

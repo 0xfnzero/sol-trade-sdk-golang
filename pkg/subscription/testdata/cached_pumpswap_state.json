@@ -73,9 +73,9 @@
       "input_mint": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
       "output_mint": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi",
       "expected_fees": [
-        "10",
-        "2",
-        "1"
+        "30",
+        "7",
+        "9"
       ],
       "accounts": [
         {
@@ -130,8 +130,9 @@
       ],
       "prepared_amount": "10000",
       "prepared_slippage_bps": 100,
-      "expected_buy_quote": "19542",
-      "expected_sell_quote": "4953"
+      "expected_buy_quote": "19479",
+      "expected_sell_quote": "4936"
     }
-  ]
+  ],
+  "quote_validation": "@pump-fun/pump-swap-sdk 2.1.0: canonical exotic quote uses flat fees when exotic fees are zero"
 }

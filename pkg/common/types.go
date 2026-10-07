@@ -282,18 +282,27 @@ func (g *GasFeeStrategy) Clear() {
 
 // BondingCurveAccount represents the bonding curve state
 type BondingCurveAccount struct {
-	Discriminator        uint64
-	Account              [32]byte
-	VirtualTokenReserves uint64
-	VirtualSolReserves   uint64
-	RealTokenReserves    uint64
-	RealSolReserves      uint64
-	TokenTotalSupply     uint64
-	Complete             bool
-	Creator              [32]byte
-	IsMayhemMode         bool
-	IsCashbackCoin       bool
-	QuoteMint            [32]byte
+	CreatorFeeBps               uint64
+	CanEditCreatorFee           bool
+	IsHolderReward              bool
+	CreatorFee                  uint64
+	ProtocolFees                uint64
+	Depth                       uint8
+	InitialVirtualQuoteReserves uint64
+	PostCompleteBaseOut         uint64
+	PostCompleteQuoteIn         uint64
+	Discriminator               uint64
+	Account                     [32]byte
+	VirtualTokenReserves        uint64
+	VirtualSolReserves          uint64
+	RealTokenReserves           uint64
+	RealSolReserves             uint64
+	TokenTotalSupply            uint64
+	Complete                    bool
+	Creator                     [32]byte
+	IsMayhemMode                bool
+	IsCashbackCoin              bool
+	QuoteMint                   [32]byte
 }
 
 // Constants for bonding curve calculations
@@ -426,6 +435,33 @@ func DecodeBondingCurveAccount(data []byte, account [32]byte) *BondingCurveAccou
 	curve.IsCashbackCoin = body[74] == 1
 	if len(body) >= 107 {
 		copy(curve.QuoteMint[:], body[75:107])
+	}
+	if len(body) >= 115 {
+		curve.CreatorFeeBps = binary.LittleEndian.Uint64(body[107:115])
+	}
+	if len(body) >= 116 {
+		curve.CanEditCreatorFee = body[115] != 0
+	}
+	if len(body) >= 117 {
+		curve.IsHolderReward = body[116] != 0
+	}
+	if len(body) >= 125 {
+		curve.CreatorFee = binary.LittleEndian.Uint64(body[117:125])
+	}
+	if len(body) >= 133 {
+		curve.ProtocolFees = binary.LittleEndian.Uint64(body[125:133])
+	}
+	if len(body) >= 134 {
+		curve.Depth = body[133]
+	}
+	if len(body) >= 142 {
+		curve.InitialVirtualQuoteReserves = binary.LittleEndian.Uint64(body[134:142])
+	}
+	if len(body) >= 150 {
+		curve.PostCompleteBaseOut = binary.LittleEndian.Uint64(body[142:150])
+	}
+	if len(body) >= 158 {
+		curve.PostCompleteQuoteIn = binary.LittleEndian.Uint64(body[150:158])
 	}
 	return curve
 }
