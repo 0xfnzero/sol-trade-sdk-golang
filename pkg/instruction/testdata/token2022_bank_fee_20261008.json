@@ -1,0 +1,313 @@
+{
+  "provenance": "mainnet simulateTransaction; official spl-token-2022-interface 3.1.1 constructors; zero signatures, sigVerify=false; no broadcast",
+  "cases": [
+    {
+      "name": "ceil_fee",
+      "data": "AQAAAHU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmQEIPAAAAAAAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAB1NfQsOIrGrP6xHUoCBm6UkBJJXxqILN2EMS3RlAbUpnU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmAAAAAAAAAAAcBAAAAAAAAOgDAAAAAAAAyAAcBAAAAAAAAOgDAAAAAAAAyAA=",
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "epoch": "1052",
+      "basis_points": 200,
+      "maximum_fee": "1000",
+      "scope": "current_bank_mint_replay",
+      "slot": "454496810",
+      "samples": [
+        {
+          "amount": "0",
+          "fee": "0"
+        },
+        {
+          "amount": "1",
+          "fee": "1"
+        },
+        {
+          "amount": "10001",
+          "fee": "201"
+        },
+        {
+          "amount": "100000",
+          "fee": "1000"
+        }
+      ]
+    },
+    {
+      "name": "capped_fee",
+      "data": "AQAAAHU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmQEIPAAAAAAAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAB1NfQsOIrGrP6xHUoCBm6UkBJJXxqILN2EMS3RlAbUpnU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmAAAAAAAAAAAcBAAAAAAAAOgDAAAAAAAAyAAcBAAAAAAAAOgDAAAAAAAAyAA=",
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "epoch": "1052",
+      "basis_points": 200,
+      "maximum_fee": "1000",
+      "scope": "current_bank_mint_replay",
+      "slot": "454496814",
+      "samples": [
+        {
+          "amount": "0",
+          "fee": "0"
+        },
+        {
+          "amount": "1",
+          "fee": "1"
+        },
+        {
+          "amount": "10001",
+          "fee": "201"
+        },
+        {
+          "amount": "100000",
+          "fee": "1000"
+        }
+      ]
+    },
+    {
+      "name": "dust_fee",
+      "data": "AQAAAHU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmQEIPAAAAAAAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAB1NfQsOIrGrP6xHUoCBm6UkBJJXxqILN2EMS3RlAbUpnU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmAAAAAAAAAAAcBAAAAAAAAOgDAAAAAAAAyAAcBAAAAAAAAOgDAAAAAAAAyAA=",
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "epoch": "1052",
+      "basis_points": 200,
+      "maximum_fee": "1000",
+      "scope": "current_bank_mint_replay",
+      "slot": "454496819",
+      "samples": [
+        {
+          "amount": "0",
+          "fee": "0"
+        },
+        {
+          "amount": "1",
+          "fee": "1"
+        },
+        {
+          "amount": "10001",
+          "fee": "201"
+        },
+        {
+          "amount": "100000",
+          "fee": "1000"
+        }
+      ]
+    },
+    {
+      "name": "zero_amount",
+      "data": "AQAAAHU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmQEIPAAAAAAAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAB1NfQsOIrGrP6xHUoCBm6UkBJJXxqILN2EMS3RlAbUpnU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmAAAAAAAAAAAcBAAAAAAAAOgDAAAAAAAAyAAcBAAAAAAAAOgDAAAAAAAAyAA=",
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "epoch": "1052",
+      "basis_points": 200,
+      "maximum_fee": "1000",
+      "scope": "current_bank_mint_replay",
+      "slot": "454496823",
+      "samples": [
+        {
+          "amount": "0",
+          "fee": "0"
+        },
+        {
+          "amount": "1",
+          "fee": "1"
+        },
+        {
+          "amount": "10001",
+          "fee": "201"
+        },
+        {
+          "amount": "100000",
+          "fee": "1000"
+        }
+      ]
+    },
+    {
+      "name": "explicit_correct_fee",
+      "data": "AQAAAHU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmQEIPAAAAAAAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAB1NfQsOIrGrP6xHUoCBm6UkBJJXxqILN2EMS3RlAbUpnU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmAAAAAAAAAAAcBAAAAAAAAOgDAAAAAAAAyAAcBAAAAAAAAOgDAAAAAAAAyAA=",
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "epoch": "1052",
+      "basis_points": 200,
+      "maximum_fee": "1000",
+      "scope": "current_bank_mint_replay",
+      "slot": "454496829",
+      "samples": [
+        {
+          "amount": "0",
+          "fee": "0"
+        },
+        {
+          "amount": "1",
+          "fee": "1"
+        },
+        {
+          "amount": "10001",
+          "fee": "201"
+        },
+        {
+          "amount": "100000",
+          "fee": "1000"
+        }
+      ]
+    },
+    {
+      "name": "scheduled_fee_same_epoch",
+      "data": "AQAAAHU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmQEIPAAAAAAAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAB1NfQsOIrGrP6xHUoCBm6UkBJJXxqILN2EMS3RlAbUpnU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmAAAAAAAAAAAcBAAAAAAAAOgDAAAAAAAAyAAeBAAAAAAAANAHAAAAAAAA9AE=",
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "epoch": "1052",
+      "basis_points": 200,
+      "maximum_fee": "1000",
+      "scope": "current_bank_mint_replay",
+      "slot": "454496838",
+      "samples": [
+        {
+          "amount": "0",
+          "fee": "0"
+        },
+        {
+          "amount": "1",
+          "fee": "1"
+        },
+        {
+          "amount": "10001",
+          "fee": "201"
+        },
+        {
+          "amount": "100000",
+          "fee": "1000"
+        }
+      ]
+    },
+    {
+      "name": "before_activation",
+      "data": "AQAAAHU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmQEIPAAAAAAAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAB1NfQsOIrGrP6xHUoCBm6UkBJJXxqILN2EMS3RlAbUpnU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmAAAAAAAAAAAcBAAAAAAAAOgDAAAAAAAAyAAeBAAAAAAAANAHAAAAAAAA9AE=",
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "epoch": "1053",
+      "basis_points": 200,
+      "maximum_fee": "1000",
+      "scope": "offline_future_epoch_replay_not_bank_simulation",
+      "slot": "454496838",
+      "samples": [
+        {
+          "amount": "0",
+          "fee": "0"
+        },
+        {
+          "amount": "1",
+          "fee": "1"
+        },
+        {
+          "amount": "10001",
+          "fee": "201"
+        },
+        {
+          "amount": "100000",
+          "fee": "1000"
+        }
+      ]
+    },
+    {
+      "name": "at_activation",
+      "data": "AQAAAHU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmQEIPAAAAAAAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAB1NfQsOIrGrP6xHUoCBm6UkBJJXxqILN2EMS3RlAbUpnU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmAAAAAAAAAAAcBAAAAAAAAOgDAAAAAAAAyAAeBAAAAAAAANAHAAAAAAAA9AE=",
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "epoch": "1054",
+      "basis_points": 500,
+      "maximum_fee": "2000",
+      "scope": "offline_future_epoch_replay_not_bank_simulation",
+      "slot": "454496838",
+      "samples": [
+        {
+          "amount": "0",
+          "fee": "0"
+        },
+        {
+          "amount": "1",
+          "fee": "1"
+        },
+        {
+          "amount": "10001",
+          "fee": "501"
+        },
+        {
+          "amount": "100000",
+          "fee": "2000"
+        }
+      ]
+    },
+    {
+      "name": "harvest_then_close",
+      "data": "AQAAAHU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmQEIPAAAAAAAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAB1NfQsOIrGrP6xHUoCBm6UkBJJXxqILN2EMS3RlAbUpnU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmyQAAAAAAAAAcBAAAAAAAAOgDAAAAAAAAyAAcBAAAAAAAAOgDAAAAAAAAyAA=",
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "epoch": "1052",
+      "basis_points": 200,
+      "maximum_fee": "1000",
+      "scope": "current_bank_mint_replay",
+      "slot": "454496845",
+      "samples": [
+        {
+          "amount": "0",
+          "fee": "0"
+        },
+        {
+          "amount": "1",
+          "fee": "1"
+        },
+        {
+          "amount": "10001",
+          "fee": "201"
+        },
+        {
+          "amount": "100000",
+          "fee": "1000"
+        }
+      ]
+    },
+    {
+      "name": "harvest_withdraw_close",
+      "data": "AQAAAHU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmQEIPAAAAAAAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAB1NfQsOIrGrP6xHUoCBm6UkBJJXxqILN2EMS3RlAbUpnU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmAAAAAAAAAAAcBAAAAAAAAOgDAAAAAAAAyAAcBAAAAAAAAOgDAAAAAAAAyAA=",
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "epoch": "1052",
+      "basis_points": 200,
+      "maximum_fee": "1000",
+      "scope": "current_bank_mint_replay",
+      "slot": "454496850",
+      "samples": [
+        {
+          "amount": "0",
+          "fee": "0"
+        },
+        {
+          "amount": "1",
+          "fee": "1"
+        },
+        {
+          "amount": "10001",
+          "fee": "201"
+        },
+        {
+          "amount": "100000",
+          "fee": "1000"
+        }
+      ]
+    },
+    {
+      "name": "close_empty_account",
+      "data": "AQAAAHU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmQEIPAAAAAAAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAB1NfQsOIrGrP6xHUoCBm6UkBJJXxqILN2EMS3RlAbUpnU19Cw4isas/rEdSgIGbpSQEklfGogs3YQxLdGUBtSmAAAAAAAAAAAcBAAAAAAAAOgDAAAAAAAAyAAcBAAAAAAAAOgDAAAAAAAAyAA=",
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "epoch": "1052",
+      "basis_points": 200,
+      "maximum_fee": "1000",
+      "scope": "current_bank_mint_replay",
+      "slot": "454496859",
+      "samples": [
+        {
+          "amount": "0",
+          "fee": "0"
+        },
+        {
+          "amount": "1",
+          "fee": "1"
+        },
+        {
+          "amount": "10001",
+          "fee": "201"
+        },
+        {
+          "amount": "100000",
+          "fee": "1000"
+        }
+      ]
+    }
+  ]
+}
