@@ -152,3 +152,37 @@ func BuildMeteoraDlmmSwap2(a MeteoraDlmmSwap2Accounts, amountIn, minOut uint64) 
 		return i == 0 || (i == 1 && a.BitmapExtension != nil) || (i >= 2 && i <= 5) || i == 8 || i >= 16
 	}), nil
 }
+
+// BuildWhirlpoolSwapV2WithHooks uses separately resolved transfer Hook accounts.
+// Cached routes remain fail closed; refresh and resolve each source/destination.
+func BuildWhirlpoolSwapV2WithHooks(a WhirlpoolSwapV2Accounts, args SwapV2Args, aToB bool, hookA, hookB solana.AccountMetaSlice) (solana.Instruction, error) {
+	base, err := BuildWhirlpoolSwapV2(a, args, aToB)
+	if err != nil {
+		return nil, err
+	}
+	d, err := base.Data()
+	if err != nil {
+		return nil, err
+	}
+	keys := base.Accounts()
+	slices := []byte{}
+	extras := solana.AccountMetaSlice{}
+	for _, s := range []struct {
+		kind  byte
+		metas solana.AccountMetaSlice
+	}{{0, hookA}, {1, hookB}, {6, keys[15:]}} {
+		if len(s.metas) > 255 {
+			return nil, errors.New("Whirlpool remaining slice exceeds u8")
+		}
+		if len(s.metas) > 0 {
+			slices = append(slices, s.kind, byte(len(s.metas)))
+			extras = append(extras, s.metas...)
+		}
+	}
+	info := []byte{0}
+	if len(slices) > 0 {
+		info = []byte{1, byte(len(slices) / 2), 0, 0, 0}
+		info = append(info, slices...)
+	}
+	return solana.NewInstruction(base.ProgramID(), append(append([]*solana.AccountMeta(nil), keys[:15]...), extras...), append(append([]byte(nil), d[:42]...), info...)), nil
+}
