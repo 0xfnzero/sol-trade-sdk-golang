@@ -27,6 +27,10 @@ func ResolveHookAccountsWithContext(hook, mint, mintOwner solana.PublicKey, mint
 	var active *solana.PublicKey
 	for o := 166; o+4 <= len(mintData); {
 		kind := binary.LittleEndian.Uint16(mintData[o:])
+		// SPL treats Uninitialized as the end of used TLV data.
+		if kind == 0 {
+			break
+		}
 		length := int(binary.LittleEndian.Uint16(mintData[o+2:]))
 		end := o + 4 + length
 		if end > len(mintData) {
