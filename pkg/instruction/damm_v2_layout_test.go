@@ -88,3 +88,34 @@ func TestDammV2PinnedBorshLayout(t *testing.T) {
 		t.Fatal("accepted truncated payload")
 	}
 }
+
+func TestDammV2CurrentOfficialLayout(t *testing.T) {
+	data, err := os.ReadFile("testdata/damm_v2_current.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct{ Payload string }
+	if err = json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := base64.StdEncoding.DecodeString(fixture.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := DecodeMeteoraPool(payload)
+	if p == nil {
+		t.Fatal("decode")
+	}
+	if p.PoolFees.CompoundingFeeBps != 321 || p.DeadLiquidityFeeCheckpoint != 987654321 || p.FeeVersion != 1 || p.LayoutVersion != 1 {
+		t.Fatal("current fee/version fields")
+	}
+	if p.TokenAAmount != 9007199254740993 || p.TokenBAmount != 9007199254740995 {
+		t.Fatal("precision loss in reserves")
+	}
+	for i, b := range p.Creator {
+		if b != byte(i) {
+			t.Fatal("creator offset")
+		}
+	}
+	assertDammField(t, reflect.ValueOf(p.PoolFees.InitSqrtPrice), "1267650600228229401496703205499", "init_sqrt_price")
+}

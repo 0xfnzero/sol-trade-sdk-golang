@@ -4,6 +4,7 @@
 package instruction
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -405,6 +406,9 @@ type MeteoraDynamicFeeStruct struct {
 }
 
 type MeteoraPoolFeesStruct struct {
+	// Current meanings; old padding fields remain raw compatibility overlays.
+	CompoundingFeeBps  uint16
+	InitSqrtPrice      [16]byte
 	BaseFee            MeteoraBaseFeeStruct
 	ProtocolFeePercent uint8
 	PartnerFeePercent  uint8
@@ -442,36 +446,42 @@ type MeteoraRewardInfo struct {
 }
 
 type MeteoraDammV2Pool struct {
-	PoolFees               MeteoraPoolFeesStruct
-	TokenAMint             solana.PublicKey
-	TokenBMint             solana.PublicKey
-	TokenAVault            solana.PublicKey
-	TokenBVault            solana.PublicKey
-	WhitelistedVault       solana.PublicKey
-	Partner                solana.PublicKey
-	Liquidity              [16]byte
-	Padding                [16]byte
-	ProtocolAFee           uint64
-	ProtocolBFee           uint64
-	PartnerAFee            uint64
-	PartnerBFee            uint64
-	SqrtMinPrice           [16]byte
-	SqrtMaxPrice           [16]byte
-	SqrtPrice              [16]byte
-	ActivationPoint        uint64
-	ActivationType         uint8
-	PoolStatus             uint8
-	TokenAFlag             uint8
-	TokenBFlag             uint8
-	CollectFeeMode         uint8
-	PoolType               uint8
-	Padding0               [2]byte
-	FeeAPerLiquidity       [32]byte
-	FeeBPerLiquidity       [32]byte
-	PermanentLockLiquidity [16]byte
-	Metrics                MeteoraPoolMetrics
-	Padding1               [10]uint64
-	RewardInfos            [2]MeteoraRewardInfo
+	DeadLiquidityFeeCheckpoint uint64
+	FeeVersion                 uint8
+	Creator                    solana.PublicKey
+	TokenAAmount               uint64
+	TokenBAmount               uint64
+	LayoutVersion              uint8
+	PoolFees                   MeteoraPoolFeesStruct
+	TokenAMint                 solana.PublicKey
+	TokenBMint                 solana.PublicKey
+	TokenAVault                solana.PublicKey
+	TokenBVault                solana.PublicKey
+	WhitelistedVault           solana.PublicKey
+	Partner                    solana.PublicKey
+	Liquidity                  [16]byte
+	Padding                    [16]byte
+	ProtocolAFee               uint64
+	ProtocolBFee               uint64
+	PartnerAFee                uint64
+	PartnerBFee                uint64
+	SqrtMinPrice               [16]byte
+	SqrtMaxPrice               [16]byte
+	SqrtPrice                  [16]byte
+	ActivationPoint            uint64
+	ActivationType             uint8
+	PoolStatus                 uint8
+	TokenAFlag                 uint8
+	TokenBFlag                 uint8
+	CollectFeeMode             uint8
+	PoolType                   uint8
+	Padding0                   [2]byte
+	FeeAPerLiquidity           [32]byte
+	FeeBPerLiquidity           [32]byte
+	PermanentLockLiquidity     [16]byte
+	Metrics                    MeteoraPoolMetrics
+	Padding1                   [10]uint64
+	RewardInfos                [2]MeteoraRewardInfo
 }
 
 func DecodeMeteoraPool(data []byte) *MeteoraDammV2Pool {
@@ -589,6 +599,14 @@ func DecodeMeteoraPool(data []byte) *MeteoraDammV2Pool {
 		return value
 	}
 	value := readPool()
+	value.PoolFees.CompoundingFeeBps = binary.LittleEndian.Uint16(data[46:48])
+	copy(value.PoolFees.InitSqrtPrice[:], data[144:160])
+	value.DeadLiquidityFeeCheckpoint = binary.LittleEndian.Uint64(data[400:408])
+	value.FeeVersion = data[478]
+	copy(value.Creator[:], data[640:672])
+	value.TokenAAmount = binary.LittleEndian.Uint64(data[672:680])
+	value.TokenBAmount = binary.LittleEndian.Uint64(data[680:688])
+	value.LayoutVersion = data[688]
 	return &value
 }
 
@@ -610,7 +628,9 @@ func FetchMeteoraPool(fetcher MeteoraPoolFetcher, poolAddress solana.PublicKey) 
 		return nil, fmt.Errorf("account data too short")
 	}
 
-	// Skip 8-byte discriminator
+	if !bytes.Equal(data[:8], []byte{241, 154, 109, 4, 17, 177, 109, 188}) {
+		return nil, fmt.Errorf("meteora pool discriminator mismatch")
+	}
 	pool := DecodeMeteoraPool(data[8:])
 	if pool == nil {
 		return nil, fmt.Errorf("failed to decode meteora pool")
