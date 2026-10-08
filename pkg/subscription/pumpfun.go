@@ -313,7 +313,10 @@ func (s *AccountCacheSnapshot) preparePumpFunRouteLeg(h PoolTradeHint, ctx Cache
 		return empty, err
 	}
 	if len(raw.Data) >= 125 && raw.Data[124] != 0 {
-		return empty, errors.New("PumpFun holder-reward account layout is not yet verified")
+		holder, _, e := solana.FindProgramAddress([][]byte{[]byte("holder-rewards"), state.Mint[:]}, instruction.PUMPFUN_PROGRAM)
+		if e != nil || raw.Data[124] != 1 || holder != solana.PublicKey(state.Curve.Creator) {
+			return empty, errors.New("Invalid PumpFun holder-reward creator")
+		}
 	}
 	config := instruction.GetPumpFunFeeSharingConfigPDA(state.Mint)
 	sharing, err := s.GetOptional(config, ctx, &instruction.PUMPFUN_FEE_PROGRAM)
