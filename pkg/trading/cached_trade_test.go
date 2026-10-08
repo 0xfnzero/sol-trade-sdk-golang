@@ -412,3 +412,13 @@ func TestPumpSwapMainnetFactoryWire(t *testing.T) {
 		}
 	}
 }
+
+func TestExplicitDammRejectsInvalidSlippage(t *testing.T) {
+	for _, slip := range []uint16{10000, 10001, 65535} {
+		minimum := uint64(1)
+		_, err := PrepareCachedTrade(CachedTradeRequest{DexType: soltradesdk.DexTypeMeteoraDammV2, TradeType: soltradesdk.TradeTypeBuy, Amount: 1, FixedOutputAmount: &minimum, SlippageBps: &slip})
+		if err == nil || !strings.Contains(err.Error(), "slippage") {
+			t.Fatalf("accepted invalid slippage %d: %v", slip, err)
+		}
+	}
+}

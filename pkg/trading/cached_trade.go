@@ -68,6 +68,9 @@ func cachedProgram(d soltradesdk.DexType) (solana.PublicKey, bool) {
 }
 func PrepareCachedTrade(r CachedTradeRequest) (PreparedCachedTrade, error) {
 	empty := PreparedCachedTrade{}
+	if r.SlippageBps != nil && *r.SlippageBps >= 10000 {
+		return empty, errors.New("invalid cached trade slippage: expected basis points in [0, 10000)")
+	}
 	if r.TradeType != soltradesdk.TradeTypeBuy && r.TradeType != soltradesdk.TradeTypeSell {
 		return empty, errors.New("cached trade requires independent Buy or Sell")
 	}
