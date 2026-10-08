@@ -193,6 +193,9 @@ func MeteoraDammV2BuildBuyInstructions(params *MeteoraDammV2BuildBuyParams) ([]s
 
 	// Determine if token A is input (WSOL/USDC)
 	isAIn := pp.TokenAMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.TokenAMint.Equals(constants.USDC_TOKEN_ACCOUNT)
+	if !params.OutputMint.IsZero() {
+		isAIn = meteoraDammV2MintMatches(params.OutputMint, pp.TokenBMint)
+	}
 
 	// Calculate swap2 amounts
 	amountIn := params.InputAmount
@@ -290,6 +293,9 @@ func MeteoraDammV2BuildSellInstructions(params *MeteoraDammV2BuildSellParams) ([
 
 	// Determine if token A is input (token being sold)
 	isAIn := pp.TokenBMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.TokenBMint.Equals(constants.USDC_TOKEN_ACCOUNT)
+	if !params.InputMint.IsZero() {
+		isAIn = meteoraDammV2MintMatches(params.InputMint, pp.TokenAMint)
+	}
 
 	// Calculate swap2 amounts
 	var fixedOutput uint64
