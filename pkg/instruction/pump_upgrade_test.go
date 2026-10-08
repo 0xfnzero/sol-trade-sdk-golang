@@ -3,6 +3,7 @@ package instruction
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"github.com/gagliardetto/solana-go"
 	"os"
 	"testing"
@@ -91,5 +92,55 @@ func TestOfficialQuoteControl(t *testing.T) {
 	}
 	if _, e = DecodePumpQuoteControl(data[:len(data)-1]); e == nil {
 		t.Fatal("truncation accepted")
+	}
+}
+
+func TestBuildersMatchSuccessfulMainnetSimulations(t *testing.T) {
+	b, e := os.ReadFile("../../tests/fixtures/pump_upgrade/simulated_instructions.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	var f struct {
+		Cases []struct {
+			Name, Program, Data string
+			Accounts            map[string]string
+			Args                []string
+			Metas               []struct {
+				Pubkey           string
+				Signer, Writable bool
+			}
+		}
+	}
+	if e = json.Unmarshal(b, &f); e != nil {
+		t.Fatal(e)
+	}
+	for _, c := range f.Cases {
+		accounts := map[string]solana.PublicKey{}
+		for k, v := range c.Accounts {
+			accounts[k] = solana.MustPublicKeyFromBase58(v)
+		}
+		args := make([]uint64, len(c.Args))
+		for i, v := range c.Args {
+			if _, e = fmt.Sscan(v, &args[i]); e != nil {
+				t.Fatal(e)
+			}
+		}
+		ix, e := BuildPumpUpgradeInstruction(c.Name, accounts, args, nil, nil)
+		if e != nil {
+			t.Fatal(e)
+		}
+		d, e := ix.Data()
+		if e != nil || hex.EncodeToString(d) != c.Data || ix.ProgramID().String() != c.Program {
+			t.Fatalf("%s encoding mismatch", c.Name)
+		}
+		if len(ix.Accounts()) != len(c.Metas) {
+			t.Fatal("account count")
+		}
+		for i, a := range ix.Accounts() {
+			m := c.Metas[i]
+			if a.PublicKey.String() != m.Pubkey || a.IsSigner != m.Signer || a.IsWritable != m.Writable {
+				t.Fatalf("%s role %d", c.Name, i)
+			}
+		}
 	}
 }
