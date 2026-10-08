@@ -144,3 +144,107 @@ func TestBuildersMatchSuccessfulMainnetSimulations(t *testing.T) {
 		}
 	}
 }
+
+func TestNativeAliasesMatchOfficialAccounts(t *testing.T) {
+	raw, err := os.ReadFile("../../tests/fixtures/pump_upgrade/native_aliases.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	type meta struct {
+		Pubkey           string
+		Signer, Writable bool
+	}
+	var f struct {
+		Cases []struct {
+			Alias                 string
+			V3, Buy, Sell, Create []meta
+		}
+	}
+	if err = json.Unmarshal(raw, &f); err != nil {
+		t.Fatal(err)
+	}
+	key := func(n byte) (p solana.PublicKey) {
+		for i := range p {
+			p[i] = n
+		}
+		return
+	}
+	user, a, b := key(1), key(2), key(3)
+	token, token2022 := solana.TokenProgramID, solana.MustPublicKeyFromBase58("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
+	params := func(base, quote, qt solana.PublicKey) PumpCompactAccountParams {
+		return PumpCompactAccountParams{User: user, BaseMint: base, QuoteMint: quote, BaseTokenProgram: token2022, QuoteTokenProgram: qt, BuybackRecipient: user}
+	}
+	hop := func(base, quote, qt solana.PublicKey) PumpMultiHop {
+		normalized := compactWSOL
+		if quote == a {
+			normalized = a
+		}
+		p, e := DerivePumpV3Accounts(params(base, normalized, qt))
+		if e != nil {
+			t.Fatal(e)
+		}
+		return PumpMultiHop{Venue: "curve", BaseMint: base, QuoteMint: quote, Address: p["bonding_curve"], BaseVault: p["associated_base_bonding_curve"], QuoteVault: p["associated_quote_bonding_curve"], BaseTokenProgram: token2022, QuoteTokenProgram: qt}
+	}
+	check := func(items []*solana.AccountMeta, expected []meta) {
+		t.Helper()
+		if len(items) != len(expected) {
+			t.Fatal("account count mismatch")
+		}
+		for i, m := range items {
+			if m.PublicKey.String() != expected[i].Pubkey || m.IsSigner != expected[i].Signer || m.IsWritable != expected[i].Writable {
+				t.Fatalf("account %d differs from official builder", i)
+			}
+		}
+	}
+	for _, c := range f.Cases {
+		alias := solana.MustPublicKeyFromBase58(c.Alias)
+		p := params(a, alias, token)
+		accounts, e := DerivePumpV3Accounts(p)
+		if e != nil {
+			t.Fatal(e)
+		}
+		ix, e := BuildPumpUpgradeInstruction("pump_buy_v3", accounts, []uint64{7, 9}, nil, nil)
+		if e != nil {
+			t.Fatal(e)
+		}
+		check(ix.Accounts(), c.V3)
+		parent, child := hop(a, alias, token), hop(b, a, token2022)
+		for _, route := range []struct {
+			Hops          []PumpMultiHop
+			Input, Output solana.PublicKey
+			Expected      []meta
+		}{{[]PumpMultiHop{parent, child}, alias, b, c.Buy}, {[]PumpMultiHop{child, parent}, b, alias, c.Sell}} {
+			beforeFirst, beforeLast := route.Hops[0], route.Hops[1]
+			accounts, remaining, e := DerivePumpMultiHopAccounts(user, route.Input, route.Output, user, route.Hops, false)
+			if e != nil {
+				t.Fatal(e)
+			}
+			ix, e := BuildPumpUpgradeInstruction("pump_amm_multi_hop_swap", accounts, []uint64{7, 9}, nil, remaining)
+			if e != nil {
+				t.Fatal(e)
+			}
+			check(ix.Accounts(), route.Expected)
+			if route.Hops[0] != beforeFirst || route.Hops[1] != beforeLast {
+				t.Fatal("input state mutated")
+			}
+		}
+		remaining, e := DerivePumpCoinQuoteCreateAccounts(b, parent, 0, 1, nil)
+		if e != nil {
+			t.Fatal(e)
+		}
+		check(remaining, c.Create)
+		actual, e := DerivePumpSwapV2Accounts(p, user, a, b)
+		if e != nil {
+			t.Fatal(e)
+		}
+		expected, e := DerivePumpSwapV2Accounts(params(a, compactWSOL, token), user, a, b)
+		if e != nil {
+			t.Fatal(e)
+		}
+		for k, v := range expected {
+			if actual[k] != v {
+				t.Fatalf("AMM alias mismatch %s", k)
+			}
+		}
+	}
+}

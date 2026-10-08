@@ -11,6 +11,19 @@ var compactFees = solana.MustPublicKeyFromBase58("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rW
 var compactATA = solana.MustPublicKeyFromBase58("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
 var compactWSOL = solana.MustPublicKeyFromBase58("So11111111111111111111111111111111111111112")
 
+func compactNormalizeQuote(mint solana.PublicKey) solana.PublicKey {
+	if mint == (solana.PublicKey{}) || mint == solana.MustPublicKeyFromBase58("So11111111111111111111111111111111111111111") {
+		return compactWSOL
+	}
+	return mint
+}
+func compactNormalizeHop(hop PumpMultiHop) PumpMultiHop {
+	hop.QuoteMint = compactNormalizeQuote(hop.QuoteMint)
+	if hop.QuoteMint == compactWSOL {
+		hop.QuoteTokenProgram = solana.TokenProgramID
+	}
+	return hop
+}
 func compactPDA(program solana.PublicKey, seed string, key *solana.PublicKey) (solana.PublicKey, error) {
 	seeds := [][]byte{[]byte(seed)}
 	if key != nil {
@@ -30,6 +43,7 @@ type PumpCompactAccountParams struct {
 }
 
 func DerivePumpV3Accounts(p PumpCompactAccountParams) (map[string]solana.PublicKey, error) {
+	p.QuoteMint = compactNormalizeQuote(p.QuoteMint)
 	if p.Cashback {
 		return nil, fmt.Errorf("cashback requires legacy trades")
 	}
@@ -101,6 +115,7 @@ func DerivePumpV3Accounts(p PumpCompactAccountParams) (map[string]solana.PublicK
 	return accounts, nil
 }
 func DerivePumpSwapV2Accounts(p PumpCompactAccountParams, pool, base_vault, quote_vault solana.PublicKey) (map[string]solana.PublicKey, error) {
+	p.QuoteMint = compactNormalizeQuote(p.QuoteMint)
 	if p.Cashback {
 		return nil, fmt.Errorf("cashback requires legacy trades")
 	}
@@ -168,6 +183,13 @@ func DerivePumpMultiHopAccounts(user, inputMint, outputMint, buybackRecipient so
 	if len(hops) == 0 || (len(hops) >= 4 && !useV0WithAlt) {
 		return fail("route requires hops and v0 with ALT for four or more hops")
 	}
+	inputMint = compactNormalizeQuote(inputMint)
+	outputMint = compactNormalizeQuote(outputMint)
+	normalized := make([]PumpMultiHop, len(hops))
+	for i, h := range hops {
+		normalized[i] = compactNormalizeHop(h)
+	}
+	hops = normalized
 	current := inputMint
 	side := false
 	remaining := []*solana.AccountMeta{}
@@ -268,6 +290,7 @@ func DerivePumpMultiHopAccounts(user, inputMint, outputMint, buybackRecipient so
 
 // DerivePumpCoinQuoteCreateAccounts derives extra create_v2 roles from decoded quote state.
 func DerivePumpCoinQuoteCreateAccounts(newMint solana.PublicKey, quote PumpMultiHop, depth, maxDepth uint8, listedQuoteMints []solana.PublicKey) ([]*solana.AccountMeta, error) {
+	quote = compactNormalizeHop(quote)
 	if depth >= maxDepth {
 		return nil, fmt.Errorf("CurveDepthExceeded")
 	}
