@@ -68,7 +68,7 @@ func TestMintExtensionPaddingAndMalformedTails(t *testing.T) {
 		}
 	}
 	for _, tail := range [][]byte{
-		{0, 1}, {0, 0, 1, 0}, {6, 0, 1}, {6, 0, 2, 0, 1},
+		{0, 1}, {6, 0, 1}, {6, 0, 2, 0, 1},
 		{6, 0, 1, 0, 1, 6, 0, 1, 0, 1}, {19, 0, 0, 0, 19, 0, 0, 0},
 	} {
 		if err := decode(tail); err == nil {

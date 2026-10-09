@@ -43,15 +43,21 @@ func TokenTransferFeeForEpoch(d []byte, owner solana.PublicKey, epoch uint64) (c
 	extensions := map[uint16][]byte{}
 	offset := 166
 	for offset < len(d) {
-		if d[offset] == 0 && zero(d[offset:]) {
+		// SPL permits one realloc byte and stops at Uninitialized before
+		// reading its unused length or subsequent allocation bytes.
+		if offset+2 > len(d) {
+			break
+		}
+		kind := binary.LittleEndian.Uint16(d[offset:])
+		if kind == 0 {
 			break
 		}
 		if offset+4 > len(d) {
 			return fail("truncated mint extension")
 		}
-		kind, n := binary.LittleEndian.Uint16(d[offset:]), int(binary.LittleEndian.Uint16(d[offset+2:]))
+		n := int(binary.LittleEndian.Uint16(d[offset+2:]))
 		offset += 4
-		if kind == 0 || extensions[kind] != nil || offset+n > len(d) {
+		if extensions[kind] != nil || offset+n > len(d) {
 			return fail("invalid/duplicate mint extension")
 		}
 		length, ok := mintExtensionLengths[kind]
