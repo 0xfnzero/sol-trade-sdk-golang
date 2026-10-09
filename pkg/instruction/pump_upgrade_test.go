@@ -208,6 +208,32 @@ func TestNativeAliasesMatchOfficialAccounts(t *testing.T) {
 			t.Fatal(e)
 		}
 		check(ix.Accounts(), c.V3)
+		mixed := params(a, alias, token2022)
+		mixedAccounts, err := DerivePumpV3Accounts(mixed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for role, expected := range accounts {
+			if mixedAccounts[role] != expected {
+				t.Fatalf("mixed quote program: %s", role)
+			}
+		}
+		expectedSwap, err := DerivePumpSwapV2Accounts(p, user, a, b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mixedSwap, err := DerivePumpSwapV2Accounts(mixed, user, a, b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for role, expected := range expectedSwap {
+			if mixedSwap[role] != expected {
+				t.Fatalf("mixed swap quote program: %s", role)
+			}
+		}
+		if mixed.QuoteTokenProgram != token2022 || mixed.QuoteMint != alias {
+			t.Fatal("mutated caller params")
+		}
 		parent, child := hop(a, alias, token), hop(b, a, token2022)
 		for _, route := range []struct {
 			Hops          []PumpMultiHop

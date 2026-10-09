@@ -182,6 +182,30 @@ func (c *SubscriptionAccountCache) Snapshot() *AccountCacheSnapshot {
 	}
 	return s
 }
+
+// SnapshotSelected freezes only pre-discovered dependencies, including observed
+// tombstones. Unknown identities are errors; reads never fall back to live state.
+// Cost depends on selected account bytes, not the total subscription size.
+func (c *SubscriptionAccountCache) SnapshotSelected(keys []solana.PublicKey) (*AccountCacheSnapshot, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.conflicted {
+		return nil, errors.New("conflicting cached account version; create a new cache for the explicitly selected fork")
+	}
+	s := &AccountCacheSnapshot{accounts: make(map[solana.PublicKey]CachedAccount, len(keys)), continuityGuard: c.assertNoConflict}
+	for _, key := range keys {
+		if _, copied := s.accounts[key]; copied {
+			continue
+		}
+		a, ok := c.accounts[key]
+		if !ok {
+			return nil, errors.New("missing cached account: " + key.String())
+		}
+		s.accounts[key] = owned(a)
+	}
+	return s, nil
+}
+
 func (s *AccountCacheSnapshot) Get(key solana.PublicKey, ctx CacheReadContext, expectedOwner *solana.PublicKey) (CachedAccount, error) {
 	if err := s.AssertUsable(); err != nil {
 		return CachedAccount{}, err
@@ -327,7 +351,27 @@ func (c *SubscriptionAccountCache) ReadySnapshot(readiness *SubscriptionReadines
 	if err != nil {
 		return nil, err
 	}
-	s := c.Snapshot()
+	return bindReadySnapshot(c.Snapshot(), guard)
+}
+
+// ReadySnapshotSelected binds a dependency-scoped snapshot to the validated
+// subscription generation. Collect the complete key set outside the trade path.
+func (c *SubscriptionAccountCache) ReadySnapshotSelected(readiness *SubscriptionReadiness, keys []solana.PublicKey) (*AccountCacheSnapshot, error) {
+	if readiness == nil {
+		return nil, errors.New("provide live subscription readiness")
+	}
+	guard, err := readiness.Guard()
+	if err != nil {
+		return nil, err
+	}
+	s, err := c.SnapshotSelected(keys)
+	if err != nil {
+		return nil, err
+	}
+	return bindReadySnapshot(s, guard)
+}
+
+func bindReadySnapshot(s *AccountCacheSnapshot, guard func() error) (*AccountCacheSnapshot, error) {
 	cacheGuard := s.continuityGuard
 	s.continuityGuard = func() error {
 		if err := cacheGuard(); err != nil {
@@ -335,7 +379,7 @@ func (c *SubscriptionAccountCache) ReadySnapshot(readiness *SubscriptionReadines
 		}
 		return guard()
 	}
-	if err = s.AssertUsable(); err != nil {
+	if err := s.AssertUsable(); err != nil {
 		return nil, err
 	}
 	return s, nil

@@ -146,11 +146,19 @@ func (e *TradeExecutor) executeParallel(
 	}()
 
 	var lastError error
+	var submittedResult *ExecuteResult
 	for result := range resultChan {
 		if result.Success {
 			return result
 		}
 		lastError = result.Error
+		if result.Submitted {
+			submittedResult = result
+		}
+	}
+	if submittedResult != nil {
+		submittedResult.Error = fmt.Errorf("all parallel submissions failed: %w", submittedResult.Error)
+		return submittedResult
 	}
 
 	return &ExecuteResult{
@@ -169,7 +177,7 @@ func (e *TradeExecutor) executeSequential(
 	for retry := 0; retry < opts.MaxRetries; retry++ {
 		for _, client := range e.swqosClients {
 			result := e.submitToClient(ctx, client, tradeType, txBytes, opts)
-			if result.Success {
+			if result.Success || result.Submitted {
 				return result
 			}
 		}
@@ -205,14 +213,18 @@ func (e *TradeExecutor) submitToClient(
 	result := &ExecuteResult{
 		Signature:   sig,
 		Success:     true,
+		Submitted:   true,
 		SubmittedAt: start,
 		SwqosType:   client.GetSwqosType(),
 	}
 
 	if opts.WaitConfirmation {
 		confirmed, confirmTime, confirmErr := e.waitForConfirmation(ctx, sig)
-		result.ConfirmedAt = time.Now()
 		result.ConfirmationMs = confirmTime.Milliseconds()
+		result.Confirmed = confirmed
+		if confirmed {
+			result.ConfirmedAt = time.Now()
+		}
 		if !confirmed {
 			result.Success = false
 			if confirmErr != nil {
@@ -428,20 +440,30 @@ func NewRateLimiter(minDelayMs int) *RateLimiter {
 }
 
 // Wait blocks until the minimum delay has passed since last submission
-func (r *RateLimiter) Wait() {
+func (r *RateLimiter) Wait() { _ = r.WaitContext(context.Background()) }
+
+// WaitContext includes admission delay in the caller's operation deadline.
+func (r *RateLimiter) WaitContext(ctx context.Context) error {
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		last := r.lastSubmit.Load()
 		now := time.Now().UnixNano()
 		elapsed := now - last
-
 		if elapsed >= r.minDelay {
 			if r.lastSubmit.CompareAndSwap(last, now) {
-				return
+				return nil
 			}
 			continue
 		}
-
-		time.Sleep(time.Duration(r.minDelay - elapsed))
+		timer := time.NewTimer(time.Duration(r.minDelay - elapsed))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
 	}
 }
 

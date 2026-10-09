@@ -5,7 +5,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 )
 
 // UltraLowLatencyConfig configuration for ULL optimizations
@@ -72,12 +71,14 @@ func (p *MemoryPool) Put(obj interface{}) {
 
 // LockFreeQueue provides a lock-free MPMC queue
 type LockFreeQueue struct {
-	head *lfNode
-	tail *lfNode
+	head atomic.Pointer[lfNode]
+	tail atomic.Pointer[lfNode]
 	len  int64
 }
 
 type lfNode struct {
+	// Written before next publishes the node, then immutable. Nodes are not
+	// recycled; typed links/local references keep them alive for Go's GC.
 	value interface{}
 	next  atomic.Pointer[lfNode]
 }
@@ -85,10 +86,9 @@ type lfNode struct {
 // NewLockFreeQueue creates a lock-free queue
 func NewLockFreeQueue() *LockFreeQueue {
 	dummy := &lfNode{}
-	q := &LockFreeQueue{
-		head: dummy,
-		tail: dummy,
-	}
+	q := &LockFreeQueue{}
+	q.head.Store(dummy)
+	q.tail.Store(dummy)
 	return q
 }
 
@@ -96,25 +96,17 @@ func NewLockFreeQueue() *LockFreeQueue {
 func (q *LockFreeQueue) Enqueue(value interface{}) {
 	node := &lfNode{value: value}
 	for {
-		tail := q.tail
+		tail := q.tail.Load()
 		next := tail.next.Load()
-		if tail == q.tail {
+		if tail == q.tail.Load() {
 			if next == nil {
 				if tail.next.CompareAndSwap(next, node) {
-					atomic.CompareAndSwapPointer(
-						(*unsafe.Pointer)(unsafe.Pointer(&q.tail)),
-						unsafe.Pointer(tail),
-						unsafe.Pointer(node),
-					)
+					q.tail.CompareAndSwap(tail, node)
 					atomic.AddInt64(&q.len, 1)
 					return
 				}
 			} else {
-				atomic.CompareAndSwapPointer(
-					(*unsafe.Pointer)(unsafe.Pointer(&q.tail)),
-					unsafe.Pointer(tail),
-					unsafe.Pointer(next),
-				)
+				q.tail.CompareAndSwap(tail, next)
 			}
 		}
 	}
@@ -123,26 +115,18 @@ func (q *LockFreeQueue) Enqueue(value interface{}) {
 // Dequeue removes item from queue
 func (q *LockFreeQueue) Dequeue() (interface{}, bool) {
 	for {
-		head := q.head
-		tail := q.tail
+		head := q.head.Load()
+		tail := q.tail.Load()
 		next := head.next.Load()
-		if head == q.head {
+		if head == q.head.Load() {
 			if head == tail {
 				if next == nil {
 					return nil, false
 				}
-				atomic.CompareAndSwapPointer(
-					(*unsafe.Pointer)(unsafe.Pointer(&q.tail)),
-					unsafe.Pointer(tail),
-					unsafe.Pointer(next),
-				)
+				q.tail.CompareAndSwap(tail, next)
 			} else {
 				value := next.value
-				if atomic.CompareAndSwapPointer(
-					(*unsafe.Pointer)(unsafe.Pointer(&q.head)),
-					unsafe.Pointer(head),
-					unsafe.Pointer(next),
-				) {
+				if q.head.CompareAndSwap(head, next) {
 					atomic.AddInt64(&q.len, -1)
 					return value, true
 				}
@@ -151,9 +135,14 @@ func (q *LockFreeQueue) Dequeue() (interface{}, bool) {
 	}
 }
 
-// Len returns queue length
+// Len returns an approximate nonnegative length during concurrent operations,
+// exact once all Enqueue/Dequeue calls finish. Publication precedes accounting.
 func (q *LockFreeQueue) Len() int64 {
-	return atomic.LoadInt64(&q.len)
+	length := atomic.LoadInt64(&q.len)
+	if length < 0 {
+		return 0
+	}
+	return length
 }
 
 // LatencyMetrics tracks latency metrics

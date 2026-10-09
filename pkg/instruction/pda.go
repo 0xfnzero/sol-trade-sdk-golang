@@ -130,7 +130,7 @@ func BuildCloseAccountInstruction(
 	tokenProgram, account, owner, destination solana.PublicKey,
 ) solana.Instruction {
 	// Close account instruction discriminator
-	data := []byte{151, 9, 59, 186, 208, 190, 183, 75}
+	data := []byte{9}
 
 	accounts := []solana.AccountMeta{
 		{PublicKey: account, IsSigner: false, IsWritable: true},

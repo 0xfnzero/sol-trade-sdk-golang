@@ -2,12 +2,17 @@ package hotpath
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -386,4 +391,88 @@ func TestHotPathParallelSubmitDoesNotCancelSlowRoutes(t *testing.T) {
 
 	require.True(t, result.Success)
 	require.NoError(t, <-slowDone)
+}
+
+func TestHotPathStateConcurrentStartStopAndRestart(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var request map[string]interface{}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&request))
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"jsonrpc": "2.0", "id": request["id"], "result": map[string]interface{}{"context": map[string]interface{}{"slot": 1}, "value": map[string]interface{}{"blockhash": solana.Hash{}.String(), "lastValidBlockHeight": 100}}})
+	}))
+	defer server.Close()
+	cfg := DefaultHotPathConfig()
+	cfg.BlockhashRefreshInterval = time.Hour
+	state := NewHotPathState(rpc.New(server.URL), cfg)
+	defer state.Stop()
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); assert.NoError(t, state.Start(context.Background())) }()
+	}
+	wg.Wait()
+	require.Equal(t, int32(1), calls.Load())
+	done := make(chan struct{})
+	go func() { state.Stop(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Stop blocked after repeated Start")
+	}
+	require.NoError(t, state.Start(context.Background()))
+	require.Equal(t, int32(2), calls.Load())
+	state.Stop()
+	state.Stop()
+}
+
+func TestHotPathStateStopCancelsInitialFetch(t *testing.T) {
+	requested := make(chan struct{})
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		close(requested)
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	defer server.Close()
+	defer close(release)
+	state := NewHotPathState(rpc.New(server.URL), DefaultHotPathConfig())
+	result := make(chan error, 1)
+	go func() { result <- state.Start(context.Background()) }()
+	select {
+	case <-requested:
+	case <-time.After(time.Second):
+		t.Fatal("initial fetch not started")
+	}
+	state.Stop()
+	select {
+	case err := <-result:
+		require.Error(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("Start did not observe cancellation")
+	}
+	require.False(t, state.IsDataFresh())
+}
+
+func TestHotPathStateFailedStartCanRetry(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		if calls.Add(1) == 1 {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"jsonrpc": "2.0", "id": request["id"], "error": map[string]interface{}{"code": -32000, "message": "not ready"}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"jsonrpc": "2.0", "id": request["id"], "result": map[string]interface{}{"context": map[string]interface{}{"slot": 1}, "value": map[string]interface{}{"blockhash": solana.Hash{}.String(), "lastValidBlockHeight": 100}}})
+	}))
+	defer server.Close()
+	state := NewHotPathState(rpc.New(server.URL), DefaultHotPathConfig())
+	defer state.Stop()
+	require.Error(t, state.Start(context.Background()))
+	require.NoError(t, state.Start(context.Background()))
+	require.Equal(t, int32(2), calls.Load())
 }

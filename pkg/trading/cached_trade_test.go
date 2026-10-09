@@ -153,7 +153,7 @@ func TestPumpFunConcentratedMultihopEvidence(t *testing.T) {
 				}
 				wire := append(append([]byte{}, p.Compiled.Message...), make([]byte, p.Compiled.RequiredSignatures*64)...)
 				if fmt.Sprintf("%x", sha256.Sum256(wire)) != v.Expected.Hash || strconv.FormatUint(p.Route.MinimumNetAmountOut, 10) != v.Expected.Minimum || strconv.FormatUint(p.EstimatedNativeResidualLamports, 10) != v.Expected.Residual {
-					t.Fatal("cross-language simulation evidence mismatch")
+					t.Fatal("cross-language unsigned fixture wire/quote mismatch")
 				}
 			})
 		}

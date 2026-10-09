@@ -82,9 +82,12 @@ func main() {
 	}
 
 	cache := &subscription.SubscriptionAccountCache{}
+	// Complete fixed CPMM quote/build dependency set, discovered before trade triggers.
+	dependencyKeys := make([]solana.PublicKey, 0, 6)
 	readSlot := uint64(0)
 	for _, value := range []snapshotAccount{in.Pool, in.Config, in.BaseMint, in.QuoteMint, in.BaseVault, in.QuoteVault} {
 		a := account(value)
+		dependencyKeys = append(dependencyKeys, a.Pubkey)
 		slot := number(value.Slot)
 		if slot > readSlot {
 			readSlot = slot
@@ -107,7 +110,11 @@ func main() {
 	if !*in.BaseIn {
 		hint.InputMint, hint.OutputMint = quote.Pubkey, base.Pubkey
 	}
-	prepared, e := cache.Snapshot().PrepareCpmm(hint, ctx, number(in.UnixTimestamp), payer, number(in.Amount), in.SlippageBps)
+	frozen, e := cache.SnapshotSelected(dependencyKeys)
+	if e != nil {
+		panic(e)
+	}
+	prepared, e := frozen.PrepareCpmm(hint, ctx, number(in.UnixTimestamp), payer, number(in.Amount), in.SlippageBps)
 	if e != nil {
 		panic(e)
 	}

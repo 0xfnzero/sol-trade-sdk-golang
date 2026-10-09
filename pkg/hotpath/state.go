@@ -38,6 +38,22 @@ type PrefetchedData struct {
 	Slot            uint64
 }
 
+// A run owns its context and synchronization; cache reads never take the lifecycle lock.
+type prefetchRun struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	ready  chan struct{}
+	done   chan struct{}
+	err    error
+}
+
+type blockhashNotification struct {
+	ctx             context.Context
+	callback        func(*solana.Hash, uint64)
+	hash            solana.Hash
+	lastValidHeight uint64
+}
+
 // HotPathState manages pre-fetched state for hot path execution
 // NO RPC calls are made during trading execution
 type HotPathState struct {
@@ -47,15 +63,17 @@ type HotPathState struct {
 	currentData atomic.Value // *PrefetchedData
 
 	// Background prefetch control
-	prefetchCtx    context.Context
-	prefetchCancel context.CancelFunc
-	prefetchWg     sync.WaitGroup
+	lifecycleMu sync.Mutex
+	prefetchRun *prefetchRun
 
 	// RPC client for background prefetching only
 	rpcClient *rpc.Client
 
 	// Callbacks for state updates
 	onBlockhashUpdate func(hash *solana.Hash, lastValidHeight uint64)
+	// At most one callback worker and one pending latest update per state.
+	callbackRunning bool
+	pendingCallback *blockhashNotification
 
 	// Metrics
 	mu               sync.Mutex
@@ -89,49 +107,91 @@ func (h *HotPathState) Start(ctx context.Context) error {
 	if !h.config.EnablePrefetch {
 		return nil
 	}
-
-	h.prefetchCtx, h.prefetchCancel = context.WithCancel(ctx)
-
-	// Initial prefetch synchronously
-	if err := h.prefetchBlockhash(); err != nil {
-		return err
+	if h.rpcClient == nil || h.config.BlockhashRefreshInterval <= 0 {
+		return fmt.Errorf("prefetch requires an RPC client and a positive refresh interval")
 	}
-
-	// Start background prefetch loop
-	h.prefetchWg.Add(1)
-	go h.prefetchLoop()
-
-	return nil
+	for {
+		h.lifecycleMu.Lock()
+		run := h.prefetchRun
+		if run != nil && run.ctx.Err() != nil {
+			h.lifecycleMu.Unlock()
+			<-run.done
+			h.lifecycleMu.Lock()
+			if h.prefetchRun == run {
+				h.prefetchRun = nil
+			}
+			h.lifecycleMu.Unlock()
+			continue
+		}
+		if run == nil {
+			runCtx, cancel := context.WithCancel(ctx)
+			run = &prefetchRun{ctx: runCtx, cancel: cancel, ready: make(chan struct{}), done: make(chan struct{})}
+			h.prefetchRun = run
+			go h.prefetchLoop(run)
+		}
+		h.lifecycleMu.Unlock()
+		select {
+		case <-run.ready:
+			if run.err != nil {
+				<-run.done
+				h.lifecycleMu.Lock()
+				if h.prefetchRun == run {
+					h.prefetchRun = nil
+				}
+				h.lifecycleMu.Unlock()
+			}
+			return run.err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }
 
-// Stop stops background prefetching
+// Stop cancels and joins the captured prefetch run; it cannot clear a later restart.
+// Already-running notifications finish independently, so callbacks can call Stop.
 func (h *HotPathState) Stop() {
-	if h.prefetchCancel != nil {
-		h.prefetchCancel()
+	h.lifecycleMu.Lock()
+	run := h.prefetchRun
+	if run != nil {
+		run.cancel()
 	}
-	h.prefetchWg.Wait()
+	h.lifecycleMu.Unlock()
+	if run != nil {
+		<-run.done
+		h.lifecycleMu.Lock()
+		if h.prefetchRun == run {
+			h.prefetchRun = nil
+		}
+		h.lifecycleMu.Unlock()
+	}
 }
 
-// prefetchLoop runs in background to keep data fresh
-func (h *HotPathState) prefetchLoop() {
-	defer h.prefetchWg.Done()
-
+func (h *HotPathState) prefetchLoop(run *prefetchRun) {
+	defer close(run.done)
+	defer run.cancel()
+	run.err = h.prefetchBlockhash(run.ctx)
+	close(run.ready)
+	if run.err != nil {
+		return
+	}
 	ticker := time.NewTicker(h.config.BlockhashRefreshInterval)
 	defer ticker.Stop()
-
 	for {
 		select {
-		case <-h.prefetchCtx.Done():
+		case <-run.ctx.Done():
 			return
 		case <-ticker.C:
-			_ = h.prefetchBlockhash()
+			if run.ctx.Err() != nil {
+				return
+			}
+			_ = h.prefetchBlockhash(run.ctx)
 		}
 	}
 }
 
 // prefetchBlockhash fetches latest blockhash - called ONLY in background
-func (h *HotPathState) prefetchBlockhash() error {
-	ctx, cancel := context.WithTimeout(h.prefetchCtx, 5*time.Second)
+func (h *HotPathState) prefetchBlockhash(parent context.Context) error {
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 	defer cancel()
 
 	result, err := h.rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentProcessed)
@@ -142,6 +202,9 @@ func (h *HotPathState) prefetchBlockhash() error {
 		return err
 	}
 
+	if err := parent.Err(); err != nil {
+		return err
+	}
 	data := &PrefetchedData{
 		Blockhash:       &result.Value.Blockhash,
 		LastValidHeight: result.Value.LastValidBlockHeight,
@@ -154,13 +217,39 @@ func (h *HotPathState) prefetchBlockhash() error {
 	h.mu.Lock()
 	h.prefetchCount++
 	h.lastPrefetchTime = time.Now()
+	if h.onBlockhashUpdate != nil {
+		h.pendingCallback = &blockhashNotification{
+			ctx: parent, callback: h.onBlockhashUpdate,
+			hash: *data.Blockhash, lastValidHeight: data.LastValidHeight,
+		}
+		if !h.callbackRunning {
+			h.callbackRunning = true
+			go h.notifyBlockhashUpdates()
+		}
+	}
 	h.mu.Unlock()
 
-	if h.onBlockhashUpdate != nil {
-		h.onBlockhashUpdate(data.Blockhash, data.LastValidHeight)
-	}
-
 	return nil
+}
+
+// Notifications never run on the prefetch goroutine that Stop joins. A slow
+// callback coalesces pending updates instead of growing a goroutine/queue backlog.
+func (h *HotPathState) notifyBlockhashUpdates() {
+	for {
+		h.mu.Lock()
+		notification := h.pendingCallback
+		h.pendingCallback = nil
+		if notification == nil {
+			h.callbackRunning = false
+			h.mu.Unlock()
+			return
+		}
+		h.mu.Unlock()
+		if notification.ctx.Err() == nil {
+			// Pass an owned value; mutating it cannot corrupt the cached hash.
+			notification.callback(&notification.hash, notification.lastValidHeight)
+		}
+	}
 }
 
 // GetBlockhash returns the current cached blockhash - NO RPC CALL
@@ -193,9 +282,13 @@ func (h *HotPathState) IsDataFresh() bool {
 	return time.Since(data.FetchedAt) <= h.config.CacheTTL
 }
 
-// OnBlockhashUpdate sets callback for blockhash updates
+// OnBlockhashUpdate sets a serialized notification callback. Slow callbacks
+// receive the latest pending update; cancelled runs' pending updates are dropped.
+// Callbacks can Stop/Start this state. A callback panic propagates as before.
 func (h *HotPathState) OnBlockhashUpdate(fn func(hash *solana.Hash, lastValidHeight uint64)) {
+	h.mu.Lock()
 	h.onBlockhashUpdate = fn
+	h.mu.Unlock()
 }
 
 // GetMetrics returns prefetch metrics

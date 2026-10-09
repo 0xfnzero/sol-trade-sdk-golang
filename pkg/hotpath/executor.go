@@ -2,6 +2,7 @@ package hotpath
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"sync"
@@ -253,6 +254,18 @@ func (e *HotPathExecutor) BuildTransaction(
 
 	// Build transaction
 	var txInstructions []solana.Instruction
+	// Keep nonce advance at index zero when inserting compute budget instructions.
+	remaining := instructions
+	if gasConfig != nil && len(instructions) > 0 && instructions[0].ProgramID() == solana.SystemProgramID {
+		data, err := instructions[0].Data()
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode first instruction: %w", err)
+		}
+		if len(data) == 4 && binary.LittleEndian.Uint32(data) == 4 {
+			txInstructions = append(txInstructions, instructions[0])
+			remaining = instructions[1:]
+		}
+	}
 
 	// Add compute budget instructions if gas config provided
 	if gasConfig != nil {
@@ -279,7 +292,7 @@ func (e *HotPathExecutor) BuildTransaction(
 			unitPriceIx,
 		)
 	}
-	txInstructions = append(txInstructions, instructions...)
+	txInstructions = append(txInstructions, remaining...)
 
 	tx, err := solana.NewTransaction(
 		txInstructions,

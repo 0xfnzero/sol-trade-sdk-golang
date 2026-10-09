@@ -55,14 +55,14 @@
 
 交易 SDK 的各语言版本及相关 Rust SDK：
 
-| 语言 | 仓库 | 描述 |
+| 语言 | 仓库 | 描述 | 版本 |
 |------|------|------|
-| **Rust** | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | 超低延迟，零拷贝优化 |
-| **Node.js** | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | TypeScript/JavaScript，Node.js 支持 |
-| **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | 原生 async/await 支持 |
-| **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | 并发安全，goroutine 支持 |
-| **Rust** | [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk) | Solana DEX 交易与账户事件解析 |
-| **Rust** | [sol-shred-sdk](https://github.com/0xfnzero/sol-shred-sdk) | Solana 原始 shred 解码与 ShredStream DEX 事件解析 |
+| **Rust** | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | 超低延迟，零拷贝优化 | `v6.0.0` |
+| **Node.js** | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | TypeScript/JavaScript，Node.js 支持 | `v0.1.8` |
+| **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | 原生 async/await 支持 | `v0.1.8` |
+| **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | 并发安全，goroutine 支持 | `v0.1.9` |
+| **Rust** | [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk) | Solana DEX 交易与账户事件解析 | `v0.7.11` |
+| **Rust** | [sol-shred-sdk](https://github.com/0xfnzero/sol-shred-sdk) | Solana 原始 shred 解码与 ShredStream DEX 事件解析 | `v4.0.3` |
 
 ## 这个 SDK 适合什么场景
 
@@ -77,9 +77,15 @@
 
 ## 🔖 当前版本
 
-**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.8`
+**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.9`
 
 本版本修复 PumpFun token program 选择，并将 SOL 转账和关闭 token 账户工具迁移到 `getLatestBlockhash`。`solana-go` 升级到 v1.24.0，最低要求 Go 1.25+。交易执行仍需由调用方传入 recent blockhash 或 durable nonce；热路径不会查询 RPC 获取 blockhash、账户或余额数据。
+
+## v0.1.9 — Signed transaction and hot-path hardening
+
+Fixes SPL CloseAccount opcode and Token/Token-2022/WSOL execution boundaries. Hardens cached preparation, nonce lifecycle, bounded executor queues and transfer-fee rounding. Adds signed transaction parsing and offline bank regressions. Caller-signed SWQoS submission does not automatically filter provider-owned minimum-tip lanes.
+
+Validation includes local CPU benchmarks and offline signed-bank scenarios. Measured hot paths use cached inputs without RPC. Benchmarks do not establish production network or transaction-landing latency. No funded mainnet transactions were broadcast.
 
 ## v0.1.8 — Token program 与 RPC 修复
 
@@ -129,7 +135,7 @@ git clone https://github.com/0xfnzero/sol-trade-sdk-golang
 
 ```go
 // 添加到您的 go.mod
-require github.com/0xfnzero/sol-trade-sdk-golang v0.1.8
+require github.com/0xfnzero/sol-trade-sdk-golang v0.1.9
 
 replace github.com/0xfnzero/sol-trade-sdk-golang => ./sol-trade-sdk-golang
 ```
@@ -143,7 +149,7 @@ go mod tidy
 ### 使用 Go Modules
 
 ```bash
-go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.8
+go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.9
 ```
 
 ## 🛠️ 使用示例

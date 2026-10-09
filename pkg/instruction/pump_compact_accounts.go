@@ -44,6 +44,9 @@ type PumpCompactAccountParams struct {
 
 func DerivePumpV3Accounts(p PumpCompactAccountParams) (map[string]solana.PublicKey, error) {
 	p.QuoteMint = compactNormalizeQuote(p.QuoteMint)
+	if p.QuoteMint == compactWSOL {
+		p.QuoteTokenProgram = solana.TokenProgramID
+	}
 	if p.Cashback {
 		return nil, fmt.Errorf("cashback requires legacy trades")
 	}
@@ -116,6 +119,9 @@ func DerivePumpV3Accounts(p PumpCompactAccountParams) (map[string]solana.PublicK
 }
 func DerivePumpSwapV2Accounts(p PumpCompactAccountParams, pool, base_vault, quote_vault solana.PublicKey) (map[string]solana.PublicKey, error) {
 	p.QuoteMint = compactNormalizeQuote(p.QuoteMint)
+	if p.QuoteMint == compactWSOL {
+		p.QuoteTokenProgram = solana.TokenProgramID
+	}
 	if p.Cashback {
 		return nil, fmt.Errorf("cashback requires legacy trades")
 	}

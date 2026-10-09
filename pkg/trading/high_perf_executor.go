@@ -260,8 +260,17 @@ func (e *HighPerfTradeExecutor) Execute(
 		}
 	}
 
-	// Rate limit
-	e.rateLimiter.Wait()
+	timeoutMs := opts.TimeoutMs
+	if timeoutMs <= 0 {
+		timeoutMs = 30000
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutMs)*time.Millisecond)
+	defer cancel()
+	// Admission, submission and optional confirmation share one deadline.
+	if err := e.rateLimiter.WaitContext(ctx); err != nil {
+		e.recordFailure()
+		return &HighPerfTradeResult{Error: err}
+	}
 
 	if opts.ParallelSubmit {
 		return e.executeParallel(ctx, tradeType, transaction, opts)
@@ -278,21 +287,21 @@ func (e *HighPerfTradeExecutor) executeParallel(
 ) *HighPerfTradeResult {
 	start := time.Now()
 
-	resultChan := make(chan *HighPerfTradeResult, len(e.clients))
-	var wg sync.WaitGroup
-
 	e.mu.RLock()
 	clients := make([]soltradesdk.SwqosClient, 0, len(e.clients))
 	for _, client := range e.clients {
 		clients = append(clients, client)
 	}
 	e.mu.RUnlock()
+	resultChan := make(chan *HighPerfTradeResult, len(clients))
+	receipts := make(chan *HighPerfTradeResult, len(clients))
+	var wg sync.WaitGroup
 
 	for _, client := range clients {
 		wg.Add(1)
 		go func(c soltradesdk.SwqosClient) {
 			defer wg.Done()
-			result := e.submitToClient(ctx, c, tradeType, transaction, opts)
+			result := e.submitToClient(ctx, c, tradeType, transaction, opts, func(r *HighPerfTradeResult) { receipts <- r })
 			resultChan <- result
 		}(client)
 	}
@@ -302,20 +311,49 @@ func (e *HighPerfTradeExecutor) executeParallel(
 		close(resultChan)
 	}()
 
-	// Wait for first success or collect all failures
-	for result := range resultChan {
-		if result.Success {
-			e.recordSuccess(time.Since(start))
-			return result
+	var acknowledged *HighPerfTradeResult
+	for {
+		select {
+		case result, ok := <-resultChan:
+			if !ok {
+				e.recordFailure()
+				if acknowledged != nil {
+					return acknowledged
+				}
+				return &HighPerfTradeResult{Error: fmt.Errorf("all parallel submissions failed")}
+			}
+			if result.Success {
+				e.recordSuccess(time.Since(start))
+				return result
+			}
+			if result.Signature != "" {
+				acknowledged = result
+			}
+		case receipt := <-receipts:
+			if acknowledged == nil {
+				acknowledged = receipt
+			}
+		case <-ctx.Done():
+			for {
+				select {
+				case receipt := <-receipts:
+					if acknowledged == nil {
+						acknowledged = receipt
+					}
+				default:
+					goto drained
+				}
+			}
+		drained:
+			e.recordFailure()
+			if acknowledged != nil {
+				acknowledged.Error = ctx.Err()
+				return acknowledged
+			}
+			return &HighPerfTradeResult{Error: ctx.Err()}
 		}
 	}
 
-	e.recordFailure()
-	return &HighPerfTradeResult{
-		Success:            false,
-		Error:              fmt.Errorf("all parallel submissions failed"),
-		ConfirmationTimeMs: time.Since(start).Milliseconds(),
-	}
 }
 
 // executeSequential submits to clients one by one
@@ -327,6 +365,7 @@ func (e *HighPerfTradeExecutor) executeSequential(
 ) *HighPerfTradeResult {
 	start := time.Now()
 
+	var acknowledged *HighPerfTradeResult
 	for retry := 0; retry < opts.MaxRetries; retry++ {
 		e.mu.RLock()
 		clients := make([]soltradesdk.SwqosClient, 0, len(e.clients))
@@ -337,6 +376,19 @@ func (e *HighPerfTradeExecutor) executeSequential(
 
 		for _, client := range clients {
 			result := e.submitToClient(ctx, client, tradeType, transaction, opts)
+			if result.Signature != "" {
+				acknowledged = result
+				if !result.Success {
+					e.recordFailure()
+					return result
+				}
+			}
+			if ctx.Err() != nil {
+				if acknowledged != nil {
+					return acknowledged
+				}
+				return result
+			}
 			if result.Success {
 				e.recordSuccess(time.Since(start))
 				return result
@@ -344,11 +396,24 @@ func (e *HighPerfTradeExecutor) executeSequential(
 		}
 
 		if retry < opts.MaxRetries-1 {
-			time.Sleep(time.Duration(opts.RetryDelayMs) * time.Millisecond)
+			timer := time.NewTimer(time.Duration(opts.RetryDelayMs) * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				if acknowledged != nil {
+					acknowledged.Error = ctx.Err()
+					return acknowledged
+				}
+				return &HighPerfTradeResult{Error: ctx.Err()}
+			case <-timer.C:
+			}
 		}
 	}
 
 	e.recordFailure()
+	if acknowledged != nil {
+		return acknowledged
+	}
 	return &HighPerfTradeResult{
 		Success:            false,
 		Error:              fmt.Errorf("all submissions failed after %d retries", opts.MaxRetries),
@@ -364,17 +429,23 @@ func (e *HighPerfTradeExecutor) submitToClient(
 	tradeType soltradesdk.TradeType,
 	transaction []byte,
 	opts *HighPerfExecuteOptions,
+	acknowledge ...func(*HighPerfTradeResult),
 ) *HighPerfTradeResult {
 	start := time.Now()
 
-	sig, err := client.SendTransaction(ctx, tradeType, transaction, opts.WaitConfirmation)
+	sig, err := client.SendTransaction(ctx, tradeType, transaction, false)
 	if err != nil {
-		return &HighPerfTradeResult{
+		result := &HighPerfTradeResult{
 			Success:            false,
 			Error:              err,
 			ConfirmationTimeMs: time.Since(start).Milliseconds(),
 			SWQoSType:          client.GetSwqosType(),
 		}
+		if sig != (solana.Signature{}) {
+			result.Signature = sig.String()
+			result.SubmittedAt = &start
+		}
+		return result
 	}
 
 	result := &HighPerfTradeResult{
@@ -384,8 +455,28 @@ func (e *HighPerfTradeExecutor) submitToClient(
 		ConfirmationTimeMs: time.Since(start).Milliseconds(),
 		SWQoSType:          client.GetSwqosType(),
 	}
-	confirmedAt := time.Now()
-	result.ConfirmedAt = &confirmedAt
+	if len(acknowledge) > 0 {
+		receipt := *result
+		receipt.Success = false
+		receipt.ConfirmationTimeMs = 0
+		acknowledge[0](&receipt)
+	}
+	if opts.WaitConfirmation {
+		confirmCtx, cancel := context.WithTimeout(ctx, time.Duration(e.config.ConfirmationTimeoutMs)*time.Millisecond)
+		defer cancel()
+		observer := &TradeExecutor{rpcClient: e.rpcClient, confirmationRetry: e.config.ConfirmationRetryCount}
+		ok, elapsed, err := observer.waitForConfirmation(confirmCtx, sig)
+		result.ConfirmationTimeMs = elapsed.Milliseconds()
+		if !ok {
+			result.Success = false
+			result.Error = err
+			return result
+		}
+		confirmedAt := time.Now()
+		result.ConfirmedAt = &confirmedAt
+	} else {
+		result.ConfirmationTimeMs = 0
+	}
 
 	// Cache result
 	e.signatureCache.Set(sig.String(), result)

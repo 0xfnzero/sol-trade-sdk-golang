@@ -55,14 +55,20 @@
 
 Trading SDK language versions and related Rust SDKs:
 
-| Language | Repository | Description |
-|----------|------------|-------------|
-| **Rust** | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | Ultra-low latency with zero-copy optimization |
-| **Node.js** | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | TypeScript/JavaScript for Node.js |
-| **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | Async/await native support |
-| **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | Concurrent-safe with goroutine support |
-| **Rust** | [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk) | Solana DEX transaction and account event parsing |
-| **Rust** | [sol-shred-sdk](https://github.com/0xfnzero/sol-shred-sdk) | Raw Solana shred decoding and ShredStream DEX event parsing |
+| Language | Repository | Description | Version |
+|----------|------------|-------------|---------|
+| **Rust** | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | Ultra-low latency with zero-copy optimization | `v6.0.0` |
+| **Node.js** | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | TypeScript/JavaScript for Node.js | `v0.1.8` |
+| **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | Async/await native support | `v0.1.8` |
+| **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | Concurrent-safe with goroutine support | `v0.1.9` |
+| **Rust** | [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk) | Solana DEX transaction and account event parsing | `v0.7.11` |
+| **Rust** | [sol-shred-sdk](https://github.com/0xfnzero/sol-shred-sdk) | Raw Solana shred decoding and ShredStream DEX event parsing | `v4.0.3` |
+
+## v0.1.9 — Signed transaction and hot-path hardening
+
+Fixes SPL CloseAccount opcode and Token/Token-2022/WSOL execution boundaries. Hardens cached preparation, nonce lifecycle, bounded executor queues and transfer-fee rounding. Adds signed transaction parsing and offline bank regressions. Caller-signed SWQoS submission does not automatically filter provider-owned minimum-tip lanes.
+
+Validation includes local CPU benchmarks and offline signed-bank scenarios. Measured hot paths use cached inputs without RPC. Benchmarks do not establish production network or transaction-landing latency. No funded mainnet transactions were broadcast.
 
 ## What This SDK Is For
 
@@ -77,7 +83,7 @@ Trading SDK language versions and related Rust SDKs:
 
 ## 🔖 Current Release
 
-**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.8`
+**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.9`
 
 This release fixes PumpFun token-program selection and migrates the SOL transfer/token-account close helpers to `getLatestBlockhash`. It upgrades `solana-go` to v1.24.0 and requires Go 1.25+. Trade execution still requires a caller-supplied recent blockhash or durable nonce; hot-path execution does not query RPC for blockhash, account, or balance data.
 
@@ -131,7 +137,7 @@ Add the dependency to your `go.mod`:
 
 ```go
 // Add to your go.mod
-require github.com/0xfnzero/sol-trade-sdk-golang v0.1.8
+require github.com/0xfnzero/sol-trade-sdk-golang v0.1.9
 
 replace github.com/0xfnzero/sol-trade-sdk-golang => ./sol-trade-sdk-golang
 ```
@@ -145,7 +151,7 @@ go mod tidy
 ### Use Go Modules
 
 ```bash
-go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.8
+go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.9
 ```
 
 ## 🛠️ Usage Examples
