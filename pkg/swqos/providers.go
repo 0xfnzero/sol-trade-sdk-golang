@@ -595,7 +595,10 @@ type SpeedlandingExtClient struct {
 func NewSpeedlandingExtClient(config *SwqosConfigExtended) *SpeedlandingExtClient {
 	url := config.URL
 	if url == "" {
-		url = "fra.speedlanding.trade:17778"
+		url = speedlandingEndpoints[config.Region]
+		if url == "" {
+			url = speedlandingEndpoints[SwqosRegionDefault]
+		}
 	}
 	return &SpeedlandingExtClient{
 		SwqosProviderBase: SwqosProviderBase{config: config},

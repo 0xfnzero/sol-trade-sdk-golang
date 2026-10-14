@@ -294,45 +294,82 @@ func DerivePumpMultiHopAccounts(user, inputMint, outputMint, buybackRecipient so
 	return accounts, remaining, nil
 }
 
-// DerivePumpCoinQuoteCreateAccounts derives extra create_v2 roles from decoded quote state.
+// DerivePumpCoinQuoteCreateAccounts preserves the depth-0 API; nested quotes need WithChain.
 func DerivePumpCoinQuoteCreateAccounts(newMint solana.PublicKey, quote PumpMultiHop, depth, maxDepth uint8, listedQuoteMints []solana.PublicKey) ([]*solana.AccountMeta, error) {
-	quote = compactNormalizeHop(quote)
-	if depth >= maxDepth {
+	return DerivePumpCoinQuoteCreateAccountsWithChain(newMint, quote, nil, depth, maxDepth, listedQuoteMints)
+}
+
+// DerivePumpCoinQuoteCreateAccountsWithChain packs Q then ancestors nearest first; no RPC.
+func DerivePumpCoinQuoteCreateAccountsWithChain(newMint solana.PublicKey, quote PumpMultiHop, chain []PumpMultiHop, depth, maxDepth uint8, listedQuoteMints []solana.PublicKey) ([]*solana.AccountMeta, error) {
+	if depth >= maxDepth || depth >= 5 {
 		return nil, fmt.Errorf("CurveDepthExceeded")
 	}
-	eligible := depth > 0 || quote.QuoteMint == compactWSOL || quote.QuoteMint == solana.MustPublicKeyFromBase58("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
-	for _, mint := range listedQuoteMints {
-		if mint == quote.QuoteMint {
-			eligible = true
-		}
+	if len(chain) != int(depth) {
+		return nil, fmt.Errorf("QuoteChainAccountsRequired")
 	}
-	if !eligible {
+	hops := make([]PumpMultiHop, 1+len(chain))
+	hops[0] = compactNormalizeHop(quote)
+	for i, h := range chain {
+		hops[i+1] = compactNormalizeHop(h)
+	}
+	supported := func(mint solana.PublicKey) bool {
+		if mint == compactWSOL || mint == solana.MustPublicKeyFromBase58("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v") {
+			return true
+		}
+		for _, m := range listedQuoteMints {
+			if compactNormalizeQuote(m) == mint {
+				return true
+			}
+		}
+		return false
+	}
+	if !supported(hops[len(hops)-1].QuoteMint) {
 		return nil, fmt.Errorf("QuoteBondingCurveNotEligible")
 	}
-	if _, _, e := DerivePumpMultiHopAccounts(newMint, quote.QuoteMint, quote.BaseMint, newMint, []PumpMultiHop{quote}, false); e != nil {
-		return nil, e
+	// Later ancestor whitelist entries do not rewrite Q's stored depth.
+	seen := map[solana.PublicKey]bool{newMint: true}
+	for i, h := range hops {
+		if seen[h.BaseMint] {
+			return nil, fmt.Errorf("invalid quote chain")
+		}
+		seen[h.BaseMint] = true
+		if i > 0 && (hops[i-1].QuoteMint != h.BaseMint || hops[i-1].QuoteTokenProgram != h.BaseTokenProgram) {
+			return nil, fmt.Errorf("discontinuous quote chain")
+		}
+		if h.Venue == "curve" && h.Complete {
+			return nil, fmt.Errorf("QuoteCurveAwaitingMigration")
+		}
+		validationHop := h
+		validationHop.Mayhem = i == 0 && h.Mayhem
+		if _, _, err := DerivePumpMultiHopAccounts(newMint, h.QuoteMint, h.BaseMint, newMint, []PumpMultiHop{validationHop}, false); err != nil {
+			return nil, err
+		}
 	}
-	curve, e := compactPDA(compactPump, "bonding-curve", &newMint)
-	if e != nil {
-		return nil, e
+	quote = hops[0]
+	curve, err := compactPDA(compactPump, "bonding-curve", &newMint)
+	if err != nil {
+		return nil, err
 	}
-	vault, e := compactAta(curve, quote.BaseMint, quote.BaseTokenProgram)
-	if e != nil {
-		return nil, e
+	vault, err := compactAta(curve, quote.BaseMint, quote.BaseTokenProgram)
+	if err != nil {
+		return nil, err
 	}
-	control, e := compactPDA(compactPump, "quote-control", nil)
-	if e != nil {
-		return nil, e
+	control, err := compactPDA(compactPump, "quote-control", nil)
+	if err != nil {
+		return nil, err
 	}
-	quoteCurve, e := compactPDA(compactPump, "bonding-curve", &quote.BaseMint)
-	if e != nil {
-		return nil, e
+	keys := []solana.PublicKey{quote.BaseMint, vault, quote.BaseTokenProgram, control}
+	for _, h := range hops {
+		curve, err := compactPDA(compactPump, "bonding-curve", &h.BaseMint)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, curve)
+		if h.Venue == "pool" {
+			keys = append(keys, h.Address, h.BaseVault, h.QuoteVault)
+		}
 	}
-	keys := []solana.PublicKey{quote.BaseMint, vault, quote.BaseTokenProgram, control, quoteCurve}
-	if quote.Venue == "pool" {
-		keys = append(keys, quote.Address, quote.BaseVault, quote.QuoteVault)
-	}
-	accounts := []*solana.AccountMeta{}
+	accounts := make([]*solana.AccountMeta, 0, len(keys))
 	for i, k := range keys {
 		accounts = append(accounts, &solana.AccountMeta{PublicKey: k, IsWritable: i == 1})
 	}

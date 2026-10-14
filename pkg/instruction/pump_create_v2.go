@@ -16,7 +16,13 @@ type PumpCreateV2Params struct {
 // BuildPumpCreateV2Instruction accepts validated quote roles after the fixed 16 accounts.
 func BuildPumpCreateV2Instruction(accounts map[string]solana.PublicKey, p PumpCreateV2Params, remaining []*solana.AccountMeta) (solana.Instruction, error) {
 	n := len(remaining)
-	if n != 0 && n != 3 && n != 4 && n != 5 && n != 8 {
+	valid := n == 0 || n == 3 || n == 4
+	for groups := 1; groups <= 5; groups++ {
+		for pools := 0; pools <= groups; pools++ {
+			valid = valid || n == 4+groups+pools*3
+		}
+	}
+	if !valid {
 		return nil, fmt.Errorf("invalid quote creation accounts")
 	}
 	for i, a := range remaining {

@@ -482,15 +482,15 @@ var heliusEndpoints = map[SwqosRegion]string{
 }
 
 var speedlandingEndpoints = map[SwqosRegion]string{
-	SwqosRegionNewYork:    "nyc.speedlanding.trade:17778",
+	SwqosRegionNewYork:    "ny.speedlanding.trade:17778",
 	SwqosRegionFrankfurt:  "fra.speedlanding.trade:17778",
 	SwqosRegionAmsterdam:  "ams.speedlanding.trade:17778",
-	SwqosRegionDublin:     "ams.speedlanding.trade:17778",
-	SwqosRegionSLC:        "nyc.speedlanding.trade:17778",
+	SwqosRegionDublin:     "lon.speedlanding.trade:17778",
+	SwqosRegionSLC:        "ny.speedlanding.trade:17778",
 	SwqosRegionTokyo:      "tyo.speedlanding.trade:17778",
 	SwqosRegionSingapore:  "sgp.speedlanding.trade:17778",
-	SwqosRegionLondon:     "ams.speedlanding.trade:17778",
-	SwqosRegionLosAngeles: "nyc.speedlanding.trade:17778",
+	SwqosRegionLondon:     "lon.speedlanding.trade:17778",
+	SwqosRegionLosAngeles: "ny.speedlanding.trade:17778",
 	SwqosRegionDefault:    "fra.speedlanding.trade:17778",
 }
 
@@ -2214,7 +2214,7 @@ func (c *SoyasClient) MinTipSol() float64      { return MinTipSoyas }
 // SpeedlandingClient submits transactions via QUIC (Solana TPU ALPN "solana-tpu").
 // SNI is fixed to "speed-landing" to match the Rust SDK.
 type SpeedlandingClient struct {
-	endpoint   string // host:port e.g. nyc.speedlanding.trade:17778
+	endpoint   string // host:port e.g. ny.speedlanding.trade:17778
 	serverName string // TLS SNI derived from endpoint host
 }
 

@@ -305,7 +305,7 @@ func TestBloxrouteSuccessWithoutSignatureIsError(t *testing.T) {
 }
 
 func TestSpeedlandingUsesFixedRustSNI(t *testing.T) {
-	client := NewSpeedlandingClient("nyc.speedlanding.trade:17778", "")
+	client := NewSpeedlandingClient("ny.speedlanding.trade:17778", "")
 
 	if client.serverName != "speed-landing" {
 		t.Fatalf("expected speed-landing SNI, got %q", client.serverName)
