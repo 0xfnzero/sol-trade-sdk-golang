@@ -207,6 +207,17 @@ func (c *SubscriptionAccountCache) SnapshotSelected(keys []solana.PublicKey) (*A
 }
 
 func (s *AccountCacheSnapshot) Get(key solana.PublicKey, ctx CacheReadContext, expectedOwner *solana.PublicKey) (CachedAccount, error) {
+	a, err := s.get(key, ctx, expectedOwner)
+	if err != nil {
+		return CachedAccount{}, err
+	}
+	return owned(a), nil
+}
+
+// get borrows immutable snapshot bytes for internal read-only decoders. Public
+// Get still returns an owned copy, and every access retains continuity, owner,
+// tombstone and slot checks. Never expose or mutate the borrowed Data slice.
+func (s *AccountCacheSnapshot) get(key solana.PublicKey, ctx CacheReadContext, expectedOwner *solana.PublicKey) (CachedAccount, error) {
 	if err := s.AssertUsable(); err != nil {
 		return CachedAccount{}, err
 	}
@@ -223,7 +234,7 @@ func (s *AccountCacheSnapshot) Get(key solana.PublicKey, ctx CacheReadContext, e
 	if len(a.Data) == 0 {
 		return CachedAccount{}, errors.New("cached account is closed")
 	}
-	return owned(a), nil
+	return a, nil
 }
 
 // GetOptional accepts an observed zero-lamport tombstone, never an unobserved key.

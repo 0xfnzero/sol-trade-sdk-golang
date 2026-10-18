@@ -407,8 +407,19 @@ func TestPumpSwapMainnetFactoryWire(t *testing.T) {
 			t.Fatal(err)
 		}
 		wire := append(append([]byte{}, p.Compiled.Message...), make([]byte, 64*int(p.Compiled.RequiredSignatures))...)
-		if fmt.Sprintf("%x", sha256.Sum256(wire)) != v.Expected.Hash || strconv.FormatUint(p.Route.MinimumNetAmountOut, 10) != v.Expected.Minimum {
-			t.Fatal("mainnet replay differs")
+		// Original captures preserve the old ceil-minimum and track_volume=0.
+		// Current wires use official floor/track_volume=1 and readonly global volume.
+		// The readonly privilege is asserted separately in subscription tests.
+		expectedHash := "7eef1cfe9c2b2f958bb0f290a1e35a90acdf84283cec137bddc43d5b0263c027"
+		if direction == "sell" {
+			expectedHash = "abb7e8eff2d17f35b8fef75dc7cf585fb07db6427c7941bf992f02ba02512117"
+		}
+		oldMinimum, err := strconv.ParseUint(v.Expected.Minimum, 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fmt.Sprintf("%x", sha256.Sum256(wire)) != expectedHash || p.Route.MinimumNetAmountOut != oldMinimum-1 {
+			t.Errorf("mainnet replay differs: direction=%s hash=%x minimum=%d", direction, sha256.Sum256(wire), p.Route.MinimumNetAmountOut)
 		}
 	}
 }

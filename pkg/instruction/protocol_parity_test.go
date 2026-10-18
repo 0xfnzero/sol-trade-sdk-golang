@@ -58,6 +58,8 @@ func testPumpSwapParams(overrides func(*PumpSwapParams)) *PumpSwapParams {
 	if overrides != nil {
 		overrides(params)
 	}
+	params.CoinCreatorVaultAuthority = GetCoinCreatorVaultAuthority(params.CoinCreator)
+	params.CoinCreatorVaultAta = GetCoinCreatorVaultAtaWithTokenProgram(params.CoinCreator, params.QuoteMint, params.QuoteTokenProgram)
 	return params
 }
 
@@ -344,12 +346,12 @@ func TestPumpSwapFixedOutputBuyUsesBuyDiscriminator(t *testing.T) {
 	if got := binary.LittleEndian.Uint64(data[8:16]); got != fixedOutput {
 		t.Fatalf("base amount = %d", got)
 	}
-	if data[24] != 0 {
+	if data[24] != 1 {
 		t.Fatalf("track volume = %d", data[24])
 	}
 }
 
-func TestPumpSwapReverseSellUsesBuyTwoArgData(t *testing.T) {
+func TestPumpSwapReverseSellUsesBuyData(t *testing.T) {
 	payer := testPK(99)
 	quoteMint := testPK(22)
 	ixs, err := BuildSellInstructions(&BuildSellParams{
@@ -370,10 +372,10 @@ func TestPumpSwapReverseSellUsesBuyTwoArgData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("data error: %v", err)
 	}
-	if string(data[:8]) != string(PUMPSWAP_BUY_DISCRIMINATOR) {
-		t.Fatalf("expected buy discriminator for reverse sell")
+	if string(data[:8]) != string(PUMPSWAP_BUY_EXACT_QUOTE_IN_DISCRIMINATOR) {
+		t.Fatalf("expected exact quote-in discriminator for reverse sell")
 	}
-	if len(data) != 24 {
+	if len(data) != 25 {
 		t.Fatalf("reverse sell data len = %d", len(data))
 	}
 	closeIx := ixs[len(ixs)-1]

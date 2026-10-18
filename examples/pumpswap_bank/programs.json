@@ -1,0 +1,12 @@
+{
+  "sha256": "24e5a1085d333648394a70dfc39bb1cee3a6b17fd7ec841d7713af5b5f5135fe",
+  "programs": {
+    "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ": "73c679c8dae8d24153fdd0455b557b73662e93ab2ec88831a9e4be2b08a897a4",
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA": "8190d3f7ceb6cb7a7a8d8924bff89f9f611e15ce1f806f2b6237f3311a98f697",
+    "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA": "a8d05e6927cc6e861d3052a9bf2258ce3a4588f47307d53d0c20ecbe0b86697e",
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb": "0999dbf708971e723b08d1caafc988826a59c6001ed6dc02260da07defbe1469",
+    "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8": "3bcf0828cf38e5f703adbf31dc1bf81f0a1254dcb176ca950ae52231c20e6d14",
+    "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo": "d296c6771cec945601027613ca637c1be6721044c5859009d41c453477844c1f"
+  },
+  "provenance": "Unmodified public deployed SBF; Pump AMM, fee and Token programs from pinned 2026-10-09 parser bank; AMMv4 and DLMM from pinned 2026-10-08 validation captures. Account snapshots are separate 2026-10-18 captures. Mixed historical deployment/account fixture, not a claimed atomic mainnet bank."
+}

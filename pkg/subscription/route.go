@@ -4,6 +4,7 @@ package subscription
 // intermediate residual balances are reported rather than spent from the wallet.
 import (
 	"errors"
+	"fmt"
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
 	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
@@ -54,7 +55,7 @@ func (s *AccountCacheSnapshot) PrepareRoute(hints []PoolTradeHint, ctx CacheRead
 	}
 	spend := amount
 	for _, h := range hints {
-		p, e := s.Get(h.Pool, ctx, nil)
+		p, e := s.get(h.Pool, ctx, nil)
 		if e != nil {
 			return PreparedCachedRoute{}, e
 		}
@@ -108,7 +109,7 @@ func (s *AccountCacheSnapshot) PrepareRoute(hints []PoolTradeHint, ctx CacheRead
 			return PreparedCachedRoute{}, errors.New("pool protocol has no native cached quote implementation")
 		}
 		if e != nil {
-			return PreparedCachedRoute{}, e
+			return PreparedCachedRoute{}, fmt.Errorf("route pool %s: %w", h.Pool, e)
 		}
 		if used == 0 || used > spend || minimum == 0 {
 			return PreparedCachedRoute{}, errors.New("route has zero output or overconsumes input")
@@ -118,7 +119,7 @@ func (s *AccountCacheSnapshot) PrepareRoute(hints []PoolTradeHint, ctx CacheRead
 		spend = minimum
 	}
 	for _, m := range mints {
-		a, e := s.Get(m, ctx, nil)
+		a, e := s.get(m, ctx, nil)
 		if e != nil {
 			return PreparedCachedRoute{}, e
 		}

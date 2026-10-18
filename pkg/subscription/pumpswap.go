@@ -24,7 +24,7 @@ type CachedPumpSwapState struct {
 
 func (s *AccountCacheSnapshot) PumpSwap(h PoolTradeHint, c CacheReadContext) (CachedPumpSwapState, error) {
 	fail := func(message string) (CachedPumpSwapState, error) { return CachedPumpSwapState{}, errors.New(message) }
-	a, e := s.Get(h.Pool, c, &instruction.PUMPSWAP_PROGRAM)
+	a, e := s.get(h.Pool, c, &instruction.PUMPSWAP_PROGRAM)
 	if e != nil {
 		return CachedPumpSwapState{}, e
 	}
@@ -44,7 +44,7 @@ func (s *AccountCacheSnapshot) PumpSwap(h PoolTradeHint, c CacheReadContext) (Ca
 	if p.PoolBaseTokenAccount == p.PoolQuoteTokenAccount {
 		return fail("PumpSwap vaults collide")
 	}
-	g, e := s.Get(instruction.PUMPSWAP_GLOBAL_ACCOUNT, c, &instruction.PUMPSWAP_PROGRAM)
+	g, e := s.get(instruction.PUMPSWAP_GLOBAL_ACCOUNT, c, &instruction.PUMPSWAP_PROGRAM)
 	if e != nil {
 		return CachedPumpSwapState{}, e
 	}
@@ -52,7 +52,7 @@ func (s *AccountCacheSnapshot) PumpSwap(h PoolTradeHint, c CacheReadContext) (Ca
 	if len(d) < 899 || !bytes.Equal(d[:8], []byte{149, 8, 156, 202, 160, 252, 176, 217}) || d[417] > 1 || d[642] > 1 {
 		return fail("invalid PumpSwap global config")
 	}
-	a, e = s.Get(instruction.FEE_CONFIG, c, &instruction.FEE_PROGRAM)
+	a, e = s.get(instruction.FEE_CONFIG, c, &instruction.FEE_PROGRAM)
 	if e != nil {
 		return CachedPumpSwapState{}, e
 	}
@@ -75,7 +75,7 @@ func (s *AccountCacheSnapshot) PumpSwap(h PoolTradeHint, c CacheReadContext) (Ca
 	mints := [2]solana.PublicKey{p.BaseMint, p.QuoteMint}
 	vaults := [2]solana.PublicKey{p.PoolBaseTokenAccount, p.PoolQuoteTokenAccount}
 	for i, mint := range mints {
-		m, e := s.Get(mint, c, nil)
+		m, e := s.get(mint, c, nil)
 		if e != nil {
 			return CachedPumpSwapState{}, e
 		}
@@ -83,7 +83,7 @@ func (s *AccountCacheSnapshot) PumpSwap(h PoolTradeHint, c CacheReadContext) (Ca
 		if e != nil {
 			return CachedPumpSwapState{}, e
 		}
-		v, e := s.Get(vaults[i], c, &m.Owner)
+		v, e := s.get(vaults[i], c, &m.Owner)
 		if e != nil {
 			return CachedPumpSwapState{}, e
 		}
@@ -181,7 +181,7 @@ func (s *AccountCacheSnapshot) PreparePumpSwap(h PoolTradeHint, c CacheReadConte
 		}
 		out = q.UIQuote
 	}
-	minimum, e := calc.CalculateWithSlippageSell(out, uint64(slippageBps))
+	minimum, e := calc.PumpSwapMinimumOutput(out, uint64(slippageBps))
 	if e != nil {
 		return PreparedPumpSwap{}, e
 	}
@@ -211,9 +211,10 @@ func (s *AccountCacheSnapshot) PreparePumpSwap(h PoolTradeHint, c CacheReadConte
 	w := func(k solana.PublicKey) *solana.AccountMeta { return solana.Meta(k).WRITE() }
 	r := func(k solana.PublicKey) *solana.AccountMeta { return solana.Meta(k) }
 	ata := instruction.GetAssociatedTokenAddress
-	accounts := solana.AccountMetaSlice{w(h.Pool), w(payer).SIGNER(), r(instruction.PUMPSWAP_GLOBAL_ACCOUNT), r(p.BaseMint), r(p.QuoteMint), w(ata(payer, p.BaseMint, state.BaseTokenProgram)), w(ata(payer, p.QuoteMint, state.QuoteTokenProgram)), w(p.PoolBaseTokenAccount), w(p.PoolQuoteTokenAccount), r(recipient), w(ata(recipient, p.QuoteMint, state.QuoteTokenProgram)), r(state.BaseTokenProgram), r(state.QuoteTokenProgram), r(solana.SystemProgramID), r(solana.SPLAssociatedTokenAccountProgramID), r(instruction.PUMPSWAP_EVENT_AUTHORITY), r(instruction.PUMPSWAP_PROGRAM), w(instruction.GetCoinCreatorVaultAtaWithTokenProgram(p.CoinCreator, p.QuoteMint, state.QuoteTokenProgram)), r(instruction.GetCoinCreatorVaultAuthority(p.CoinCreator))}
+	creatorAuthority := instruction.GetCoinCreatorVaultAuthority(p.CoinCreator)
+	accounts := solana.AccountMetaSlice{w(h.Pool), w(payer).SIGNER(), r(instruction.PUMPSWAP_GLOBAL_ACCOUNT), r(p.BaseMint), r(p.QuoteMint), w(ata(payer, p.BaseMint, state.BaseTokenProgram)), w(ata(payer, p.QuoteMint, state.QuoteTokenProgram)), w(p.PoolBaseTokenAccount), w(p.PoolQuoteTokenAccount), r(recipient), w(ata(recipient, p.QuoteMint, state.QuoteTokenProgram)), r(state.BaseTokenProgram), r(state.QuoteTokenProgram), r(solana.SystemProgramID), r(solana.SPLAssociatedTokenAccountProgramID), r(instruction.PUMPSWAP_EVENT_AUTHORITY), r(instruction.PUMPSWAP_PROGRAM), w(ata(creatorAuthority, p.QuoteMint, state.QuoteTokenProgram)), r(creatorAuthority)}
 	if quoteIn {
-		accounts = append(accounts, w(instruction.GLOBAL_VOLUME_ACCUMULATOR), w(instruction.GetPumpSwapUserVolumeAccumulatorPDA(payer)))
+		accounts = append(accounts, r(instruction.GLOBAL_VOLUME_ACCUMULATOR), w(instruction.GetPumpSwapUserVolumeAccumulatorPDA(payer)))
 	}
 	accounts = append(accounts, r(instruction.FEE_CONFIG), r(instruction.FEE_PROGRAM))
 	if !p.CoinCreator.IsZero() {
@@ -230,6 +231,9 @@ func (s *AccountCacheSnapshot) PreparePumpSwap(h PoolTradeHint, c CacheReadConte
 	copy(data, disc)
 	binary.LittleEndian.PutUint64(data[8:16], amount)
 	binary.LittleEndian.PutUint64(data[16:24], minimum)
+	if quoteIn {
+		data[24] = 1
+	}
 	if e = s.AssertUsable(); e != nil {
 		return PreparedPumpSwap{}, e
 	}

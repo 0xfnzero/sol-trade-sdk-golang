@@ -30,6 +30,26 @@
     <a href="https://discord.gg/vuazbGkqQE">Discord</a>
 </p>
 
+## PumpSwap custom quote tokens and cached routes
+
+Direct PumpSwap builders match explicit input/output mints, including custom
+Token-2022 quote tokens. Cache preparation supports independent buy/sell routes,
+bounded best-protected path selection, quote freshness checks and offline V0/V1
+signing with explicit nonce/tip/ALT policies. Every hop spends protected credit;
+preparation and signing require no RPC.
+
+Run `go run ./examples/pumpswap_cached_prepare` and
+`go test ./examples/pumpswap_cached_prepare -count=2` for historical TTWO replay.
+See [the API, limits and native tests](docs/PUMPSWAP_QUOTE_ROUTING.md).
+
+Run `go run ./examples/hotpath_latency` from the repository root to measure
+cached three-hop buy/sell search and preparation, V0+ALT build/sign and V1
+build/sign. Edit `examples/hotpath_latency/config.json` for warmup, samples and
+batch size; an alternate config path is optional. The native benchmark uses a
+public deterministic test key and frozen accounts, reports p50/p95/p99
+nanoseconds and allocations, and makes no RPC calls or submissions. Keep real
+wallets out of this example. Local CPU results do not measure network landing.
+
 ## 📋 Table of Contents
 
 - [✨ Features](#-features)
@@ -57,12 +77,18 @@ Trading SDK language versions and related Rust SDKs:
 
 | Language | Repository | Description | Version |
 |----------|------------|-------------|---------|
-| **Rust** | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | Ultra-low latency with zero-copy optimization | `v6.0.1` |
-| **Node.js** | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | TypeScript/JavaScript for Node.js | `v0.1.9` |
-| **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | Async/await native support | `v0.1.9` |
-| **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | Concurrent-safe with goroutine support | `v0.1.10` |
+| **Rust** | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | Ultra-low latency with zero-copy optimization | `v6.0.2` |
+| **Node.js** | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | TypeScript/JavaScript for Node.js | `v0.1.10` |
+| **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | Async/await native support | `v0.1.10` |
+| **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | Concurrent-safe with goroutine support | `v0.1.11` |
 | **Rust** | [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk) | Solana DEX transaction and account event parsing | `v0.7.13` |
 | **Rust** | [sol-shred-sdk](https://github.com/0xfnzero/sol-shred-sdk) | Raw Solana shred decoding and ShredStream DEX event parsing | `v4.0.4` |
+
+## v0.1.11 — PumpSwap custom quotes and creator account fixes
+
+Builds PumpSwap buys and sells with the actual quote mint/token program, validates creator vault identities, honors explicit fee recipients in mayhem mode, and removes an unnecessary global volume write lock. Adds cached quotes, conversion-route selection and complete offline signing preparation, with TTWO pool and SOL→USDC→TTWO→target buy/sell regressions.
+
+Four language implementations share a real 3007 failure fixture and compare instruction data and account privileges. Native local bank regressions use captured public programs/accounts and synthetic wallets. See [PumpSwap fixes and validation](docs/PUMPSWAP_REPORTED_FAILURE.md).
 
 ## v0.1.10 — Pump depth-2 and SpeedLanding regional updates
 
@@ -89,9 +115,9 @@ Validation includes local CPU benchmarks and offline signed-bank scenarios. Meas
 
 ## 🔖 Current Release
 
-**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.9`
+**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.11`
 
-This release fixes PumpFun token-program selection and migrates the SOL transfer/token-account close helpers to `getLatestBlockhash`. It upgrades `solana-go` to v1.24.0 and requires Go 1.25+. Trade execution still requires a caller-supplied recent blockhash or durable nonce; hot-path execution does not query RPC for blockhash, account, or balance data.
+This release includes PumpSwap custom quotes, creator account validation, cached routes and offline signing preparation. Execution uses caller-supplied blockhash/nonce and validated account snapshots.
 
 ## v0.1.8 — Token-program and RPC fixes
 
@@ -143,7 +169,7 @@ Add the dependency to your `go.mod`:
 
 ```go
 // Add to your go.mod
-require github.com/0xfnzero/sol-trade-sdk-golang v0.1.10
+require github.com/0xfnzero/sol-trade-sdk-golang v0.1.11
 
 replace github.com/0xfnzero/sol-trade-sdk-golang => ./sol-trade-sdk-golang
 ```
@@ -157,7 +183,7 @@ go mod tidy
 ### Use Go Modules
 
 ```bash
-go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.10
+go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.11
 ```
 
 ## 🛠️ Usage Examples
@@ -280,24 +306,24 @@ Please ensure that the parameters your trading logic depends on are available in
 
 | Description | Run Command | Source Code |
 |-------------|-------------|-------------|
-| Create and configure TradingClient instance | `go run ./examples/trading_client` | [examples/trading_client](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/trading_client/main.go) | `v0.1.10` |
-| Share infrastructure across multiple wallets | `go run ./examples/shared_infrastructure` | [examples/shared_infrastructure](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/shared_infrastructure/main.go) | `v0.1.10` |
-| PumpFun token sniping trading | `go run ./examples/pumpfun_sniper_trading` | [examples/pumpfun_sniper_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpfun_sniper_trading/main.go) | `v0.1.10` |
-| PumpFun token copy trading | `go run ./examples/pumpfun_copy_trading` | [examples/pumpfun_copy_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpfun_copy_trading/main.go) | `v0.1.10` |
-| PumpSwap trading operations | `go run ./examples/pumpswap_trading` | [examples/pumpswap_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpswap_trading/main.go) | `v0.1.10` |
-| PumpSwap direct trading (via RPC) | `go run ./examples/pumpswap_direct_trading` | [examples/pumpswap_direct_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpswap_direct_trading/main.go) | `v0.1.10` |
-| Raydium CPMM trading operations | `go run ./examples/raydium_cpmm_trading` | [examples/raydium_cpmm_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/raydium_cpmm_trading/main.go) | `v0.1.10` |
-| Raydium AMM V4 trading operations | `go run ./examples/raydium_amm_v4_trading` | [examples/raydium_amm_v4_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/raydium_amm_v4_trading/main.go) | `v0.1.10` |
-| Meteora DAMM V2 trading operations | `go run ./examples/meteora_damm_v2_trading` | [examples/meteora_damm_v2_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/meteora_damm_v2_trading/main.go) | `v0.1.10` |
-| Bonk token sniping trading | `go run ./examples/bonk_sniper_trading` | [examples/bonk_sniper_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/bonk_sniper_trading/main.go) | `v0.1.10` |
-| Bonk token copy trading | `go run ./examples/bonk_copy_trading` | [examples/bonk_copy_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/bonk_copy_trading/main.go) | `v0.1.10` |
-| Custom instruction middleware example | `go run ./examples/middleware_system` | [examples/middleware_system](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/middleware_system/main.go) | `v0.1.10` |
-| Address lookup table example | `go run ./examples/address_lookup` | [examples/address_lookup](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/address_lookup/main.go) | `v0.1.10` |
-| Nonce cache (durable nonce) example | `go run ./examples/nonce_cache` | [examples/nonce_cache](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/nonce_cache/main.go) | `v0.1.10` |
-| Wrap/unwrap SOL to/from WSOL example | `go run ./examples/wsol_wrapper` | [examples/wsol_wrapper](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/wsol_wrapper/main.go) | `v0.1.10` |
-| Seed trading example | `go run ./examples/seed_trading` | [examples/seed_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/seed_trading/main.go) | `v0.1.10` |
-| Gas fee strategy example | `go run ./examples/gas_fee_strategy` | [examples/gas_fee_strategy](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/gas_fee_strategy/main.go) | `v0.1.10` |
-| Hot path trading (zero-RPC) | `go run ./examples/hot_path_trading` | [examples/hot_path_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/hot_path_trading/main.go) | `v0.1.10` |
+| Create and configure TradingClient instance | `go run ./examples/trading_client` | [examples/trading_client](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/trading_client/main.go) | `v0.1.11` |
+| Share infrastructure across multiple wallets | `go run ./examples/shared_infrastructure` | [examples/shared_infrastructure](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/shared_infrastructure/main.go) | `v0.1.11` |
+| PumpFun token sniping trading | `go run ./examples/pumpfun_sniper_trading` | [examples/pumpfun_sniper_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpfun_sniper_trading/main.go) | `v0.1.11` |
+| PumpFun token copy trading | `go run ./examples/pumpfun_copy_trading` | [examples/pumpfun_copy_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpfun_copy_trading/main.go) | `v0.1.11` |
+| PumpSwap trading operations | `go run ./examples/pumpswap_trading` | [examples/pumpswap_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpswap_trading/main.go) | `v0.1.11` |
+| PumpSwap direct trading (via RPC) | `go run ./examples/pumpswap_direct_trading` | [examples/pumpswap_direct_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpswap_direct_trading/main.go) | `v0.1.11` |
+| Raydium CPMM trading operations | `go run ./examples/raydium_cpmm_trading` | [examples/raydium_cpmm_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/raydium_cpmm_trading/main.go) | `v0.1.11` |
+| Raydium AMM V4 trading operations | `go run ./examples/raydium_amm_v4_trading` | [examples/raydium_amm_v4_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/raydium_amm_v4_trading/main.go) | `v0.1.11` |
+| Meteora DAMM V2 trading operations | `go run ./examples/meteora_damm_v2_trading` | [examples/meteora_damm_v2_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/meteora_damm_v2_trading/main.go) | `v0.1.11` |
+| Bonk token sniping trading | `go run ./examples/bonk_sniper_trading` | [examples/bonk_sniper_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/bonk_sniper_trading/main.go) | `v0.1.11` |
+| Bonk token copy trading | `go run ./examples/bonk_copy_trading` | [examples/bonk_copy_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/bonk_copy_trading/main.go) | `v0.1.11` |
+| Custom instruction middleware example | `go run ./examples/middleware_system` | [examples/middleware_system](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/middleware_system/main.go) | `v0.1.11` |
+| Address lookup table example | `go run ./examples/address_lookup` | [examples/address_lookup](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/address_lookup/main.go) | `v0.1.11` |
+| Nonce cache (durable nonce) example | `go run ./examples/nonce_cache` | [examples/nonce_cache](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/nonce_cache/main.go) | `v0.1.11` |
+| Wrap/unwrap SOL to/from WSOL example | `go run ./examples/wsol_wrapper` | [examples/wsol_wrapper](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/wsol_wrapper/main.go) | `v0.1.11` |
+| Seed trading example | `go run ./examples/seed_trading` | [examples/seed_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/seed_trading/main.go) | `v0.1.11` |
+| Gas fee strategy example | `go run ./examples/gas_fee_strategy` | [examples/gas_fee_strategy](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/gas_fee_strategy/main.go) | `v0.1.11` |
+| Hot path trading (zero-RPC) | `go run ./examples/hot_path_trading` | [examples/hot_path_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/hot_path_trading/main.go) | `v0.1.11` |
 
 ### ⚙️ SWQoS Service Configuration
 
@@ -449,3 +475,14 @@ Full cross-language API parity is still in progress. See the [API migration guid
 
 
 DAMM v2 单跳缓存准备与显式模拟见 [cached_damm_v2](examples/cached_damm_v2/main.go)。当前要求调用方显式最低输出，预计到账未知；SOL 与已有 WSOL 使用不同账户结算。PumpFun 当前配置读取尚不代表完整费用报价或 cached factory。
+
+### Offline deployed-program validation
+
+[Native Go PumpSwap bank replay](examples/pumpswap_offline_bank/README.md) executes
+12 direct/three-hop buy/sell scenarios using real signatures and frozen public
+SBF programs, including ALT rejection and final-swap rollback. Run
+`go test ./examples/pumpswap_offline_bank -count=1 -v` from this repository.
+Local preparation/signing benchmarks:
+`go test ./examples/pumpswap_cached_prepare -run '^$' -bench BenchmarkPumpSwapCached -benchmem`.
+Replay and construction make no RPC calls. Mixed historical captures and synthetic
+local funding are documented; these checks do not measure production latency.

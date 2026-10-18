@@ -85,7 +85,7 @@ func TestPumpSwapQuoteModesUseEffectiveQuoteReserves(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sellBase.InternalQuoteAmountOut != 16_201_203 || sellBase.UIQuote != 16_112_095 || sellBase.MinQuote != 15_910_694 {
+	if sellBase.InternalQuoteAmountOut != 16_201_203 || sellBase.UIQuote != 16_112_095 || sellBase.MinQuote != 15_910_693 {
 		t.Fatalf("sell base = %+v", sellBase)
 	}
 

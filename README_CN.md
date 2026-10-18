@@ -30,6 +30,23 @@
     <a href="https://discord.gg/vuazbGkqQE">Discord</a>
 </p>
 
+## PumpSwap 自定义 quote token 与缓存路由
+
+直接构建按明确输入、输出 mint 判断方向，支持普通 Token-2022 自定义 quote。
+新增缓存路由准备、最高保护输出选路、报价有效期校验及 V0/V1 离线签名，支持明确的
+nonce、小费和 ALT 配置。每跳仅使用前一跳保护金额，准备及签名热路径无 RPC。
+
+执行 `go run ./examples/pumpswap_cached_prepare` 和
+`go test ./examples/pumpswap_cached_prepare -count=2` 可重复回放 TTWO 历史缓存。
+完整 API、限制及原生测试见[文档](docs/PUMPSWAP_QUOTE_ROUTING.md)。
+
+在仓库根目录运行 `go run ./examples/hotpath_latency`，可测量缓存三跳买卖路由
+搜索与准备、V0+ALT 构建签名和 V1 构建签名。通过
+`examples/hotpath_latency/config.json` 配置预热次数、样本数和批次数量，
+也可传入其它配置路径。输出 p50/p95/p99 纳秒耗时和内存分配统计。
+示例使用公开的固定测试私钥与冻结账户，不调用 RPC、不发送交易；
+请勿向该测试密钥转账。结果仅表示本地 CPU 工作量，不代表网络上链延迟。
+
 ## 📋 目录
 
 - [✨ 项目特性](#-项目特性)
@@ -57,10 +74,10 @@
 
 | 语言 | 仓库 | 描述 | 版本 |
 |------|------|------|
-| **Rust** | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | 超低延迟，零拷贝优化 | `v6.0.1` |
-| **Node.js** | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | TypeScript/JavaScript，Node.js 支持 | `v0.1.9` |
-| **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | 原生 async/await 支持 | `v0.1.9` |
-| **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | 并发安全，goroutine 支持 | `v0.1.10` |
+| **Rust** | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | 超低延迟，零拷贝优化 | `v6.0.2` |
+| **Node.js** | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | TypeScript/JavaScript，Node.js 支持 | `v0.1.10` |
+| **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | 原生 async/await 支持 | `v0.1.10` |
+| **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | 并发安全，goroutine 支持 | `v0.1.11` |
 | **Rust** | [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk) | Solana DEX 交易与账户事件解析 | `v0.7.13` |
 | **Rust** | [sol-shred-sdk](https://github.com/0xfnzero/sol-shred-sdk) | Solana 原始 shred 解码与 ShredStream DEX 事件解析 | `v4.0.4` |
 
@@ -77,9 +94,15 @@
 
 ## 🔖 当前版本
 
-**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.9`
+**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.1.11`
 
-本版本修复 PumpFun token program 选择，并将 SOL 转账和关闭 token 账户工具迁移到 `getLatestBlockhash`。`solana-go` 升级到 v1.24.0，最低要求 Go 1.25+。交易执行仍需由调用方传入 recent blockhash 或 durable nonce；热路径不会查询 RPC 获取 blockhash、账户或余额数据。
+本版本包含 PumpSwap 多报价池、creator 账户校验、缓存路由与离线签名准备。交易执行使用调用方提供的区块哈希／nonce 和已验证的账户快照。
+
+## v0.1.11 — PumpSwap 多报价池与 creator 账户修复
+
+支持按实际 quote mint/token program 构建 PumpSwap 买卖，补齐 creator vault 校验，修复显式手续费收款方与 mayhem 模式行为，并移除不必要的全局成交量写锁。新增缓存报价、转换路线选择和完整离线签名准备，包含 TTWO 池及 SOL→USDC→TTWO→目标币的买卖回归。
+
+四语言共享真实 3007 失败样本，并逐字段核对业务指令。原生本地 bank 回归使用历史公共程序／账户与合成钱包状态。说明见 [PumpSwap 修复与验证](docs/PUMPSWAP_REPORTED_FAILURE.md)。
 
 ## v0.1.10 — Pump depth-2 and SpeedLanding regional updates
 
@@ -141,7 +164,7 @@ git clone https://github.com/0xfnzero/sol-trade-sdk-golang
 
 ```go
 // 添加到您的 go.mod
-require github.com/0xfnzero/sol-trade-sdk-golang v0.1.10
+require github.com/0xfnzero/sol-trade-sdk-golang v0.1.11
 
 replace github.com/0xfnzero/sol-trade-sdk-golang => ./sol-trade-sdk-golang
 ```
@@ -155,7 +178,7 @@ go mod tidy
 ### 使用 Go Modules
 
 ```bash
-go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.10
+go get github.com/0xfnzero/sol-trade-sdk-golang@v0.1.11
 ```
 
 ## 🛠️ 使用示例
@@ -276,24 +299,24 @@ fmt.Printf("交易签名: %s\n", result.Signature)
 
 | 描述 | 运行命令 | 源码 |
 |------|----------|------|
-| 创建并配置 TradingClient 实例 | `go run ./examples/trading_client` | [examples/trading_client](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/trading_client/main.go) | `v0.1.10` |
-| 多钱包共享基础设施 | `go run ./examples/shared_infrastructure` | [examples/shared_infrastructure](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/shared_infrastructure/main.go) | `v0.1.10` |
-| PumpFun 代币狙击交易 | `go run ./examples/pumpfun_sniper_trading` | [examples/pumpfun_sniper_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpfun_sniper_trading/main.go) | `v0.1.10` |
-| PumpFun 代币跟单交易 | `go run ./examples/pumpfun_copy_trading` | [examples/pumpfun_copy_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpfun_copy_trading/main.go) | `v0.1.10` |
-| PumpSwap 交易操作 | `go run ./examples/pumpswap_trading` | [examples/pumpswap_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpswap_trading/main.go) | `v0.1.10` |
-| PumpSwap 直接交易（通过 RPC） | `go run ./examples/pumpswap_direct_trading` | [examples/pumpswap_direct_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpswap_direct_trading/main.go) | `v0.1.10` |
-| Raydium CPMM 交易操作 | `go run ./examples/raydium_cpmm_trading` | [examples/raydium_cpmm_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/raydium_cpmm_trading/main.go) | `v0.1.10` |
-| Raydium AMM V4 交易操作 | `go run ./examples/raydium_amm_v4_trading` | [examples/raydium_amm_v4_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/raydium_amm_v4_trading/main.go) | `v0.1.10` |
-| Meteora DAMM V2 交易操作 | `go run ./examples/meteora_damm_v2_trading` | [examples/meteora_damm_v2_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/meteora_damm_v2_trading/main.go) | `v0.1.10` |
-| Bonk 代币狙击交易 | `go run ./examples/bonk_sniper_trading` | [examples/bonk_sniper_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/bonk_sniper_trading/main.go) | `v0.1.10` |
-| Bonk 代币跟单交易 | `go run ./examples/bonk_copy_trading` | [examples/bonk_copy_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/bonk_copy_trading/main.go) | `v0.1.10` |
-| 自定义指令中间件示例 | `go run ./examples/middleware_system` | [examples/middleware_system](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/middleware_system/main.go) | `v0.1.10` |
-| 地址查找表示例 | `go run ./examples/address_lookup` | [examples/address_lookup](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/address_lookup/main.go) | `v0.1.10` |
-| Nonce 缓存（持久 Nonce）示例 | `go run ./examples/nonce_cache` | [examples/nonce_cache](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/nonce_cache/main.go) | `v0.1.10` |
-| SOL 与 WSOL 互转示例 | `go run ./examples/wsol_wrapper` | [examples/wsol_wrapper](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/wsol_wrapper/main.go) | `v0.1.10` |
-| Seed 交易示例 | `go run ./examples/seed_trading` | [examples/seed_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/seed_trading/main.go) | `v0.1.10` |
-| Gas 费策略示例 | `go run ./examples/gas_fee_strategy` | [examples/gas_fee_strategy](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/gas_fee_strategy/main.go) | `v0.1.10` |
-| 热路径交易（零 RPC） | `go run ./examples/hot_path_trading` | [examples/hot_path_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/hot_path_trading/main.go) | `v0.1.10` |
+| 创建并配置 TradingClient 实例 | `go run ./examples/trading_client` | [examples/trading_client](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/trading_client/main.go) | `v0.1.11` |
+| 多钱包共享基础设施 | `go run ./examples/shared_infrastructure` | [examples/shared_infrastructure](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/shared_infrastructure/main.go) | `v0.1.11` |
+| PumpFun 代币狙击交易 | `go run ./examples/pumpfun_sniper_trading` | [examples/pumpfun_sniper_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpfun_sniper_trading/main.go) | `v0.1.11` |
+| PumpFun 代币跟单交易 | `go run ./examples/pumpfun_copy_trading` | [examples/pumpfun_copy_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpfun_copy_trading/main.go) | `v0.1.11` |
+| PumpSwap 交易操作 | `go run ./examples/pumpswap_trading` | [examples/pumpswap_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpswap_trading/main.go) | `v0.1.11` |
+| PumpSwap 直接交易（通过 RPC） | `go run ./examples/pumpswap_direct_trading` | [examples/pumpswap_direct_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpswap_direct_trading/main.go) | `v0.1.11` |
+| Raydium CPMM 交易操作 | `go run ./examples/raydium_cpmm_trading` | [examples/raydium_cpmm_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/raydium_cpmm_trading/main.go) | `v0.1.11` |
+| Raydium AMM V4 交易操作 | `go run ./examples/raydium_amm_v4_trading` | [examples/raydium_amm_v4_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/raydium_amm_v4_trading/main.go) | `v0.1.11` |
+| Meteora DAMM V2 交易操作 | `go run ./examples/meteora_damm_v2_trading` | [examples/meteora_damm_v2_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/meteora_damm_v2_trading/main.go) | `v0.1.11` |
+| Bonk 代币狙击交易 | `go run ./examples/bonk_sniper_trading` | [examples/bonk_sniper_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/bonk_sniper_trading/main.go) | `v0.1.11` |
+| Bonk 代币跟单交易 | `go run ./examples/bonk_copy_trading` | [examples/bonk_copy_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/bonk_copy_trading/main.go) | `v0.1.11` |
+| 自定义指令中间件示例 | `go run ./examples/middleware_system` | [examples/middleware_system](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/middleware_system/main.go) | `v0.1.11` |
+| 地址查找表示例 | `go run ./examples/address_lookup` | [examples/address_lookup](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/address_lookup/main.go) | `v0.1.11` |
+| Nonce 缓存（持久 Nonce）示例 | `go run ./examples/nonce_cache` | [examples/nonce_cache](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/nonce_cache/main.go) | `v0.1.11` |
+| SOL 与 WSOL 互转示例 | `go run ./examples/wsol_wrapper` | [examples/wsol_wrapper](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/wsol_wrapper/main.go) | `v0.1.11` |
+| Seed 交易示例 | `go run ./examples/seed_trading` | [examples/seed_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/seed_trading/main.go) | `v0.1.11` |
+| Gas 费策略示例 | `go run ./examples/gas_fee_strategy` | [examples/gas_fee_strategy](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/gas_fee_strategy/main.go) | `v0.1.11` |
+| 热路径交易（零 RPC） | `go run ./examples/hot_path_trading` | [examples/hot_path_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/hot_path_trading/main.go) | `v0.1.11` |
 
 ### ⚙️ SWQoS 服务配置说明
 
@@ -439,3 +462,10 @@ MIT License
 ## API 兼容性
 
 完整跨语言 API 对齐仍在进行；公开行为和支持边界见 [API 迁移说明](docs/USAGE.md#api-compatibility)，使用方法见 examples 目录。
+
+### 离线链上程序模拟
+
+[原生 Go PumpSwap bank 示例](examples/pumpswap_offline_bank/README.md) 使用真实签名和冻结的公开 SBF 程序，覆盖直接买卖、三跳正反向路由、ALT、最终一跳失败回滚等 12 类场景，每类在新 bank 重复两次。
+在仓库根目录执行 `go test ./examples/pumpswap_offline_bank -count=1 -v`。
+本地构建基准：`go test ./examples/pumpswap_cached_prepare -run '^$' -bench BenchmarkPumpSwapCached -benchmem`。
+回放和构建无 RPC；样本为不同时间的历史捕获，测试资金为本地合成余额，不代表生产延迟。

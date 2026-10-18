@@ -21,7 +21,7 @@ type AmmV4Quote struct{ AmountIn, AmountOut, MinimumAmountOut, SwapFee uint64 }
 
 func (s *AccountCacheSnapshot) AmmV4(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64) (CachedAmmV4State, error) {
 	fail := func(err error) (CachedAmmV4State, error) { return CachedAmmV4State{}, err }
-	a, err := s.Get(h.Pool, ctx, &AmmV4Program)
+	a, err := s.get(h.Pool, ctx, &AmmV4Program)
 	if err != nil {
 		return fail(err)
 	}
@@ -55,7 +55,7 @@ func (s *AccountCacheSnapshot) AmmV4(h PoolTradeHint, ctx CacheReadContext, unix
 	reserves := []uint64{}
 	for _, offsets := range [][4]int{{336, 400, 192, 32}, {368, 432, 200, 40}} {
 		vault, mint, pnl, decs := offsets[0], offsets[1], offsets[2], offsets[3]
-		m, e := s.Get(key(mint), ctx, &solana.TokenProgramID)
+		m, e := s.get(key(mint), ctx, &solana.TokenProgramID)
 		if e != nil {
 			return fail(e)
 		}
@@ -65,7 +65,7 @@ func (s *AccountCacheSnapshot) AmmV4(h PoolTradeHint, ctx CacheReadContext, unix
 		if uint64(m.Data[44]) != num(decs) {
 			return fail(errors.New("AMM v4 mint decimals mismatch"))
 		}
-		v, e := s.Get(key(vault), ctx, &solana.TokenProgramID)
+		v, e := s.get(key(vault), ctx, &solana.TokenProgramID)
 		if e != nil {
 			return fail(e)
 		}

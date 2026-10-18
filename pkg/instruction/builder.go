@@ -115,7 +115,8 @@ func (b *PumpSwapInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([]so
 		useExactQuote = *bp.UseExactSolAmount
 	}
 	return BuildBuyInstructions(&BuildBuyParams{
-		Payer:               bp.Payer,
+		Payer:     bp.Payer,
+		InputMint: bp.InputMint, OutputMint: bp.OutputMint,
 		InputAmount:         bp.InputAmount,
 		SlippageBasisPoints: bp.SlippageBasisPoints,
 		ProtocolParams:      toPumpSwapParams(protocolParams),
@@ -133,7 +134,8 @@ func (b *PumpSwapInstructionBuilder) BuildSellInstructions(bp *BuildParams) ([]s
 		return nil, soltradesdk.ErrInvalidProtocolParams
 	}
 	return BuildSellInstructions(&BuildSellParams{
-		Payer:               bp.Payer,
+		Payer:     bp.Payer,
+		InputMint: bp.InputMint, OutputMint: bp.OutputMint,
 		InputAmount:         bp.InputAmount,
 		SlippageBasisPoints: bp.SlippageBasisPoints,
 		ProtocolParams:      toPumpSwapParams(protocolParams),
@@ -345,26 +347,28 @@ func toPumpFunParams(p *params.PumpFunParams) *PumpFunParams {
 
 func toPumpSwapParams(p *params.PumpSwapParams) *PumpSwapParams {
 	return &PumpSwapParams{
-		Pool:                      p.Pool,
-		BaseMint:                  p.BaseMint,
-		QuoteMint:                 p.QuoteMint,
-		PoolBaseTokenAccount:      p.PoolBaseTokenAccount,
-		PoolQuoteTokenAccount:     p.PoolQuoteTokenAccount,
-		PoolBaseTokenReserves:     p.PoolBaseTokenReserves,
-		PoolQuoteTokenReserves:    p.PoolQuoteTokenReserves,
-		VirtualQuoteReserves:      p.VirtualQuoteReserves,
-		CoinCreatorVaultAta:       p.CoinCreatorVaultATA,
-		CoinCreatorVaultAuthority: p.CoinCreatorVaultAuth,
-		BaseTokenProgram:          p.BaseTokenProgram,
-		QuoteTokenProgram:         p.QuoteTokenProgram,
-		IsMayhemMode:              p.IsMayhemMode,
-		IsCashbackCoin:            p.IsCashbackCoin,
-		PoolCreator:               p.PoolCreator,
-		CoinCreator:               p.CoinCreator,
-		CoinCreatorKnown:          p.CoinCreatorKnown,
-		CashbackFeeBasisPoints:    p.CashbackFeeBasisPoints,
-		FeeBasisPoints:            p.FeeBasisPoints,
-		BaseMintSupply:            p.BaseMintSupply,
+		Pool:                              p.Pool,
+		BaseMint:                          p.BaseMint,
+		QuoteMint:                         p.QuoteMint,
+		PoolBaseTokenAccount:              p.PoolBaseTokenAccount,
+		PoolQuoteTokenAccount:             p.PoolQuoteTokenAccount,
+		PoolBaseTokenReserves:             p.PoolBaseTokenReserves,
+		PoolQuoteTokenReserves:            p.PoolQuoteTokenReserves,
+		VirtualQuoteReserves:              p.VirtualQuoteReserves,
+		CoinCreatorVaultAta:               p.CoinCreatorVaultATA,
+		CoinCreatorVaultAuthority:         p.CoinCreatorVaultAuth,
+		BaseTokenProgram:                  p.BaseTokenProgram,
+		QuoteTokenProgram:                 p.QuoteTokenProgram,
+		IsMayhemMode:                      p.IsMayhemMode,
+		IsCashbackCoin:                    p.IsCashbackCoin,
+		PoolCreator:                       p.PoolCreator,
+		CoinCreator:                       p.CoinCreator,
+		CoinCreatorKnown:                  p.CoinCreatorKnown,
+		CashbackFeeBasisPoints:            p.CashbackFeeBasisPoints,
+		FeeBasisPoints:                    p.FeeBasisPoints,
+		BaseMintSupply:                    p.BaseMintSupply,
+		ProtocolFeeRecipientOverride:      p.ProtocolFeeRecipientOverride,
+		ProtocolExtraFeeRecipientOverride: p.ProtocolExtraFeeRecipientOverride,
 	}
 }
 

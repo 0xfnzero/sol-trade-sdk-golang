@@ -185,52 +185,55 @@ func GetUserVolumeAccumulatorQuoteAta(user, quoteMint, quoteTokenProgram solana.
 
 // PumpSwapParams contains parameters for PumpSwap operations
 type PumpSwapParams struct {
-	Pool                         solana.PublicKey
-	BaseMint                     solana.PublicKey
-	QuoteMint                    solana.PublicKey
-	PoolBaseTokenAccount         solana.PublicKey
-	PoolQuoteTokenAccount        solana.PublicKey
-	PoolBaseTokenReserves        uint64
-	PoolQuoteTokenReserves       uint64
-	VirtualQuoteReserves         *big.Int
-	CoinCreatorVaultAta          solana.PublicKey
-	CoinCreatorVaultAuthority    solana.PublicKey
-	BaseTokenProgram             solana.PublicKey
-	QuoteTokenProgram            solana.PublicKey
-	IsMayhemMode                 bool
-	IsCashbackCoin               bool
-	PoolCreator                  solana.PublicKey
-	CoinCreator                  solana.PublicKey
-	CoinCreatorKnown             bool
-	CashbackFeeBasisPoints       uint64
-	FeeBasisPoints               *calc.PumpSwapFeeBasisPoints
-	BaseMintSupply               *uint64
-	ProtocolFeeRecipientOverride *solana.PublicKey
+	Pool                              solana.PublicKey
+	BaseMint                          solana.PublicKey
+	QuoteMint                         solana.PublicKey
+	PoolBaseTokenAccount              solana.PublicKey
+	PoolQuoteTokenAccount             solana.PublicKey
+	PoolBaseTokenReserves             uint64
+	PoolQuoteTokenReserves            uint64
+	VirtualQuoteReserves              *big.Int
+	CoinCreatorVaultAta               solana.PublicKey
+	CoinCreatorVaultAuthority         solana.PublicKey
+	BaseTokenProgram                  solana.PublicKey
+	QuoteTokenProgram                 solana.PublicKey
+	IsMayhemMode                      bool
+	IsCashbackCoin                    bool
+	PoolCreator                       solana.PublicKey
+	CoinCreator                       solana.PublicKey
+	CoinCreatorKnown                  bool
+	CashbackFeeBasisPoints            uint64
+	FeeBasisPoints                    *calc.PumpSwapFeeBasisPoints
+	BaseMintSupply                    *uint64
+	ProtocolFeeRecipientOverride      *solana.PublicKey
+	ProtocolExtraFeeRecipientOverride *solana.PublicKey
 }
 
 // BuildBuyParams contains parameters for building buy instructions
 type BuildBuyParams struct {
-	Payer               solana.PublicKey
-	InputAmount         uint64
-	SlippageBasisPoints uint64
-	ProtocolParams      *PumpSwapParams
-	CreateInputMintAta  bool
-	CloseInputMintAta   bool
-	CreateOutputMintAta bool
-	UseExactQuoteAmount bool
-	FixedOutputAmount   *uint64
+	InputMint, OutputMint solana.PublicKey
+	Payer                 solana.PublicKey
+	InputAmount           uint64
+	SlippageBasisPoints   uint64
+	ProtocolParams        *PumpSwapParams
+	CreateInputMintAta    bool
+	CloseInputMintAta     bool
+	CreateOutputMintAta   bool
+	UseExactQuoteAmount   bool
+	FixedOutputAmount     *uint64
 }
 
 // BuildSellParams contains parameters for building sell instructions
 type BuildSellParams struct {
-	Payer               solana.PublicKey
-	InputAmount         uint64
-	SlippageBasisPoints uint64
-	ProtocolParams      *PumpSwapParams
-	CreateOutputMintAta bool
-	CloseOutputMintAta  bool
-	CloseInputMintAta   bool
-	FixedOutputAmount   *uint64
+	InputMint, OutputMint solana.PublicKey
+	Payer                 solana.PublicKey
+	InputAmount           uint64
+	SlippageBasisPoints   uint64
+	ProtocolParams        *PumpSwapParams
+	CreateOutputMintAta   bool
+	CloseOutputMintAta    bool
+	CloseInputMintAta     bool
+	FixedOutputAmount     *uint64
 }
 
 // ===== WSOL Manager - 100% from Rust =====
@@ -341,25 +344,31 @@ func shouldAddPoolV2(pp *PumpSwapParams) bool {
 // BuildBuyInstructions builds buy instructions for PumpSwap
 // 100% port from Rust: src/instruction/pumpswap.rs build_buy_instructions
 func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) {
-	if params.InputAmount == 0 {
+	if params == nil || params.InputAmount == 0 {
 		return nil, ErrInvalidAmount
 	}
 
 	pp := params.ProtocolParams
-
-	// Check if pool contains WSOL or USDC
-	isWsol := pp.QuoteMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.BaseMint.Equals(constants.WSOL_TOKEN_ACCOUNT)
-	isUsdc := pp.QuoteMint.Equals(constants.USDC_TOKEN_ACCOUNT) || pp.BaseMint.Equals(constants.USDC_TOKEN_ACCOUNT)
-	if !isWsol && !isUsdc {
-		return nil, ErrInvalidPool
+	if err := pp.ValidateAccounts(); err != nil {
+		return nil, err
+	}
+	if params.SlippageBasisPoints >= 10000 {
+		return nil, fmt.Errorf("invalid slippage basis points")
+	}
+	if params.FixedOutputAmount != nil && *params.FixedOutputAmount == 0 {
+		return nil, ErrInvalidAmount
 	}
 
-	quoteIsWsolOrUsdc := pp.QuoteMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.QuoteMint.Equals(constants.USDC_TOKEN_ACCOUNT)
+	quoteToBase, err := pumpSwapDirection(pp, params.InputMint, params.OutputMint, true)
+	if err != nil {
+		return nil, err
+	}
+	quoteToBaseForBuy := quoteToBase
 	inputStableMint := pp.QuoteMint
 	inputStableTokenProgram := pp.QuoteTokenProgram
 	outputTradeMint := pp.BaseMint
 	outputTradeTokenProgram := pp.BaseTokenProgram
-	if !quoteIsWsolOrUsdc {
+	if !quoteToBaseForBuy {
 		inputStableMint = pp.BaseMint
 		inputStableTokenProgram = pp.BaseTokenProgram
 		outputTradeMint = pp.QuoteMint
@@ -373,7 +382,7 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 	var solAmount uint64
 
 	if params.FixedOutputAmount != nil {
-		if !quoteIsWsolOrUsdc {
+		if !quoteToBaseForBuy {
 			return nil, fmt.Errorf("PumpSwap exact-output buy requires a buy instruction")
 		}
 		if *params.FixedOutputAmount >= pp.PoolBaseTokenReserves {
@@ -381,7 +390,7 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 		}
 		tokenAmount = *params.FixedOutputAmount
 		solAmount = params.InputAmount
-	} else if quoteIsWsolOrUsdc {
+	} else if quoteToBaseForBuy {
 		result, err := calc.BuyQuoteInputInternalWithFees(
 			params.InputAmount,
 			params.SlippageBasisPoints,
@@ -417,10 +426,10 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 
 	// Determine fee recipient
 	var feeRecipient solana.PublicKey
-	if pp.IsMayhemMode {
-		feeRecipient = GetMayhemFeeRecipientRandom()
-	} else if pp.ProtocolFeeRecipientOverride != nil {
+	if pp.ProtocolFeeRecipientOverride != nil {
 		feeRecipient = *pp.ProtocolFeeRecipientOverride
+	} else if pp.IsMayhemMode {
+		feeRecipient = GetMayhemFeeRecipientRandom()
 	} else {
 		feeRecipient = GetProtocolFeeRecipientRandom()
 	}
@@ -471,9 +480,9 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 	}
 
 	// Add volume accumulator accounts for quote buy
-	if quoteIsWsolOrUsdc {
+	if quoteToBaseForBuy {
 		accounts = append(accounts, solana.AccountMeta{
-			PublicKey: GLOBAL_VOLUME_ACCUMULATOR, IsSigner: false, IsWritable: true,
+			PublicKey: GLOBAL_VOLUME_ACCUMULATOR, IsSigner: false, IsWritable: false,
 		})
 		userVolumeAccumulator := GetPumpSwapUserVolumeAccumulatorPDA(params.Payer)
 		accounts = append(accounts, solana.AccountMeta{
@@ -489,10 +498,13 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 
 	// Add cashback WSOL ATA if needed
 	if pp.IsCashbackCoin {
-		wsolAta := GetUserVolumeAccumulatorWsolAta(params.Payer)
+		wsolAta := GetUserVolumeAccumulatorQuoteAta(params.Payer, pp.QuoteMint, pp.QuoteTokenProgram)
 		accounts = append(accounts, solana.AccountMeta{
 			PublicKey: wsolAta, IsSigner: false, IsWritable: true,
 		})
+		if !quoteToBaseForBuy {
+			accounts = append(accounts, solana.AccountMeta{PublicKey: GetPumpSwapUserVolumeAccumulatorPDA(params.Payer), IsWritable: true})
+		}
 	}
 
 	if shouldAddPoolV2(pp) {
@@ -501,7 +513,12 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 			PublicKey: poolV2, IsSigner: false, IsWritable: false,
 		})
 	}
-	protocolExtra := GetProtocolExtraFeeRecipientRandom()
+	var protocolExtra solana.PublicKey
+	if pp.ProtocolExtraFeeRecipientOverride != nil {
+		protocolExtra = *pp.ProtocolExtraFeeRecipientOverride
+	} else {
+		protocolExtra = GetProtocolExtraFeeRecipientRandom()
+	}
 	accounts = append(accounts, solana.AccountMeta{
 		PublicKey: protocolExtra, IsSigner: false, IsWritable: false,
 	})
@@ -511,25 +528,22 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 
 	// Build instruction data
 	var data []byte
-	trackVolume := byte(0)
-	if pp.IsCashbackCoin {
-		trackVolume = 1
-	}
+	trackVolume := byte(1)
 	if params.FixedOutputAmount != nil {
 		data = make([]byte, 25)
 		copy(data[0:8], PUMPSWAP_BUY_DISCRIMINATOR)
 		binary.LittleEndian.PutUint64(data[8:16], tokenAmount)
 		binary.LittleEndian.PutUint64(data[16:24], solAmount)
 		data[24] = trackVolume
-	} else if quoteIsWsolOrUsdc && params.UseExactQuoteAmount {
+	} else if quoteToBaseForBuy && params.UseExactQuoteAmount {
 		// buy_exact_quote_in(spendable_quote_in, min_base_amount_out, track_volume)
-		minBaseAmountOut, _ := calc.CalculateWithSlippageSell(tokenAmount, params.SlippageBasisPoints)
+		minBaseAmountOut, _ := calc.PumpSwapMinimumOutput(tokenAmount, params.SlippageBasisPoints)
 		data = make([]byte, 25)
 		copy(data[0:8], PUMPSWAP_BUY_EXACT_QUOTE_IN_DISCRIMINATOR)
 		binary.LittleEndian.PutUint64(data[8:16], params.InputAmount)
 		binary.LittleEndian.PutUint64(data[16:24], minBaseAmountOut)
 		data[24] = trackVolume
-	} else if quoteIsWsolOrUsdc {
+	} else if quoteToBaseForBuy {
 		// buy(token_amount, max_quote, track_volume)
 		data = make([]byte, 25)
 		copy(data[0:8], PUMPSWAP_BUY_DISCRIMINATOR)
@@ -547,7 +561,9 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 
 	// Close WSOL ATA if requested
 	if params.CloseInputMintAta {
-		instructions = append(instructions, CloseWsol(params.Payer))
+		if ix := CloseWsolForMint(params.Payer, inputStableMint, inputStableTokenProgram); ix != nil {
+			instructions = append(instructions, ix)
+		}
 	}
 
 	return instructions, nil
@@ -556,23 +572,29 @@ func BuildBuyInstructions(params *BuildBuyParams) ([]solana.Instruction, error) 
 // BuildSellInstructions builds sell instructions for PumpSwap
 // 100% port from Rust: src/instruction/pumpswap.rs build_sell_instructions
 func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error) {
-	if params.InputAmount == 0 {
+	if params == nil || params.InputAmount == 0 {
 		return nil, ErrInvalidAmount
 	}
 
 	pp := params.ProtocolParams
-
-	// Check if pool contains WSOL or USDC
-	isWsol := pp.QuoteMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.BaseMint.Equals(constants.WSOL_TOKEN_ACCOUNT)
-	isUsdc := pp.QuoteMint.Equals(constants.USDC_TOKEN_ACCOUNT) || pp.BaseMint.Equals(constants.USDC_TOKEN_ACCOUNT)
-	if !isWsol && !isUsdc {
-		return nil, ErrInvalidPool
+	if err := pp.ValidateAccounts(); err != nil {
+		return nil, err
+	}
+	if params.SlippageBasisPoints >= 10000 {
+		return nil, fmt.Errorf("invalid slippage basis points")
+	}
+	if params.FixedOutputAmount != nil && *params.FixedOutputAmount == 0 {
+		return nil, ErrInvalidAmount
 	}
 
-	quoteIsWsolOrUsdc := pp.QuoteMint.Equals(constants.WSOL_TOKEN_ACCOUNT) || pp.QuoteMint.Equals(constants.USDC_TOKEN_ACCOUNT)
+	quoteToBase, err := pumpSwapDirection(pp, params.InputMint, params.OutputMint, false)
+	if err != nil {
+		return nil, err
+	}
+	baseToQuote := !quoteToBase
 	outputStableMint := pp.QuoteMint
 	outputStableTokenProgram := pp.QuoteTokenProgram
-	if !quoteIsWsolOrUsdc {
+	if !baseToQuote {
 		outputStableMint = pp.BaseMint
 		outputStableTokenProgram = pp.BaseTokenProgram
 	}
@@ -584,7 +606,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	var solAmount uint64
 
 	if params.FixedOutputAmount != nil {
-		if quoteIsWsolOrUsdc {
+		if baseToQuote {
 			return nil, fmt.Errorf("PumpSwap exact-output sell requires a buy instruction")
 		}
 		if *params.FixedOutputAmount >= pp.PoolBaseTokenReserves {
@@ -592,7 +614,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 		}
 		tokenAmount = params.InputAmount
 		solAmount = *params.FixedOutputAmount
-	} else if quoteIsWsolOrUsdc {
+	} else if baseToQuote {
 		result, err := calc.SellBaseInputInternalWithFees(
 			params.InputAmount,
 			params.SlippageBasisPoints,
@@ -627,10 +649,10 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 
 	// Determine fee recipient
 	var feeRecipient solana.PublicKey
-	if pp.IsMayhemMode {
-		feeRecipient = GetMayhemFeeRecipientRandom()
-	} else if pp.ProtocolFeeRecipientOverride != nil {
+	if pp.ProtocolFeeRecipientOverride != nil {
 		feeRecipient = *pp.ProtocolFeeRecipientOverride
+	} else if pp.IsMayhemMode {
+		feeRecipient = GetMayhemFeeRecipientRandom()
 	} else {
 		feeRecipient = GetProtocolFeeRecipientRandom()
 	}
@@ -670,9 +692,9 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	}
 
 	// Add volume accumulator accounts for non-quote sell
-	if !quoteIsWsolOrUsdc {
+	if !baseToQuote {
 		accounts = append(accounts, solana.AccountMeta{
-			PublicKey: GLOBAL_VOLUME_ACCUMULATOR, IsSigner: false, IsWritable: true,
+			PublicKey: GLOBAL_VOLUME_ACCUMULATOR, IsSigner: false, IsWritable: false,
 		})
 		userVolumeAccumulator := GetPumpSwapUserVolumeAccumulatorPDA(params.Payer)
 		accounts = append(accounts, solana.AccountMeta{
@@ -690,10 +712,10 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	if pp.IsCashbackCoin {
 		quoteAta := GetUserVolumeAccumulatorQuoteAta(params.Payer, pp.QuoteMint, pp.QuoteTokenProgram)
 		userVolumeAccumulator := GetPumpSwapUserVolumeAccumulatorPDA(params.Payer)
-		accounts = append(accounts,
-			solana.AccountMeta{PublicKey: quoteAta, IsSigner: false, IsWritable: true},
-			solana.AccountMeta{PublicKey: userVolumeAccumulator, IsSigner: false, IsWritable: true},
-		)
+		accounts = append(accounts, solana.AccountMeta{PublicKey: quoteAta, IsSigner: false, IsWritable: true})
+		if baseToQuote {
+			accounts = append(accounts, solana.AccountMeta{PublicKey: userVolumeAccumulator, IsSigner: false, IsWritable: true})
+		}
 	}
 
 	if shouldAddPoolV2(pp) {
@@ -702,7 +724,12 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 			PublicKey: poolV2, IsSigner: false, IsWritable: false,
 		})
 	}
-	protocolExtra := GetProtocolExtraFeeRecipientRandom()
+	var protocolExtra solana.PublicKey
+	if pp.ProtocolExtraFeeRecipientOverride != nil {
+		protocolExtra = *pp.ProtocolExtraFeeRecipientOverride
+	} else {
+		protocolExtra = GetProtocolExtraFeeRecipientRandom()
+	}
 	accounts = append(accounts, solana.AccountMeta{
 		PublicKey: protocolExtra, IsSigner: false, IsWritable: false,
 	})
@@ -712,14 +739,22 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 
 	// Build instruction data
 	data := make([]byte, 24)
-	if quoteIsWsolOrUsdc {
+	if baseToQuote {
 		copy(data[0:8], PUMPSWAP_SELL_DISCRIMINATOR)
 		binary.LittleEndian.PutUint64(data[8:16], tokenAmount)
 		binary.LittleEndian.PutUint64(data[16:24], solAmount)
 	} else {
-		copy(data[0:8], PUMPSWAP_BUY_DISCRIMINATOR)
-		binary.LittleEndian.PutUint64(data[8:16], solAmount)
-		binary.LittleEndian.PutUint64(data[16:24], tokenAmount)
+		data = append(data, 1)
+		if params.FixedOutputAmount != nil {
+			copy(data[0:8], PUMPSWAP_BUY_DISCRIMINATOR)
+			binary.LittleEndian.PutUint64(data[8:16], solAmount)
+			binary.LittleEndian.PutUint64(data[16:24], tokenAmount)
+		} else {
+			copy(data[0:8], PUMPSWAP_BUY_EXACT_QUOTE_IN_DISCRIMINATOR)
+			binary.LittleEndian.PutUint64(data[8:16], params.InputAmount)
+			minimum, _ := calc.PumpSwapMinimumOutput(solAmount, params.SlippageBasisPoints)
+			binary.LittleEndian.PutUint64(data[16:24], minimum)
+		}
 	}
 
 	instructions = append(instructions, newInstruction(PUMPSWAP_PROGRAM, accounts, data))
@@ -735,7 +770,7 @@ func BuildSellInstructions(params *BuildSellParams) ([]solana.Instruction, error
 	if params.CloseInputMintAta {
 		inputAccount := userBaseTokenAccount
 		inputProgram := pp.BaseTokenProgram
-		if !quoteIsWsolOrUsdc {
+		if !baseToQuote {
 			inputAccount = userQuoteTokenAccount
 			inputProgram = pp.QuoteTokenProgram
 		}

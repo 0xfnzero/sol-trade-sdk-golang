@@ -130,7 +130,7 @@ func TestPumpSwapIndependentPreparation(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			if p.Quote.AmountOut != out || p.Quote.MinimumAmountOut != out-out/100 {
+			if p.Quote.AmountOut != out || p.Quote.MinimumAmountOut != out*99/100 {
 				t.Fatal(p.Quote, want)
 			}
 			d, e := p.Instruction.Data()
@@ -147,6 +147,9 @@ func TestPumpSwapIndependentPreparation(t *testing.T) {
 			}
 			if len(keys) != n || keys[9].PublicKey[0] != 8 || keys[len(keys)-2].PublicKey[0] != 10 {
 				t.Fatal(keys)
+			}
+			if buy && keys[19].IsWritable {
+				t.Fatal("global volume accumulator must be readonly")
 			}
 			route, e := s.PrepareRoute([]PoolTradeHint{leg}, ctx, 1, payer, 10000, 100, 8)
 			if e != nil {

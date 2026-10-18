@@ -49,7 +49,7 @@ func (s *AccountCacheSnapshot) PrepareDlmm(h PoolTradeHint, ctx CacheReadContext
 	if amount == 0 || unixTimestamp > math.MaxInt64 || slippageBps >= 10000 || maximumArrays < 1 || maximumArrays > 32 {
 		return fail(errors.New("invalid cached DLMM request"))
 	}
-	p, e := s.Get(h.Pool, ctx, &DlmmProgram)
+	p, e := s.get(h.Pool, ctx, &DlmmProgram)
 	if e != nil {
 		return fail(e)
 	}
@@ -76,11 +76,11 @@ func (s *AccountCacheSnapshot) PrepareDlmm(h PoolTradeHint, ctx CacheReadContext
 	}
 	orders := d[35] == 2 || (d[35] == 0 && key(264) == (solana.PublicKey{}) && key(408) == (solana.PublicKey{}))
 	state := calc.DlmmPool{ActiveID: int32(u32(76)), BinStep: u16(80), FeeMode: d[36], Static: calc.DlmmStaticFee{BaseFactor: u16(8), Power: d[34], Control: u32(16), MaximumVolatility: u32(20), FilterPeriod: u16(10), DecayPeriod: u16(12), ReductionFactor: u16(14)}, Variable: calc.DlmmVariableFee{Volatility: u32(40), Reference: u32(44), IndexReference: int32(u32(48)), LastTimestamp: int64(u64(56))}}
-	mx, e := s.Get(key(88), ctx, nil)
+	mx, e := s.get(key(88), ctx, nil)
 	if e != nil {
 		return fail(e)
 	}
-	my, e := s.Get(key(120), ctx, nil)
+	my, e := s.get(key(120), ctx, nil)
 	if e != nil {
 		return fail(e)
 	}
@@ -135,7 +135,7 @@ func (s *AccountCacheSnapshot) PrepareDlmm(h PoolTradeHint, ctx CacheReadContext
 					return fail(err)
 				}
 				bitmap = &k
-				a, err := s.Get(k, ctx, &DlmmProgram)
+				a, err := s.get(k, ctx, &DlmmProgram)
 				if err != nil {
 					return fail(err)
 				}
@@ -162,7 +162,7 @@ func (s *AccountCacheSnapshot) PrepareDlmm(h PoolTradeHint, ctx CacheReadContext
 			if err != nil {
 				return fail(err)
 			}
-			a, err := s.Get(address, ctx, &DlmmProgram)
+			a, err := s.get(address, ctx, &DlmmProgram)
 			if err != nil {
 				return fail(err)
 			}

@@ -67,6 +67,11 @@ func cachedProgram(d soltradesdk.DexType) (solana.PublicKey, bool) {
 	return solana.PublicKey{}, false
 }
 func PrepareCachedTrade(r CachedTradeRequest) (PreparedCachedTrade, error) {
+	return prepareCachedTrade(r, true)
+}
+
+// Share validated instructions without imposing V1 compiler limits on V0/ALTs.
+func prepareCachedTrade(r CachedTradeRequest, compileV1 bool) (PreparedCachedTrade, error) {
 	empty := PreparedCachedTrade{}
 	if r.SlippageBps != nil && *r.SlippageBps >= 10000 {
 		return empty, errors.New("invalid cached trade slippage: expected basis points in [0, 10000)")
@@ -92,7 +97,7 @@ func PrepareCachedTrade(r CachedTradeRequest) (PreparedCachedTrade, error) {
 			candidate := r
 			candidate.Hints = hints
 			candidate.Candidates = nil
-			result, err := PrepareCachedTrade(candidate)
+			result, err := prepareCachedTrade(candidate, compileV1)
 			if err != nil {
 				var unavailable *subscription.CacheNotReadyError
 				if errors.As(err, &unavailable) {
@@ -181,6 +186,14 @@ func PrepareCachedTrade(r CachedTradeRequest) (PreparedCachedTrade, error) {
 	if e != nil {
 		return empty, e
 	}
+	return finalizeCachedRoute(r, route, stateNative, compileV1)
+}
+
+// Settlement/compilation consumes an already validated immutable quote. Prepared
+// PumpSwap trades reuse this path without decoding or requoting pool accounts.
+func finalizeCachedRoute(r CachedTradeRequest, route subscription.PreparedCachedRoute, stateNative, compileV1 bool) (PreparedCachedTrade, error) {
+	empty := PreparedCachedTrade{}
+	var e error
 	instructions := append(append([]solana.Instruction{}, route.SetupInstructions...), route.SwapInstructions...)
 	required := uint64(0)
 	residual := uint64(0)
@@ -216,6 +229,20 @@ func PrepareCachedTrade(r CachedTradeRequest) (PreparedCachedTrade, error) {
 		tip := system.NewTransferInstruction(r.TipLamports, r.Payer, r.TipAccount).Build()
 		instructions = append([]solana.Instruction{tip}, instructions...)
 	}
+	var compiled *serialization.CompiledV1Message
+	if compileV1 {
+		compiled, e = compileCachedV1(r, instructions, r.RecentBlockhash)
+		if e != nil {
+			return empty, e
+		}
+	}
+	if e = r.Snapshot.AssertUsable(); e != nil {
+		return empty, e
+	}
+	return PreparedCachedTrade{Route: route, Instructions: instructions, Compiled: compiled, RequiredNativeLamports: required, EstimatedNativeResidualLamports: residual}, nil
+}
+
+func compileCachedV1(r CachedTradeRequest, instructions []solana.Instruction, blockhash solana.Hash) (*serialization.CompiledV1Message, error) {
 	compute, loaded := uint32(300000), uint32(64*1024*1024)
 	config := serialization.V1Config{ComputeUnitLimit: &compute, LoadedAccountsDataSizeLimit: &loaded}
 	if r.V1Config != nil {
@@ -227,14 +254,7 @@ func PrepareCachedTrade(r CachedTradeRequest) (PreparedCachedTrade, error) {
 			config.LoadedAccountsDataSizeLimit = &loaded
 		}
 	}
-	compiled, e := serialization.CompileV1Message(r.Payer, instructions, r.RecentBlockhash, config)
-	if e != nil {
-		return empty, e
-	}
-	if e = r.Snapshot.AssertUsable(); e != nil {
-		return empty, e
-	}
-	return PreparedCachedTrade{Route: route, Instructions: instructions, Compiled: compiled, RequiredNativeLamports: required, EstimatedNativeResidualLamports: residual}, nil
+	return serialization.CompileV1Message(r.Payer, instructions, blockhash, config)
 }
 
 type CachedWireSubmit func(context.Context, []byte, soltradesdk.TradeType) (solana.Signature, error)

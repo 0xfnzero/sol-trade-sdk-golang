@@ -368,7 +368,7 @@ func SellBaseInputInternalWithFees(
 		return nil, errors.New("insufficient real quote reserves to cover the sell output")
 	}
 	final := raw - fees
-	minQuote, err := CalculateWithSlippageSell(final, slippageBasisPoints)
+	minQuote, err := PumpSwapMinimumOutput(final, slippageBasisPoints)
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +428,7 @@ func SellQuoteInputInternalWithFees(
 	if err != nil {
 		return nil, err
 	}
-	minQuote, err := CalculateWithSlippageSell(quote, slippageBasisPoints)
+	minQuote, err := PumpSwapMinimumOutput(quote, slippageBasisPoints)
 	if err != nil {
 		return nil, err
 	}
@@ -946,4 +946,10 @@ func PriceToken1InToken0(sqrtPriceX64 uint64, decimalsToken0, decimalsToken1 uin
 		return 0.0
 	}
 	return 1.0 / PriceToken0InToken1(sqrtPriceX64, decimalsToken0, decimalsToken1)
+}
+
+// PumpSwapMinimumOutput matches the official SDK: floor the final protected output.
+func PumpSwapMinimumOutput(amount, bps uint64) (uint64, error) {
+	product := new(big.Int).Mul(new(big.Int).SetUint64(amount), new(big.Int).SetUint64(10000-ClampSlippageBasisPoints(bps)))
+	return product.Div(product, big.NewInt(10000)).Uint64(), nil
 }

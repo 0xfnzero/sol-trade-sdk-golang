@@ -252,6 +252,9 @@ type PumpSwapParams struct {
 	CashbackFeeBasisPoints uint64
 	FeeBasisPoints         *calc.PumpSwapFeeBasisPoints
 	BaseMintSupply         *uint64
+	// Recipients from the caller's verified current GlobalConfig, including mayhem.
+	ProtocolFeeRecipientOverride      *solana.PublicKey
+	ProtocolExtraFeeRecipientOverride *solana.PublicKey
 }
 
 // NewPumpSwapParams creates new PumpSwap params
