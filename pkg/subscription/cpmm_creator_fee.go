@@ -31,7 +31,7 @@ func (s *AccountCacheSnapshot) GetObservation(key solana.PublicKey, ctx CacheRea
 	if !ok {
 		return CachedAccount{}, fmt.Errorf("missing cached account: %s", key)
 	}
-	if a.Slot > ctx.Slot || ctx.Slot-a.Slot > ctx.MaximumSlotAge {
+	if s.stale(a.Slot,ctx) {
 		return CachedAccount{}, fmt.Errorf("cached account is future or stale")
 	}
 	return owned(a), nil

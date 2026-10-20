@@ -1,0 +1,168 @@
+{
+  "source": "Normalized legs from cross_dex_stock_routes_20261020.json; historical replay, not live quotes",
+  "cases": [
+    {
+      "name": "pumpfun_v2_buy_raydium",
+      "signature": "26EFfjMXyzeyAt9L8vhesb54Y1REipUjLXFdCCmcgohY3a59WVk17QcHw1ZgJ4C7qmHm3HgcCD7RBhF2pYUwr9Hb",
+      "route": {
+        "succeeded": true,
+        "legs": [
+          {
+            "pool": "49iMatQtoyabsYAQc8GafVq6aeBFVDxSRH44oiatyyw6",
+            "program": "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+            "protocol": "RaydiumClmm",
+            "input_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "output_mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+          },
+          {
+            "pool": "4zYAPTcWh3z2KvCnRr4UPvUArcBUEKpm9EJWAKwXigLB",
+            "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+            "protocol": "PumpFun",
+            "input_mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+            "output_mint": "7VNu5K2Qw82UvdNUogicGHzLtcNQzFGbfXArsjMzpump"
+          }
+        ]
+      },
+      "expected_pools": [
+        "49iMatQtoyabsYAQc8GafVq6aeBFVDxSRH44oiatyyw6"
+      ]
+    },
+    {
+      "name": "pumpfun_v2_sell_raydium",
+      "signature": "4svuWVvKzYAEnCmG4X6uYQBAWo7J8d3GgSr1cZ2z9WUZRsV2TMvBcGhNGdRrKBU6Z52t8ZZE5EmT73xCWcgnneiE",
+      "route": {
+        "succeeded": true,
+        "legs": [
+          {
+            "pool": "4zYAPTcWh3z2KvCnRr4UPvUArcBUEKpm9EJWAKwXigLB",
+            "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+            "protocol": "PumpFun",
+            "input_mint": "7VNu5K2Qw82UvdNUogicGHzLtcNQzFGbfXArsjMzpump",
+            "output_mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+          },
+          {
+            "pool": "49iMatQtoyabsYAQc8GafVq6aeBFVDxSRH44oiatyyw6",
+            "program": "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+            "protocol": "RaydiumClmm",
+            "input_mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+            "output_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+          }
+        ]
+      },
+      "expected_pools": [
+        "49iMatQtoyabsYAQc8GafVq6aeBFVDxSRH44oiatyyw6"
+      ]
+    },
+    {
+      "name": "pumpfun_v3_raydium",
+      "signature": "tjnQBBDiyg5JQwt9Qb2gU6VyGfxWsaeG6UqpNhRFT3TyBPiMvUXwQ48H8UVZw4i7ZuEhuJAtynonu7sJQEVDJtG",
+      "route": {
+        "succeeded": true,
+        "legs": [
+          {
+            "pool": "49iMatQtoyabsYAQc8GafVq6aeBFVDxSRH44oiatyyw6",
+            "program": "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+            "protocol": "RaydiumClmm",
+            "input_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "output_mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+          },
+          {
+            "pool": "4zYAPTcWh3z2KvCnRr4UPvUArcBUEKpm9EJWAKwXigLB",
+            "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+            "protocol": "PumpFun",
+            "input_mint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+            "output_mint": "7VNu5K2Qw82UvdNUogicGHzLtcNQzFGbfXArsjMzpump"
+          }
+        ]
+      },
+      "expected_pools": [
+        "49iMatQtoyabsYAQc8GafVq6aeBFVDxSRH44oiatyyw6"
+      ]
+    },
+    {
+      "name": "stonk_meteora",
+      "signature": "Q27PiYUChf1BRvDFwC9TEm9eiNJiZ3WpCzJPHDiVAwfVSZWtjNQ65bVGFaohBPUJFrsGZsHy9UAtUj68pVzmt3x",
+      "route": {
+        "succeeded": true,
+        "legs": [
+          {
+            "pool": "Bu2A9LUZaMRnf7ZyC1nzREn6dVGVVuPwxz5aFBFkJLTa",
+            "program": "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+            "protocol": "MeteoraDlmm",
+            "input_mint": "So11111111111111111111111111111111111111112",
+            "output_mint": "ABNB56TteaTZG1S3DY2W8VMncQmHMvNCGaZgAba49CLP"
+          },
+          {
+            "pool": "CDuY2tir5HSVate6DHF1J3RB9cEetLDVjJU9sHKXZQd4",
+            "program": "LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj",
+            "protocol": "LaunchLab",
+            "input_mint": "ABNB56TteaTZG1S3DY2W8VMncQmHMvNCGaZgAba49CLP",
+            "output_mint": "GHh2ZVQfpSMmrjhRpAUyS2ZZ6AH4WTMWJYWJBa4ATT17"
+          }
+        ]
+      },
+      "expected_pools": [
+        "Bu2A9LUZaMRnf7ZyC1nzREn6dVGVVuPwxz5aFBFkJLTa"
+      ]
+    },
+    {
+      "name": "pumpswap_raydium",
+      "signature": "Acuhf8XxNkRhpbDtLQh5bYCw3ANHHuKuxS3wJjVEnuY2FPmFYrkUiMNVsr7knSRNT7Jfr3emovnoRaAuZxDC9h1",
+      "route": {
+        "succeeded": true,
+        "legs": [
+          {
+            "pool": "G2UuRbmVDzDFP4qyoBJrSKBXSi7d6V4bPP9tHPs36y4b",
+            "program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+            "protocol": "PumpSwap",
+            "input_mint": "nxPqZ4F7ux8Vph5NFu25rEP6Kx9Gr1U6Fmj36Rjpump",
+            "output_mint": "TTWofwAge91oFhZs7kpQdyrVRkmevgM88xijGvQFbKo"
+          },
+          {
+            "pool": "6PTm7MkUmtsLU7w6dWrMHJAt8PnzoCgcZdKyTKEhUAPL",
+            "program": "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+            "protocol": "RaydiumClmm",
+            "input_mint": "TTWofwAge91oFhZs7kpQdyrVRkmevgM88xijGvQFbKo",
+            "output_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+          },
+          {
+            "pool": "Gf7sXMoP8iRw4iiXmJ1nq4vxcRycbGXy5RL8a8LnTd3v",
+            "program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+            "protocol": "PumpSwap",
+            "input_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "output_mint": "So11111111111111111111111111111111111111112"
+          }
+        ]
+      },
+      "expected_pools": [
+        "6PTm7MkUmtsLU7w6dWrMHJAt8PnzoCgcZdKyTKEhUAPL"
+      ]
+    },
+    {
+      "name": "pumpswap_orca",
+      "signature": "42HczUe3DL3qUCXAqey85movXTB8gAaTvUWopWUJJkPRLn3rohQzD1t3vD6UarTPig1JCTZb8nXKHuNroVFah8qS",
+      "route": {
+        "succeeded": true,
+        "legs": [
+          {
+            "pool": "3bCkqSFZcYs7fthurTzPDRu4r9kQycq1sCUDykBuYnRB",
+            "program": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+            "protocol": "OrcaWhirlpool",
+            "input_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "output_mint": "DJTu7vi8norVzdVAffgvb39VP7wjKeTsgaMBJrzfxvoF"
+          },
+          {
+            "pool": "AP8QankwMGgRdV24Zrg7QDeV9mEqVZndy53XDJXUnUej",
+            "program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+            "protocol": "PumpSwap",
+            "input_mint": "DJTu7vi8norVzdVAffgvb39VP7wjKeTsgaMBJrzfxvoF",
+            "output_mint": "BfmHAgkbrQuW4izeQgiCmLacu6GAhgfDuxcTVFiJpump"
+          }
+        ]
+      },
+      "expected_pools": [
+        "3bCkqSFZcYs7fthurTzPDRu4r9kQycq1sCUDykBuYnRB"
+      ]
+    }
+  ]
+}

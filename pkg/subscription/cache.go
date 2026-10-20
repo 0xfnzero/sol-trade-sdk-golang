@@ -169,6 +169,7 @@ func (c *SubscriptionAccountCache) UpdateRaw(key, owner solana.PublicKey, data [
 }
 
 type AccountCacheSnapshot struct {
+	observedThrough *uint64
 	continuityGuard func() error
 	accounts        map[solana.PublicKey]CachedAccount
 }
@@ -228,7 +229,7 @@ func (s *AccountCacheSnapshot) get(key solana.PublicKey, ctx CacheReadContext, e
 	if expectedOwner != nil && a.Owner != *expectedOwner {
 		return CachedAccount{}, errors.New("cached account owner mismatch")
 	}
-	if a.Slot > ctx.Slot || ctx.Slot-a.Slot > ctx.MaximumSlotAge {
+	if s.stale(a.Slot, ctx) {
 		return CachedAccount{}, errors.New("cached account is future or stale")
 	}
 	if len(a.Data) == 0 {
@@ -246,7 +247,7 @@ func (s *AccountCacheSnapshot) GetOptional(key solana.PublicKey, ctx CacheReadCo
 	if !ok {
 		return nil, errors.New("missing cached account: " + key.String())
 	}
-	if a.Slot > ctx.Slot || ctx.Slot-a.Slot > ctx.MaximumSlotAge {
+	if s.stale(a.Slot, ctx) {
 		return nil, errors.New("cached account is future or stale")
 	}
 	if len(a.Data) == 0 {
@@ -394,4 +395,33 @@ func bindReadySnapshot(s *AccountCacheSnapshot, guard func() error) (*AccountCac
 		return nil, err
 	}
 	return s, nil
+}
+
+// ObservedSnapshot requires a coherent baseline and continuous provider observation.
+// An account replay or unrelated slot notification is not sufficient attestation.
+// Original account Slot/WriteVersion remain unchanged; stream gaps revoke readiness.
+func (c *SubscriptionAccountCache) ObservedSnapshot(readiness *SubscriptionReadiness, slot uint64, keys []solana.PublicKey) (*AccountCacheSnapshot, error) {
+	var s *AccountCacheSnapshot
+	var err error
+	if keys == nil {
+		s, err = c.ReadySnapshot(readiness)
+	} else {
+		s, err = c.ReadySnapshotSelected(readiness, keys)
+	}
+	if err != nil {
+		return nil, err
+	}
+	s.observedThrough = &slot
+	return s, nil
+}
+func (s *AccountCacheSnapshot) stale(accountSlot uint64, ctx CacheReadContext) bool {
+	observed := accountSlot
+	if s.observedThrough != nil {
+		observed = *s.observedThrough
+	}
+	fresh := observed
+	if accountSlot > fresh {
+		fresh = accountSlot
+	}
+	return accountSlot > ctx.Slot || observed > ctx.Slot || ctx.Slot-fresh > ctx.MaximumSlotAge
 }

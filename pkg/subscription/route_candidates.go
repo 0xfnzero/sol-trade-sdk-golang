@@ -6,25 +6,23 @@ import (
 	"sort"
 )
 
-// CandidateRoutes returns increasing-hop paths. Actual pool state is validated by PrepareRoute.
-func VisitCandidateRoutes(candidates []PoolTradeHint, input, output solana.PublicKey, maximumHops int, visit func([]PoolTradeHint) (bool, error)) error {
-	if visit == nil {
-		return errors.New("missing candidate visitor")
-	}
-	if maximumHops < 1 || maximumHops > 5 || input == output || input.IsZero() || output.IsZero() {
-		return errors.New("invalid candidate route endpoints or hop limit")
-	}
+// CandidateRouteGraph owns immutable topology; searches can run independently.
+type CandidateRouteGraph struct {
+	adjacent map[solana.PublicKey][]PoolTradeHint
+}
+
+func NewCandidateRouteGraph(candidates []PoolTradeHint) (*CandidateRouteGraph, error) {
 	pools := map[solana.PublicKey]PoolTradeHint{}
 	for _, h := range candidates {
 		if err := h.validate(); err != nil {
-			return err
+			return nil, err
 		}
 		if old, ok := pools[h.Pool]; ok && !((old.InputMint == h.InputMint && old.OutputMint == h.OutputMint) || (old.InputMint == h.OutputMint && old.OutputMint == h.InputMint)) {
-			return errors.New("conflicting candidate pool mints")
+			return nil, errors.New("conflicting candidate pool mints")
 		}
 		pools[h.Pool] = h
 		if len(pools) > 64 {
-			return errors.New("candidate search budget: maximum 64 pools")
+			return nil, errors.New("candidate search budget: maximum 64 pools")
 		}
 	}
 	type edge struct {
@@ -46,6 +44,15 @@ func VisitCandidateRoutes(candidates []PoolTradeHint, input, output solana.Publi
 	for _, e := range edges {
 		adjacent[e.hint.InputMint] = append(adjacent[e.hint.InputMint], e.hint)
 	}
+	return &CandidateRouteGraph{adjacent: adjacent}, nil
+}
+func (g *CandidateRouteGraph) Visit(input, output solana.PublicKey, maximumHops int, visit func([]PoolTradeHint) (bool, error)) error {
+	if visit == nil {
+		return errors.New("missing candidate visitor")
+	}
+	if maximumHops < 1 || maximumHops > 5 || input == output || input.IsZero() || output.IsZero() {
+		return errors.New("invalid candidate route endpoints or hop limit")
+	}
 	type path struct {
 		hints []PoolTradeHint
 		mint  solana.PublicKey
@@ -56,7 +63,7 @@ func VisitCandidateRoutes(candidates []PoolTradeHint, input, output solana.Publi
 	for depth := 0; depth < maximumHops && len(frontier) > 0; depth++ {
 		next := []path{}
 		for _, p := range frontier {
-			for _, h := range adjacent[p.mint] {
+			for _, h := range g.adjacent[p.mint] {
 				if p.seen[h.OutputMint] {
 					continue
 				}
@@ -101,6 +108,14 @@ func VisitCandidateRoutes(candidates []PoolTradeHint, input, output solana.Publi
 		return errors.New("no connected candidate route")
 	}
 	return nil
+}
+
+func VisitCandidateRoutes(candidates []PoolTradeHint, input, output solana.PublicKey, maximumHops int, visit func([]PoolTradeHint) (bool, error)) error {
+	graph, err := NewCandidateRouteGraph(candidates)
+	if err != nil {
+		return err
+	}
+	return graph.Visit(input, output, maximumHops, visit)
 }
 
 // CandidateRoutes collects bounded shortest paths. Preparation uses VisitCandidateRoutes to stop at the first valid route.
