@@ -6,9 +6,9 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
-	"github.com/0xfnzero/sol-trade-sdk-golang/examples/internal/latency"
-	"github.com/0xfnzero/sol-trade-sdk-golang/examples/internal/pumpswapreplay"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/examples/internal/latency"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/examples/internal/pumpswapreplay"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"os"
 )

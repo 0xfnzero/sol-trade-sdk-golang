@@ -5,10 +5,11 @@ package subscription
 import (
 	"errors"
 	"fmt"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
+	"math/big"
 )
 
 type CachedRouteLeg struct {
@@ -29,6 +30,18 @@ type PreparedCachedRoute struct {
 }
 
 func (s *AccountCacheSnapshot) PrepareRoute(hints []PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int, allowPumpFunNative ...bool) (PreparedCachedRoute, error) {
+	return s.prepareRoute(hints, ctx, unixTimestamp, payer, amount, slippageBps, maximumArrays, nil, allowPumpFunNative...)
+}
+
+type BridgeLimits struct {
+	AnchorPool                         solana.PublicKey
+	SlippageBps, MaximumPriceImpactBps uint16
+}
+
+func (s *AccountCacheSnapshot) PrepareRouteWithBridgeLimits(hints []PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int, limits *BridgeLimits) (PreparedCachedRoute, error) {
+	return s.prepareRoute(hints, ctx, unixTimestamp, payer, amount, slippageBps, maximumArrays, limits)
+}
+func (s *AccountCacheSnapshot) prepareRoute(hints []PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int, limits *BridgeLimits, allowPumpFunNative ...bool) (PreparedCachedRoute, error) {
 	var result PreparedCachedRoute
 	if amount == 0 || len(hints) < 1 || len(hints) > 5 || slippageBps >= 10000 || maximumArrays < 1 || maximumArrays > 32 {
 		return result, errors.New("invalid cached route request")
@@ -53,8 +66,17 @@ func (s *AccountCacheSnapshot) PrepareRoute(hints []PoolTradeHint, ctx CacheRead
 			return result, errors.New("disconnected route")
 		}
 	}
+	if limits != nil && (limits.SlippageBps >= 10000 || limits.MaximumPriceImpactBps >= 10000) {
+		return result, errors.New("invalid bridge limits")
+	}
+	targetSlippage := slippageBps
 	spend := amount
 	for _, h := range hints {
+		bridge := limits != nil && h.Pool != limits.AnchorPool
+		slippageBps = targetSlippage
+		if bridge {
+			slippageBps = limits.SlippageBps
+		}
 		p, e := s.get(h.Pool, ctx, nil)
 		if e != nil {
 			return PreparedCachedRoute{}, e
@@ -114,6 +136,24 @@ func (s *AccountCacheSnapshot) PrepareRoute(hints []PoolTradeHint, ctx CacheRead
 		if used == 0 || used > spend || minimum == 0 {
 			return PreparedCachedRoute{}, errors.New("route has zero output or overconsumes input")
 		}
+		if bridge {
+			probeAmount := max(uint64(1), spend/100)
+			probeUsed, reference, err := s.quoteRouteLeg(h, ctx, unixTimestamp, payer, probeAmount, maximumArrays)
+			if err != nil {
+				return result, err
+			}
+			ref := &reference
+			if ref == nil || *ref == 0 || used != spend || probeUsed != probeAmount {
+				return result, errors.New("unusable bridge impact probe")
+			}
+			lhs := new(big.Int).Mul(new(big.Int).SetUint64(estimated), new(big.Int).SetUint64(probeAmount))
+			lhs.Mul(lhs, big.NewInt(10000))
+			rhs := new(big.Int).Mul(new(big.Int).SetUint64(*ref), new(big.Int).SetUint64(spend))
+			rhs.Mul(rhs, new(big.Int).SetUint64(uint64(10000-limits.MaximumPriceImpactBps)))
+			if lhs.Cmp(rhs) < 0 {
+				return result, errors.New("bridge price impact exceeds limit")
+			}
+		}
 		result.Legs = append(result.Legs, CachedRouteLeg{Hint: h, AmountIn: used, EstimatedNetAmountOut: &estimated, MinimumNetAmountOut: minimum, Instruction: ix})
 		result.SwapInstructions = append(result.SwapInstructions, ix)
 		spend = minimum
@@ -138,4 +178,59 @@ func (s *AccountCacheSnapshot) PrepareRoute(hints []PoolTradeHint, ctx CacheRead
 	}
 	result.MinimumNetAmountOut = spend
 	return result, nil
+}
+
+// quoteRouteLeg shares protocol math with preparation, without building instructions.
+func (s *AccountCacheSnapshot) quoteRouteLeg(h PoolTradeHint, ctx CacheReadContext, timestamp uint64, payer solana.PublicKey, amount uint64, arrays int) (uint64, uint64, error) {
+	a, err := s.Get(h.Pool, ctx, nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	switch a.Owner {
+	case ClmmProgram:
+		q, e := s.QuoteClmm(h, ctx, timestamp, payer, amount, 0, arrays)
+		return q.AmountIn, q.EstimatedNetAmountOut, e
+	case DlmmProgram:
+		q, e := s.QuoteDlmm(h, ctx, timestamp, payer, amount, 0, arrays)
+		return q.AmountIn, q.EstimatedNetAmountOut, e
+	case WhirlpoolProgram:
+		q, e := s.QuoteWhirlpool(h, ctx, timestamp, payer, amount, 0, arrays)
+		return q.AmountIn, q.EstimatedNetAmountOut, e
+	case AmmV4Program:
+		p, e := s.AmmV4(h, ctx, timestamp)
+		if e != nil {
+			return 0, 0, e
+		}
+		q, e := QuoteCachedAmmV4ExactIn(p, amount, h.InputMint == p.CoinMint, 0)
+		return q.AmountIn, q.AmountOut, e
+	case CpmmProgram:
+		p, e := s.Cpmm(h, ctx, timestamp)
+		if e != nil {
+			return 0, 0, e
+		}
+		q, e := QuoteCachedCpmmExactIn(p, amount, h.InputMint == p.BaseMint, 0)
+		return q.AmountIn, q.AmountOut, e
+	case instruction.PUMPSWAP_PROGRAM:
+		r, e := s.calculatePumpSwap(h, ctx, payer, amount, 0, true)
+		return r.Quote.AmountIn, r.Quote.AmountOut, e
+	case instruction.PUMPFUN_PROGRAM:
+		p, e := s.PumpFun(h, ctx)
+		if e != nil {
+			return 0, 0, e
+		}
+		if p.Quote == pumpWSOL {
+			return 0, 0, errors.New("PumpFun native quote requires cached trade settlement")
+		}
+		q, e := QuoteCachedPumpFunExactIn(p, amount, h.InputMint == p.Quote, 0)
+		return q.AmountIn, q.EstimatedNetAmountOut, e
+	case instruction.BONK_PROGRAM:
+		a, p, e := s.LaunchLabCurve(h, ctx)
+		if e != nil {
+			return 0, 0, e
+		}
+		q, e := calc.QuoteLaunchLabExactIn(p, amount, h.InputMint == a.QuoteMint, 0, 0)
+		return q.AmountIn, q.MinimumAmountOut, e
+	default:
+		return 0, 0, errors.New("pool protocol has no native cached quote implementation")
+	}
 }

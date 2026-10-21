@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/examples/internal/exampleutil"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/params"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/examples/internal/exampleutil"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/params"
 )
 
 func main() {

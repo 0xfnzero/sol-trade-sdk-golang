@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
 	"github.com/gagliardetto/solana-go"
 )
 
@@ -27,6 +27,12 @@ type BondingCurveAccount struct {
 
 // PumpFunParams represents PumpFun protocol specific parameters
 type PumpFunParams struct {
+	Version                   constants.PumpFunVersion
+	QuoteTokenProgram         solana.PublicKey
+	MinimumOutputAmount       *uint64
+	BaseTransferFeeBps        *uint16
+	QuoteTransferFeeBps       *uint16
+	BuybackRecipient          solana.PublicKey
 	BondingCurve              *BondingCurveAccount
 	AssociatedBondingCurve    solana.PublicKey
 	CreatorVault              solana.PublicKey

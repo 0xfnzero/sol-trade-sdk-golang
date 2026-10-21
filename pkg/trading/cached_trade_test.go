@@ -9,9 +9,9 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/serialization"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/subscription"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/serialization"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/subscription"
 	"github.com/gagliardetto/solana-go"
 	"math"
 	"os"
@@ -39,15 +39,16 @@ func cachedFixture(t *testing.T, direction, venue string, payer solana.PublicKey
 	}
 	var v struct {
 		Payer, Amount, Epoch string
-		MaximumSlotAge       json.RawMessage `json:"maximum_slot_age"`
-		SlippageBps          uint16          `json:"slippage_bps"`
-		ReadSlot             string          `json:"read_slot"`
-		Time                 string          `json:"unix_timestamp"`
-		Hash                 string          `json:"recent_blockhash"`
-		Input                bool            `json:"native_input"`
-		Output               bool            `json:"native_output"`
-		Seed                 string          `json:"temporary_wsol_seed"`
-		Rent                 string          `json:"rent_lamports"`
+		PumpFunVersion       soltradesdk.PumpFunVersion `json:"pumpfun_version"`
+		MaximumSlotAge       json.RawMessage            `json:"maximum_slot_age"`
+		SlippageBps          uint16                     `json:"slippage_bps"`
+		ReadSlot             string                     `json:"read_slot"`
+		Time                 string                     `json:"unix_timestamp"`
+		Hash                 string                     `json:"recent_blockhash"`
+		Input                bool                       `json:"native_input"`
+		Output               bool                       `json:"native_output"`
+		Seed                 string                     `json:"temporary_wsol_seed"`
+		Rent                 string                     `json:"rent_lamports"`
 		Legs                 []struct {
 			Pool   string
 			Input  string `json:"input_mint"`
@@ -100,8 +101,172 @@ func cachedFixture(t *testing.T, direction, venue string, payer solana.PublicKey
 		maxAge = num(string(bytes.Trim(v.MaximumSlotAge, `"`)))
 		slippage = &v.SlippageBps
 	}
-	return CachedTradeRequest{DexType: dex, SlippageBps: slippage, TradeType: trade, Snapshot: c.Snapshot(), Hints: hints, Context: subscription.CacheReadContext{Slot: num(v.ReadSlot), Epoch: num(v.Epoch), MaximumSlotAge: maxAge}, UnixTimestamp: num(v.Time), Payer: payer, Amount: num(v.Amount), RecentBlockhash: solana.MustHashFromBase58(v.Hash), NativeInput: v.Input, NativeOutput: v.Output, TemporaryWsolSeed: v.Seed, RentLamports: num(v.Rent)}
+	return CachedTradeRequest{PumpFunVersion: v.PumpFunVersion, DexType: dex, SlippageBps: slippage, TradeType: trade, Snapshot: c.Snapshot(), Hints: hints, Context: subscription.CacheReadContext{Slot: num(v.ReadSlot), Epoch: num(v.Epoch), MaximumSlotAge: maxAge}, UnixTimestamp: num(v.Time), Payer: payer, Amount: num(v.Amount), RecentBlockhash: solana.MustHashFromBase58(v.Hash), NativeInput: v.Input, NativeOutput: v.Output, TemporaryWsolSeed: v.Seed, RentLamports: num(v.Rent)}
 }
+
+func TestPumpFunInstructionVersionsPreserveProtectedHops(t *testing.T) {
+	if soltradesdk.NewTradeConfigBuilder("http://localhost").Build().PumpFunVersion != soltradesdk.PumpFunV3 {
+		t.Fatal("default must be V3")
+	}
+	for _, direction := range []string{"buy", "sell"} {
+		r := cachedFixture(t, direction, "pumpfun_whirlpool", solana.PublicKey{})
+		var minimum uint64
+		for _, version := range []soltradesdk.PumpFunVersion{soltradesdk.PumpFunLegacy, soltradesdk.PumpFunV2, soltradesdk.PumpFunV3} {
+			r.PumpFunVersion = version
+			r.TradeConfig = soltradesdk.NewTradeConfigBuilder("http://localhost").PumpFunVersion(soltradesdk.PumpFunV2).Build()
+			prepared, err := PrepareCachedTrade(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			index := 0
+			if direction == "buy" {
+				index = len(prepared.Route.Legs) - 1
+			}
+			anchor := prepared.Route.Legs[index]
+			data, err := anchor.Instruction.Data()
+			if err != nil {
+				t.Fatal(err)
+			}
+			buy := map[soltradesdk.PumpFunVersion][]byte{soltradesdk.PumpFunLegacy: {56, 252, 116, 8, 158, 223, 205, 95}, soltradesdk.PumpFunV2: {194, 171, 28, 70, 104, 77, 91, 47}, soltradesdk.PumpFunV3: {225, 247, 80, 30, 213, 179, 132, 136}}
+			sell := map[soltradesdk.PumpFunVersion][]byte{soltradesdk.PumpFunLegacy: {51, 230, 133, 164, 1, 127, 131, 173}, soltradesdk.PumpFunV2: {93, 246, 130, 60, 231, 233, 64, 178}, soltradesdk.PumpFunV3: {28, 146, 222, 119, 38, 196, 105, 213}}
+			disc := sell[version]
+			if direction == "buy" {
+				disc = buy[version]
+			}
+			if !bytes.Equal(data[:8], disc) || binary.LittleEndian.Uint64(data[8:]) != anchor.AmountIn || binary.LittleEndian.Uint64(data[16:]) != anchor.MinimumNetAmountOut {
+				t.Fatal("version or protected amount mismatch")
+			}
+			if version == soltradesdk.PumpFunV3 && len(anchor.Instruction.Accounts()) != 17 {
+				t.Fatal("V3 accounts")
+			}
+			if minimum != 0 && minimum != prepared.Route.MinimumNetAmountOut {
+				t.Fatal("version changed route protection")
+			}
+			minimum = prepared.Route.MinimumNetAmountOut
+		}
+	}
+}
+
+func TestCachedClientInheritsPumpFunVersion(t *testing.T) {
+	config := func(version soltradesdk.PumpFunVersion) *soltradesdk.TradeConfig {
+		if version == "" {
+			return nil
+		}
+		return soltradesdk.NewTradeConfigBuilder("http://unused.invalid").PumpFunVersion(version).Build()
+	}
+	signer := solana.PrivateKey(ed25519.NewKeyFromSeed(bytes.Repeat([]byte{7}, 32)))
+	for _, direction := range []string{"buy", "sell"} {
+		base := cachedFixture(t, direction, "pumpfun_whirlpool", signer.PublicKey())
+		for _, tc := range []struct {
+			name                                           string
+			global, request, requestConfig, snapshot, want soltradesdk.PumpFunVersion
+		}{
+			{"global_v1", soltradesdk.PumpFunLegacy, "", "", soltradesdk.PumpFunV3, soltradesdk.PumpFunLegacy},
+			{"global_v2", soltradesdk.PumpFunV2, "", "", soltradesdk.PumpFunV3, soltradesdk.PumpFunV2},
+			{"global_v3", soltradesdk.PumpFunV3, "", "", soltradesdk.PumpFunV2, soltradesdk.PumpFunV3},
+			{"request_override", soltradesdk.PumpFunV2, soltradesdk.PumpFunV3, soltradesdk.PumpFunLegacy, soltradesdk.PumpFunV2, soltradesdk.PumpFunV3},
+			{"request_config_override", soltradesdk.PumpFunV2, "", soltradesdk.PumpFunV3, soltradesdk.PumpFunLegacy, soltradesdk.PumpFunV3},
+			{"snapshot_fallback", "", "", "", soltradesdk.PumpFunV2, soltradesdk.PumpFunV2},
+			{"default_v3", "", "", "", "", soltradesdk.PumpFunV3},
+		} {
+			t.Run(direction+"/"+tc.name, func(t *testing.T) {
+				r := base
+				r.PumpFunVersion, r.TradeConfig = tc.request, config(tc.requestConfig)
+				r.Snapshot = base.Snapshot.WithPumpFunVersion(tc.snapshot)
+				factory := NewTradeExecutorFactory(NewTradeExecutor(nil, config(tc.global), nil))
+				client := NewTradingClient(factory)
+				executor, err := factory.CreateCachedExecutor(r.DexType)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// The explicit-version path supplies the expected instruction inputs;
+				// TestPumpFunInstructionVersionsPreserveProtectedHops checks its ABI.
+				expectedRequest := r
+				expectedRequest.PumpFunVersion = tc.want
+				expected, err := PrepareCachedTrade(expectedRequest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				index := 0
+				if direction == "buy" {
+					index = len(expected.Route.Legs) - 1
+				}
+				wantData, err := expected.Route.Legs[index].Instruction.Data()
+				if err != nil {
+					t.Fatal(err)
+				}
+				for name, prepare := range map[string]func(CachedTradeRequest) (PreparedCachedTrade, error){
+					"client_prepare": client.PrepareCachedTrade, "factory_prepare": executor.Prepare,
+				} {
+					t.Run(name, func(t *testing.T) {
+						p, err := prepare(r)
+						if err != nil {
+							t.Fatal(err)
+						}
+						data, err := p.Route.Legs[index].Instruction.Data()
+						if err != nil || !bytes.Equal(data, wantData) || p.Route.MinimumNetAmountOut != expected.Route.MinimumNetAmountOut {
+							t.Fatalf("version %s or protected inputs not preserved: data=%x err=%v", tc.want, data, err)
+						}
+					})
+				}
+				for _, entry := range []string{"client_execute", "factory_execute", "client_buy_sell"} {
+					t.Run(entry, func(t *testing.T) {
+						calls := 0
+						submit := func(_ context.Context, wire []byte, side soltradesdk.TradeType) (solana.Signature, error) {
+							calls++
+							message := wire[:len(wire)-ed25519.SignatureSize]
+							var signature solana.Signature
+							copy(signature[:], wire[len(message):])
+							if side != r.TradeType || !bytes.Contains(message, wantData) || !ed25519.Verify(ed25519.PublicKey(r.Payer[:]), message, signature[:]) {
+								t.Fatalf("signed wire did not preserve version %s and protected inputs", tc.want)
+							}
+							return signature, nil
+						}
+						var err error
+						signers := []solana.PrivateKey{signer}
+						switch entry {
+						case "client_execute":
+							_, err = client.ExecuteCachedTrade(context.Background(), r, signers, submit)
+						case "factory_execute":
+							_, err = executor.Execute(context.Background(), r, signers, submit)
+						default:
+							request := &TradeExecutionRequest{Request: r, Signers: signers, Submit: submit}
+							if direction == "buy" {
+								_, err = client.Buy(context.Background(), r.DexType, request)
+							} else {
+								_, err = client.Sell(context.Background(), r.DexType, request)
+							}
+						}
+						if err != nil || calls != 1 {
+							t.Fatalf("submission failed: calls=%d err=%v", calls, err)
+						}
+					})
+				}
+				// Reusing the source snapshot must still select its original version.
+				control := r
+				control.PumpFunVersion, control.TradeConfig = "", nil
+				original, err := PrepareCachedTrade(control)
+				if err != nil {
+					t.Fatal(err)
+				}
+				control.PumpFunVersion = tc.snapshot
+				if control.PumpFunVersion == "" {
+					control.PumpFunVersion = soltradesdk.PumpFunV3
+				}
+				unchanged, err := PrepareCachedTrade(control)
+				if err != nil {
+					t.Fatal(err)
+				}
+				before, _ := unchanged.Route.Legs[index].Instruction.Data()
+				after, _ := original.Route.Legs[index].Instruction.Data()
+				if !bytes.Equal(before, after) || r.PumpFunVersion != tc.request || r.TradeConfig != nil && r.TradeConfig.PumpFunVersion != tc.requestConfig {
+					t.Fatal("client changed the caller's request or snapshot")
+				}
+			})
+		}
+	}
+}
+
 func TestCurveAnchorRejectsMislabeledDirection(t *testing.T) {
 	for _, dex := range []soltradesdk.DexType{soltradesdk.DexTypeStonkFun, soltradesdk.DexTypeLaunchLab, soltradesdk.DexTypeBonk} {
 		for _, side := range []string{"buy", "sell"} {
@@ -196,7 +361,7 @@ func TestCachedTransportSignatures(t *testing.T) {
 	seed := bytes.Repeat([]byte{7}, 32)
 	signer := solana.PrivateKey(ed25519.NewKeyFromSeed(seed))
 	r := cachedFixture(t, "buy", "dlmm", signer.PublicKey())
-	executor := &CachedTradeExecutor{soltradesdk.DexTypeStonkFun}
+	executor := &CachedTradeExecutor{DexType: soltradesdk.DexTypeStonkFun}
 	p, err := executor.Prepare(r)
 	if err != nil {
 		t.Fatal(err)
@@ -247,7 +412,7 @@ func TestCachedTradeInvalid(t *testing.T) {
 			case "wrong_factory":
 				dex = soltradesdk.DexTypeRaydiumClmm
 			}
-			e := &CachedTradeExecutor{dex}
+			e := &CachedTradeExecutor{DexType: dex}
 			if _, err := e.Prepare(r); err == nil {
 				t.Fatal("invalid request accepted")
 			}

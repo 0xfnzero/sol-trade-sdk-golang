@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 	"math/big"
 )
@@ -25,7 +25,7 @@ func clmmWide(d []byte, o int) *big.Int {
 	}
 	return new(big.Int).SetBytes(b)
 }
-func (s *AccountCacheSnapshot) PrepareClmm(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int) (instruction.RaydiumClmmSwapV2Accounts, CachedClmmQuote, solana.Instruction, error) {
+func (s *AccountCacheSnapshot) calculateClmm(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int, quoteOnly bool) (instruction.RaydiumClmmSwapV2Accounts, CachedClmmQuote, solana.Instruction, error) {
 	fail := func(e error) (instruction.RaydiumClmmSwapV2Accounts, CachedClmmQuote, solana.Instruction, error) {
 		return instruction.RaydiumClmmSwapV2Accounts{}, CachedClmmQuote{}, nil, e
 	}
@@ -206,6 +206,10 @@ func (s *AccountCacheSnapshot) PrepareClmm(h PoolTradeHint, ctx CacheReadContext
 			if minimum == 0 {
 				return fail(errors.New("CLMM quote has zero protected output"))
 			}
+			quote := CachedClmmQuote{AmountIn: amount, EstimatedNetAmountOut: net, MinimumNetAmountOut: minimum, MinimumAmountOut: minimum, StateSlot: ctx.Slot, Epoch: ctx.Epoch, SqrtPriceLimit: limit}
+			if quoteOnly {
+				return instruction.RaydiumClmmSwapV2Accounts{}, quote, nil, nil
+			}
 			ia, _, e := solana.FindProgramAddress([][]byte{payer[:], ip[:], h.InputMint[:]}, solana.SPLAssociatedTokenAccountProgramID)
 			if e != nil {
 				return fail(e)
@@ -219,7 +223,6 @@ func (s *AccountCacheSnapshot) PrepareClmm(h PoolTradeHint, ctx CacheReadContext
 				iv, ov = ov, iv
 			}
 			a := instruction.RaydiumClmmSwapV2Accounts{Payer: payer, AmmConfig: key(9), PoolState: h.Pool, InputTokenAccount: ia, OutputTokenAccount: oa, InputVault: iv, OutputVault: ov, ObservationState: key(201), TokenProgram: solana.TokenProgramID, TokenProgram2022: solana.MustPublicKeyFromBase58("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"), InputVaultMint: h.InputMint, OutputVaultMint: h.OutputMint, TickArrays: arrays, TickArrayBitmapExtension: bitmap}
-			quote := CachedClmmQuote{AmountIn: amount, EstimatedNetAmountOut: net, MinimumNetAmountOut: minimum, MinimumAmountOut: minimum, StateSlot: ctx.Slot, Epoch: ctx.Epoch, SqrtPriceLimit: limit}
 			ix, e := instruction.BuildRaydiumClmmSwapV2(a, instruction.SwapV2Args{Amount: amount, OtherAmountThreshold: minimum, SqrtPriceLimit: limit, AmountSpecifiedIsInput: true})
 			if e != nil {
 				return fail(e)
@@ -231,4 +234,13 @@ func (s *AccountCacheSnapshot) PrepareClmm(h PoolTradeHint, ctx CacheReadContext
 		}
 	}
 	return fail(errors.New("insufficient CLMM liquidity in supplied snapshot"))
+}
+
+func (s *AccountCacheSnapshot) PrepareClmm(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int) (instruction.RaydiumClmmSwapV2Accounts, CachedClmmQuote, solana.Instruction, error) {
+	return s.calculateClmm(h, ctx, unixTimestamp, payer, amount, slippageBps, maximumArrays, false)
+}
+
+func (s *AccountCacheSnapshot) QuoteClmm(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int) (CachedClmmQuote, error) {
+	_, q, _, err := s.calculateClmm(h, ctx, unixTimestamp, payer, amount, slippageBps, maximumArrays, true)
+	return q, err
 }

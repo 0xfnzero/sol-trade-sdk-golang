@@ -27,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/quic-go/quic-go"
@@ -39,7 +39,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	blockrazorpb "github.com/0xfnzero/sol-trade-sdk-golang/pkg/swqos/blockrazorpb"
+	blockrazorpb "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/swqos/blockrazorpb"
 )
 
 // ===== Type aliases (avoid duplicate definitions with pkg/types.go) =====

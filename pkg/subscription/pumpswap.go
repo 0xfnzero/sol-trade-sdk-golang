@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 )
 
@@ -137,7 +137,7 @@ type PreparedPumpSwap struct {
 }
 
 // PreparePumpSwap builds one independent exact-in leg. Unsupported fee contexts fail explicitly.
-func (s *AccountCacheSnapshot) PreparePumpSwap(h PoolTradeHint, c CacheReadContext, payer solana.PublicKey, amount uint64, slippageBps uint16) (PreparedPumpSwap, error) {
+func (s *AccountCacheSnapshot) calculatePumpSwap(h PoolTradeHint, c CacheReadContext, payer solana.PublicKey, amount uint64, slippageBps uint16, quoteOnly bool) (PreparedPumpSwap, error) {
 	fail := func(m string) (PreparedPumpSwap, error) { return PreparedPumpSwap{}, errors.New(m) }
 	if amount == 0 || slippageBps >= 10000 || payer.IsZero() {
 		return fail("invalid PumpSwap preparation request")
@@ -187,6 +187,9 @@ func (s *AccountCacheSnapshot) PreparePumpSwap(h PoolTradeHint, c CacheReadConte
 	}
 	if minimum == 0 {
 		return fail("PumpSwap quote has zero protected output")
+	}
+	if quoteOnly {
+		return PreparedPumpSwap{State: state, Quote: PumpSwapQuote{amount, out, minimum}}, s.AssertUsable()
 	}
 	choose := func(keys []solana.PublicKey) (solana.PublicKey, bool) {
 		for _, k := range keys {
@@ -238,4 +241,8 @@ func (s *AccountCacheSnapshot) PreparePumpSwap(h PoolTradeHint, c CacheReadConte
 		return PreparedPumpSwap{}, e
 	}
 	return PreparedPumpSwap{State: state, Quote: PumpSwapQuote{amount, out, minimum}, Instruction: solana.NewInstruction(instruction.PUMPSWAP_PROGRAM, accounts, data)}, nil
+}
+
+func (s *AccountCacheSnapshot) PreparePumpSwap(h PoolTradeHint, c CacheReadContext, payer solana.PublicKey, amount uint64, slippageBps uint16) (PreparedPumpSwap, error) {
+	return s.calculatePumpSwap(h, c, payer, amount, slippageBps, false)
 }

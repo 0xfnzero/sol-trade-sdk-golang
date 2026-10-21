@@ -4,16 +4,18 @@ package trading
 import (
 	"context"
 	"errors"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/serialization"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/subscription"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/serialization"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/subscription"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"math"
 )
 
 type CachedTradeRequest struct {
+	PumpFunVersion            soltradesdk.PumpFunVersion
+	TradeConfig               *soltradesdk.TradeConfig
 	Candidates                []subscription.PoolTradeHint
 	InputMint, OutputMint     solana.PublicKey
 	DexType                   soltradesdk.DexType
@@ -70,9 +72,21 @@ func PrepareCachedTrade(r CachedTradeRequest) (PreparedCachedTrade, error) {
 	return prepareCachedTrade(r, true)
 }
 
+// Request overrides global configuration; otherwise preserve the snapshot's version.
+func (r CachedTradeRequest) withResolvedPumpFunVersion() CachedTradeRequest {
+	if r.PumpFunVersion == "" && r.TradeConfig != nil {
+		r.PumpFunVersion = r.TradeConfig.PumpFunVersion
+	}
+	if r.PumpFunVersion != "" && r.Snapshot != nil {
+		r.Snapshot = r.Snapshot.WithPumpFunVersion(r.PumpFunVersion)
+	}
+	return r
+}
+
 // Share validated instructions without imposing V1 compiler limits on V0/ALTs.
 func prepareCachedTrade(r CachedTradeRequest, compileV1 bool) (PreparedCachedTrade, error) {
 	empty := PreparedCachedTrade{}
+	r = r.withResolvedPumpFunVersion()
 	if r.SlippageBps != nil && *r.SlippageBps >= 10000 {
 		return empty, errors.New("invalid cached trade slippage: expected basis points in [0, 10000)")
 	}
@@ -263,11 +277,17 @@ type CachedTradeReceipt struct {
 	Submitted, Confirmed bool
 	MinimumNetAmountOut  uint64
 }
-type CachedTradeExecutor struct{ DexType soltradesdk.DexType }
+type CachedTradeExecutor struct {
+	DexType soltradesdk.DexType
+	config  *soltradesdk.TradeConfig
+}
 
 func (e *CachedTradeExecutor) Prepare(r CachedTradeRequest) (PreparedCachedTrade, error) {
 	if e == nil || e.DexType != r.DexType {
 		return PreparedCachedTrade{}, errors.New("factory/request protocol mismatch")
+	}
+	if r.TradeConfig == nil {
+		r.TradeConfig = e.config
 	}
 	return PrepareCachedTrade(r)
 }
@@ -307,11 +327,12 @@ func (f *TradeExecutorFactory) CreateCachedExecutor(d soltradesdk.DexType) (*Cac
 	if _, ok := cachedProgram(d); !ok {
 		return nil, errors.New("protocol has no native cached trade executor")
 	}
-	return &CachedTradeExecutor{d}, nil
+	return &CachedTradeExecutor{DexType: d, config: f.baseExecutor.tradeConfig()}, nil
 }
 
 func (c *TradingClient) PrepareCachedTrade(r CachedTradeRequest) (PreparedCachedTrade, error) {
-	return PrepareCachedTrade(r)
+	e := CachedTradeExecutor{DexType: r.DexType, config: c.factory.baseExecutor.tradeConfig()}
+	return e.Prepare(r)
 }
 func (c *TradingClient) ExecuteCachedTrade(ctx context.Context, r CachedTradeRequest, signers []solana.PrivateKey, submit CachedWireSubmit) (CachedTradeReceipt, error) {
 	e, err := c.factory.CreateCachedExecutor(r.DexType)

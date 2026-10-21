@@ -14,9 +14,9 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
 )
 
 // ===== PumpFun Program Constants from Rust: src/instruction/utils/pumpfun.rs =====
@@ -162,6 +162,7 @@ func GetCreator(creatorVaultPDA solana.PublicKey) solana.PublicKey {
 
 // BondingCurve represents the bonding curve data
 type BondingCurve struct {
+	Complete             bool
 	QuoteMint            solana.PublicKey
 	Account              solana.PublicKey
 	VirtualTokenReserves uint64
@@ -174,6 +175,12 @@ type BondingCurve struct {
 
 // PumpFunParams contains parameters for PumpFun operations
 type PumpFunParams struct {
+	Version                constants.PumpFunVersion
+	QuoteTokenProgram      solana.PublicKey
+	MinimumOutputAmount    *uint64
+	BaseTransferFeeBps     *uint16
+	QuoteTransferFeeBps    *uint16
+	BuybackRecipient       solana.PublicKey
 	BondingCurve           *BondingCurve
 	CreatorVault           solana.PublicKey
 	AssociatedBondingCurve solana.PublicKey
@@ -319,6 +326,12 @@ func pumpFunFeeRecipient(pp *PumpFunParams) solana.PublicKey {
 // PumpFunBuildBuyInstructions builds buy instructions for PumpFun
 // 100% port from Rust: src/instruction/pumpfun.rs build_buy_instructions
 func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instruction, error) {
+	if params == nil || params.ProtocolParams == nil || params.ProtocolParams.BondingCurve == nil {
+		return nil, fmt.Errorf("missing PumpFun state")
+	}
+	if params.ProtocolParams.Version != "" {
+		return pumpFunVersionedBuy(params)
+	}
 	if params.InputAmount == 0 {
 		return nil, ErrInvalidAmount
 	}
@@ -451,6 +464,12 @@ func PumpFunBuildBuyInstructions(params *PumpFunBuildBuyParams) ([]solana.Instru
 // PumpFunBuildSellInstructions builds sell instructions for PumpFun
 // 100% port from Rust: src/instruction/pumpfun.rs build_sell_instructions
 func PumpFunBuildSellInstructions(params *PumpFunBuildSellParams) ([]solana.Instruction, error) {
+	if params == nil || params.ProtocolParams == nil || params.ProtocolParams.BondingCurve == nil {
+		return nil, fmt.Errorf("missing PumpFun state")
+	}
+	if params.ProtocolParams.Version != "" {
+		return pumpFunVersionedSell(params)
+	}
 	if params.InputAmount == 0 {
 		return nil, ErrInvalidAmount
 	}

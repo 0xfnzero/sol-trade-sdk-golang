@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/examples/internal/exampleutil"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/examples/internal/exampleutil"
 )
 
 func main() {

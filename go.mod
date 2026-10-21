@@ -1,4 +1,4 @@
-module github.com/0xfnzero/sol-trade-sdk-golang
+module github.com/0xfnzero/sol-trade-sdk-golang/v9
 
 go 1.25.0
 
@@ -47,5 +47,3 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/protobuf v1.36.11
 )
-
-retract v0.0.0

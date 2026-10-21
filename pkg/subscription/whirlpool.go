@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 	"math/big"
 	"strconv"
@@ -70,7 +70,7 @@ func DecodeWhirlpoolTicks(d []byte, pool solana.PublicKey, start int32, spacing 
 	}
 	return ticks, nil
 }
-func (s *AccountCacheSnapshot) PrepareWhirlpool(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int) (instruction.WhirlpoolSwapV2Accounts, CachedWhirlpoolQuote, solana.Instruction, error) {
+func (s *AccountCacheSnapshot) calculateWhirlpool(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int, quoteOnly bool) (instruction.WhirlpoolSwapV2Accounts, CachedWhirlpoolQuote, solana.Instruction, error) {
 	fail := func(e error) (instruction.WhirlpoolSwapV2Accounts, CachedWhirlpoolQuote, solana.Instruction, error) {
 		return instruction.WhirlpoolSwapV2Accounts{}, CachedWhirlpoolQuote{}, nil, e
 	}
@@ -205,6 +205,9 @@ func (s *AccountCacheSnapshot) PrepareWhirlpool(h PoolTradeHint, ctx CacheReadCo
 			return fail(errors.New("Whirlpool quote has zero protected output"))
 		}
 		quote := CachedWhirlpoolQuote{amount, net, minimum, minimum, ctx.Slot, ctx.Epoch, result.MinimumFeeRate, result.MaximumFeeRate}
+		if quoteOnly {
+			return instruction.WhirlpoolSwapV2Accounts{}, quote, nil, nil
+		}
 		for len(arrays) < 3 {
 			arrays = append(arrays, arrays[len(arrays)-1])
 		}
@@ -225,4 +228,13 @@ func (s *AccountCacheSnapshot) PrepareWhirlpool(h PoolTradeHint, ctx CacheReadCo
 		return a, quote, ix, nil
 	}
 	return fail(errors.New("Whirlpool quote exceeds loaded array budget"))
+}
+
+func (s *AccountCacheSnapshot) PrepareWhirlpool(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int) (instruction.WhirlpoolSwapV2Accounts, CachedWhirlpoolQuote, solana.Instruction, error) {
+	return s.calculateWhirlpool(h, ctx, unixTimestamp, payer, amount, slippageBps, maximumArrays, false)
+}
+
+func (s *AccountCacheSnapshot) QuoteWhirlpool(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int) (CachedWhirlpoolQuote, error) {
+	_, q, _, err := s.calculateWhirlpool(h, ctx, unixTimestamp, payer, amount, slippageBps, maximumArrays, true)
+	return q, err
 }

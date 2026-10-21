@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"time"
 
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
 	"github.com/gagliardetto/solana-go"
 )
 
@@ -55,12 +55,27 @@ type PumpFunSellParams struct {
 
 // ExecuteBuy executes a buy on PumpFun
 func (e *PumpFunExecutor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, soltradesdk.DexTypePumpFun, soltradesdk.TradeTypeBuy, params)
+	return e.execute(ctx, soltradesdk.TradeTypeBuy, params)
 }
 
 // ExecuteSell executes a sell on PumpFun
 func (e *PumpFunExecutor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, soltradesdk.DexTypePumpFun, soltradesdk.TradeTypeSell, params)
+	return e.execute(ctx, soltradesdk.TradeTypeSell, params)
+}
+
+func (e *PumpFunExecutor) execute(ctx context.Context, direction soltradesdk.TradeType, params interface{}) (*ExecuteResult, error) {
+	var config *soltradesdk.TradeConfig
+	if e != nil {
+		config = e.TradeExecutor.tradeConfig()
+	}
+	return executeUnified(ctx, soltradesdk.DexTypePumpFun, direction, params, config)
+}
+
+func (e *TradeExecutor) tradeConfig() *soltradesdk.TradeConfig {
+	if e == nil {
+		return nil
+	}
+	return e.config
 }
 
 // PumpSwapExecutor handles PumpSwap DEX trades
@@ -117,12 +132,12 @@ type PumpSwapSellParams struct {
 
 // ExecuteBuy executes a buy on PumpSwap
 func (e *PumpSwapExecutor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, soltradesdk.DexTypePumpSwap, soltradesdk.TradeTypeBuy, params)
+	return executeUnified(ctx, soltradesdk.DexTypePumpSwap, soltradesdk.TradeTypeBuy, params, e.TradeExecutor.tradeConfig())
 }
 
 // ExecuteSell executes a sell on PumpSwap
 func (e *PumpSwapExecutor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, soltradesdk.DexTypePumpSwap, soltradesdk.TradeTypeSell, params)
+	return executeUnified(ctx, soltradesdk.DexTypePumpSwap, soltradesdk.TradeTypeSell, params, e.TradeExecutor.tradeConfig())
 }
 
 // BonkExecutor handles Bonk DEX trades
@@ -137,12 +152,12 @@ func NewBonkExecutor(base *TradeExecutor) *BonkExecutor {
 
 // ExecuteBuy executes a buy on Bonk
 func (e *BonkExecutor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, soltradesdk.DexTypeBonk, soltradesdk.TradeTypeBuy, params)
+	return executeUnified(ctx, soltradesdk.DexTypeBonk, soltradesdk.TradeTypeBuy, params, e.TradeExecutor.tradeConfig())
 }
 
 // ExecuteSell executes a sell on Bonk
 func (e *BonkExecutor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, soltradesdk.DexTypeBonk, soltradesdk.TradeTypeSell, params)
+	return executeUnified(ctx, soltradesdk.DexTypeBonk, soltradesdk.TradeTypeSell, params, e.TradeExecutor.tradeConfig())
 }
 
 // RaydiumCpmmExecutor handles Raydium CPMM DEX trades
@@ -157,12 +172,12 @@ func NewRaydiumCpmmExecutor(base *TradeExecutor) *RaydiumCpmmExecutor {
 
 // ExecuteBuy executes a buy on Raydium CPMM
 func (e *RaydiumCpmmExecutor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, soltradesdk.DexTypeRaydiumCpmm, soltradesdk.TradeTypeBuy, params)
+	return executeUnified(ctx, soltradesdk.DexTypeRaydiumCpmm, soltradesdk.TradeTypeBuy, params, e.TradeExecutor.tradeConfig())
 }
 
 // ExecuteSell executes a sell on Raydium CPMM
 func (e *RaydiumCpmmExecutor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, soltradesdk.DexTypeRaydiumCpmm, soltradesdk.TradeTypeSell, params)
+	return executeUnified(ctx, soltradesdk.DexTypeRaydiumCpmm, soltradesdk.TradeTypeSell, params, e.TradeExecutor.tradeConfig())
 }
 
 // RaydiumAmmV4Executor handles Raydium AMM V4 DEX trades
@@ -177,12 +192,12 @@ func NewRaydiumAmmV4Executor(base *TradeExecutor) *RaydiumAmmV4Executor {
 
 // ExecuteBuy executes a buy on Raydium AMM V4
 func (e *RaydiumAmmV4Executor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, soltradesdk.DexTypeRaydiumAmmV4, soltradesdk.TradeTypeBuy, params)
+	return executeUnified(ctx, soltradesdk.DexTypeRaydiumAmmV4, soltradesdk.TradeTypeBuy, params, e.TradeExecutor.tradeConfig())
 }
 
 // ExecuteSell executes a sell on Raydium AMM V4
 func (e *RaydiumAmmV4Executor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, soltradesdk.DexTypeRaydiumAmmV4, soltradesdk.TradeTypeSell, params)
+	return executeUnified(ctx, soltradesdk.DexTypeRaydiumAmmV4, soltradesdk.TradeTypeSell, params, e.TradeExecutor.tradeConfig())
 }
 
 // MeteoraDammV2Executor handles Meteora DAMM V2 DEX trades
@@ -197,12 +212,12 @@ func NewMeteoraDammV2Executor(base *TradeExecutor) *MeteoraDammV2Executor {
 
 // ExecuteBuy executes a buy on Meteora DAMM V2
 func (e *MeteoraDammV2Executor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, soltradesdk.DexTypeMeteoraDammV2, soltradesdk.TradeTypeBuy, params)
+	return executeUnified(ctx, soltradesdk.DexTypeMeteoraDammV2, soltradesdk.TradeTypeBuy, params, e.TradeExecutor.tradeConfig())
 }
 
 // ExecuteSell executes a sell on Meteora DAMM V2
 func (e *MeteoraDammV2Executor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, soltradesdk.DexTypeMeteoraDammV2, soltradesdk.TradeTypeSell, params)
+	return executeUnified(ctx, soltradesdk.DexTypeMeteoraDammV2, soltradesdk.TradeTypeSell, params, e.TradeExecutor.tradeConfig())
 }
 
 func unavailableDexExecutorError(dexType soltradesdk.DexType, operation string) error {
@@ -235,7 +250,7 @@ func NewTradeExecutorFactory(baseExecutor *TradeExecutor) *TradeExecutorFactory 
 	factory.RegisterExecutor(soltradesdk.DexTypeMeteoraDammV2, NewMeteoraDammV2Executor(baseExecutor))
 
 	for _, dex := range []soltradesdk.DexType{soltradesdk.DexTypeLaunchLab, soltradesdk.DexTypeStonkFun, soltradesdk.DexTypeRaydiumClmm, soltradesdk.DexTypeOrcaWhirlpool, soltradesdk.DexTypeMeteoraDlmm} {
-		factory.RegisterExecutor(dex, &UnifiedTradeExecutor{DexType: dex})
+		factory.RegisterExecutor(dex, &UnifiedTradeExecutor{DexType: dex, config: baseExecutor.tradeConfig()})
 	}
 	return factory
 }
@@ -292,15 +307,18 @@ type TradeExecutionRequest struct {
 	Signers []solana.PrivateKey
 	Submit  CachedWireSubmit
 }
-type UnifiedTradeExecutor struct{ DexType soltradesdk.DexType }
+type UnifiedTradeExecutor struct {
+	DexType soltradesdk.DexType
+	config  *soltradesdk.TradeConfig
+}
 
 func (e *UnifiedTradeExecutor) ExecuteBuy(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, e.DexType, soltradesdk.TradeTypeBuy, params)
+	return executeUnified(ctx, e.DexType, soltradesdk.TradeTypeBuy, params, e.config)
 }
 func (e *UnifiedTradeExecutor) ExecuteSell(ctx context.Context, params interface{}) (*ExecuteResult, error) {
-	return executeUnified(ctx, e.DexType, soltradesdk.TradeTypeSell, params)
+	return executeUnified(ctx, e.DexType, soltradesdk.TradeTypeSell, params, e.config)
 }
-func executeUnified(ctx context.Context, dex soltradesdk.DexType, direction soltradesdk.TradeType, params interface{}) (*ExecuteResult, error) {
+func executeUnified(ctx context.Context, dex soltradesdk.DexType, direction soltradesdk.TradeType, params interface{}, config *soltradesdk.TradeConfig) (*ExecuteResult, error) {
 	p, ok := params.(*TradeExecutionRequest)
 	if !ok || p == nil {
 		return nil, fmt.Errorf("%w: provide TradeExecutionRequest with frozen state, signers and raw-wire submit", soltradesdk.ErrInvalidProtocolParams)
@@ -311,7 +329,7 @@ func executeUnified(ctx context.Context, dex soltradesdk.DexType, direction solt
 	if p.Request.TradeType != direction {
 		return nil, fmt.Errorf("%w: factory/request trade direction mismatch", soltradesdk.ErrInvalidProtocolParams)
 	}
-	receipt, err := (&CachedTradeExecutor{DexType: dex}).Execute(ctx, p.Request, p.Signers, p.Submit)
+	receipt, err := (&CachedTradeExecutor{DexType: dex, config: config}).Execute(ctx, p.Request, p.Signers, p.Submit)
 	if err != nil {
 		return nil, err
 	}

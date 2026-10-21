@@ -4,9 +4,9 @@ package pumpswapreplay
 import (
 	"encoding/base64"
 	"encoding/json"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/subscription"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/subscription"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"os"
 )

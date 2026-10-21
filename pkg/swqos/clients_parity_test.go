@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
 )
 
 func TestSwqosEndpointParityRustV4021(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )

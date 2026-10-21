@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
 	"github.com/gagliardetto/solana-go"
 	"testing"
 )

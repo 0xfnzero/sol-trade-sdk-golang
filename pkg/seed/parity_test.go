@@ -2,10 +2,10 @@ package seed_test
 
 import (
 	"bytes"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/security"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/seed"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/security"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/seed"
 	"github.com/gagliardetto/solana-go"
 	"testing"
 )

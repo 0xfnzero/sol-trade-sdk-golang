@@ -1,7 +1,7 @@
 package trading
 
 import (
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/subscription"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/subscription"
 	"github.com/gagliardetto/solana-go"
 	"strings"
 	"testing"
@@ -36,7 +36,7 @@ func TestPumpSearchBoundsDedupAndDirection(t *testing.T) {
 	if p, e := pumpConversionPaths(s, a, a, token); e != nil || len(p) != 1 || len(p[0]) != 0 {
 		t.Fatal(p, e)
 	}
-	s.ConversionPools = make([]subscription.PoolTradeHint, 33)
+	s.ConversionPools = make([]subscription.PoolTradeHint, 129)
 	if _, e = pumpConversionPaths(s, a, a, token); e == nil {
 		t.Fatal("hint bound checked after dedup")
 	}

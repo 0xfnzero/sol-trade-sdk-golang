@@ -22,10 +22,10 @@ incomplete parser/log identities from verified subscription state first.
 path. `trading.PrepareBestPumpSwapTrade(search, request)` discovers connected paths
 only within the caller's conversion pool allowlist. Construct search with
 `trading.NewPumpSwapRouteSearch(pool, token, asset, hints)` for defaults of two
-conversion hops and 128 search nodes. Buy places the selected PumpSwap last;
+conversion hops and 512 search nodes. Buy places the selected PumpSwap last;
 sell places it first and requotes independently.
 
-Search permits at most 32 supplied hints, 0–3 conversion hops and 1–4096 nodes.
+Search permits at most 128 supplied hints, 0–3 conversion hops and 1–4096 nodes.
 Reversed duplicates collapse; conflicting pairs or selected-pool reuse fail.
 Mint cycles, reused pools and conversion through the traded token are excluded.
 Dead ends count against the node budget; exhaustion rejects the whole search.

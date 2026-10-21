@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package serverpb;
 
-option go_package = "github.com/0xfnzero/sol-trade-sdk-golang/pkg/swqos/blockrazorpb";
+option go_package = "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/swqos/blockrazorpb";
 
 service Server {
   rpc SendBinaryTransaction(SendBinaryRequest) returns (SendResponse);

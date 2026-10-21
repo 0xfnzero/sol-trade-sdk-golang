@@ -1,4 +1,4 @@
-// go run ./examples/cached_trade snapshots.json [--simulate]
+// go run ./examples/cached_trade snapshots.json [--pumpfun-version v1|v2|v3] [--simulate]
 // Same JSON schema as Node/Python. Quote/build are entirely local.
 package main
 
@@ -6,12 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/0xfnzero/sol-trade-sdk-golang/examples/internal/exampleutil"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/subscription"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/trading"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/examples/internal/exampleutil"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/subscription"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"os"
 	"strconv"
@@ -29,17 +29,18 @@ type routeHintInput struct {
 }
 
 type input struct {
-	FixedOutputAmount *string         `json:"fixed_output_amount"`
-	DexType           string          `json:"dex_type"`
-	TradeType         string          `json:"trade_type"`
-	NativeInput       bool            `json:"native_input"`
-	NativeOutput      bool            `json:"native_output"`
-	RentLamports      string          `json:"rent_lamports"`
-	TipAccount        string          `json:"tip_account"`
-	TipLamports       string          `json:"tip_lamports"`
-	TemporaryWsolSeed string          `json:"temporary_wsol_seed"`
-	ReadSlot          string          `json:"read_slot"`
-	MaximumSlotAge    json.RawMessage `json:"maximum_slot_age"`
+	PumpFunVersion    soltradesdk.PumpFunVersion `json:"pumpfun_version"`
+	FixedOutputAmount *string                    `json:"fixed_output_amount"`
+	DexType           string                     `json:"dex_type"`
+	TradeType         string                     `json:"trade_type"`
+	NativeInput       bool                       `json:"native_input"`
+	NativeOutput      bool                       `json:"native_output"`
+	RentLamports      string                     `json:"rent_lamports"`
+	TipAccount        string                     `json:"tip_account"`
+	TipLamports       string                     `json:"tip_lamports"`
+	TemporaryWsolSeed string                     `json:"temporary_wsol_seed"`
+	ReadSlot          string                     `json:"read_slot"`
+	MaximumSlotAge    json.RawMessage            `json:"maximum_slot_age"`
 	Payer             string
 	RecentBlockhash   string `json:"recent_blockhash"`
 	Epoch             string
@@ -87,6 +88,23 @@ func main() {
 	var in input
 	if e = json.Unmarshal(data, &in); e != nil {
 		panic(e)
+	}
+	simulationArgs := []string{}
+	for i := 2; i < len(os.Args); i++ {
+		arg := os.Args[i]
+		if arg == "--pumpfun-version" {
+			if i+1 >= len(os.Args) {
+				panic("--pumpfun-version requires v1, v2 or v3")
+			}
+			i++
+			version := soltradesdk.PumpFunVersion(os.Args[i])
+			if version != soltradesdk.PumpFunLegacy && version != soltradesdk.PumpFunV2 && version != soltradesdk.PumpFunV3 {
+				panic("unknown PumpFun version")
+			}
+			in.PumpFunVersion = version
+		} else {
+			simulationArgs = append(simulationArgs, arg)
+		}
 	}
 
 	cache := &subscription.SubscriptionAccountCache{}
@@ -159,7 +177,7 @@ func main() {
 		value := number(*in.FixedOutputAmount)
 		minimum = &value
 	}
-	prepared, err := executor.Prepare(trading.CachedTradeRequest{DexType: dex, TradeType: direction, Snapshot: cache.Snapshot(), Hints: hints, Candidates: candidates, InputMint: inputMint, OutputMint: outputMint, Context: ctx, UnixTimestamp: number(in.UnixTimestamp), Payer: payer, Amount: number(in.Amount), FixedOutputAmount: minimum, RecentBlockhash: solana.MustHashFromBase58(in.RecentBlockhash), SlippageBps: &in.SlippageBps, MaximumArrays: arrays, NativeInput: in.NativeInput, NativeOutput: in.NativeOutput, TemporaryWsolSeed: in.TemporaryWsolSeed, RentLamports: rent, TipAccount: tipAccount, TipLamports: tipLamports})
+	prepared, err := executor.Prepare(trading.CachedTradeRequest{PumpFunVersion: in.PumpFunVersion, DexType: dex, TradeType: direction, Snapshot: cache.Snapshot(), Hints: hints, Candidates: candidates, InputMint: inputMint, OutputMint: outputMint, Context: ctx, UnixTimestamp: number(in.UnixTimestamp), Payer: payer, Amount: number(in.Amount), FixedOutputAmount: minimum, RecentBlockhash: solana.MustHashFromBase58(in.RecentBlockhash), SlippageBps: &in.SlippageBps, MaximumArrays: arrays, NativeInput: in.NativeInput, NativeOutput: in.NativeOutput, TemporaryWsolSeed: in.TemporaryWsolSeed, RentLamports: rent, TipAccount: tipAccount, TipLamports: tipLamports})
 	if err != nil {
 		panic(err)
 	}
@@ -180,7 +198,7 @@ func main() {
 	}
 	out, _ := json.Marshal(map[string]any{"minimum_amount_out": strconv.FormatUint(route.MinimumNetAmountOut, 10), "legs": legs, "intermediate_residuals": residuals, "estimated_native_residual_lamports": strconv.FormatUint(prepared.EstimatedNativeResidualLamports, 10), "wire_bytes": len(raw), "transaction": encoded})
 	fmt.Println(string(out))
-	if e := exampleutil.SimulateIfRequested(os.Args[2:], raw, number(in.ReadSlot)); e != nil {
+	if e := exampleutil.SimulateIfRequested(simulationArgs, raw, number(in.ReadSlot)); e != nil {
 		panic(e)
 	}
 }

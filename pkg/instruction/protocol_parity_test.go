@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
-	dexparams "github.com/0xfnzero/sol-trade-sdk-golang/pkg/params"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
+	dexparams "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/params"
 	"github.com/gagliardetto/solana-go"
 )
 

@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
 	"github.com/gagliardetto/solana-go"
 )
 

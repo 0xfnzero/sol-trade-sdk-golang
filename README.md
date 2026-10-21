@@ -1,110 +1,73 @@
-Current version: **0.2.0**. SDK, native-language tests, examples and documentation are synchronized in this release. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for migration details.
-
-[v0.2.0: SDK、原生 examples、股票目录与交易来源同步说明](docs/cross-language-sync.md)
-
 <div align="center">
-    <h1>🚀 Sol Trade SDK for Go</h1>
-    <h3><em>A comprehensive Go SDK for seamless Solana DEX trading</em></h3>
+    <h1>Sol Trade SDK — Go</h1>
+    <p>Solana DEX trading for Go</p>
+    <a href="https://pkg.go.dev/github.com/0xfnzero/sol-trade-sdk-golang/v9"><img src="https://pkg.go.dev/badge/github.com/0xfnzero/sol-trade-sdk-golang/v9.svg" alt="sol-trade-sdk-golang"></a>
+    <a href="#license"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </div>
 
 <p align="center">
-    <strong>A high-performance Go SDK for low-latency Solana DEX trading bots. Built for speed and efficiency, it enables seamless, high-throughput interaction with PumpFun, Pump AMM (PumpSwap), Bonk, Meteora DAMM v2, Raydium AMM v4, and Raydium CPMM for latency-critical trading strategies.</strong>
+    <a href="README.md">English</a> · <a href="README_CN.md">中文</a> ·
+    <a href="examples/README.md">Examples</a> ·
+    <a href="docs/USAGE.md">Documentation</a> ·
+    <a href="RELEASE_NOTES.md">Release and migration</a> ·
+    <a href="#sdk-versions-and-related-sdks">Related SDKs</a>
 </p>
 
-<p align="center">
-    <a href="https://pkg.go.dev/github.com/0xfnzero/sol-trade-sdk-golang">
-        <img src="https://pkg.go.dev/badge/github.com/0xfnzero/sol-trade-sdk-golang.svg" alt="Go Reference">
-    </a>
-    <a href="LICENSE">
-        <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
-    </a>
-</p>
+Build, sign and submit transactions across configured channels, with cached routing for DEXes including PumpFun, PumpSwap, Raydium and Meteora. See the usage guide for language-specific APIs and support boundaries.
 
-<p align="center">
-    <img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go">
-    <img src="https://img.shields.io/badge/Solana-9945FF?style=for-the-badge&logo=solana&logoColor=white" alt="Solana">
-    <img src="https://img.shields.io/badge/DEX-4B8BBE?style=for-the-badge&logo=bitcoin&logoColor=white" alt="DEX Trading">
-</p>
+Current version: **9.0.0**. Read the [migration notes](RELEASE_NOTES.md) before upgrading; see the [changelog](CHANGELOG.md) for historical changes.
 
-<p align="center">
-    <a href="https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/README_CN.md">中文</a> |
-    <a href="https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/README.md">English</a> |
-    <a href="https://fnzero.dev/">Website</a> |
-    <a href="https://t.me/fnzero_group">Telegram</a> |
-    <a href="https://discord.gg/vuazbGkqQE">Discord</a>
-</p>
+## Contents
 
-## PumpSwap custom quote tokens and cached routes
+Pump.fun defaults to V3 with per-request V1/V2/V3 overrides. See [version configuration, multi-hop examples and simulation limits](docs/PUMPFUN_VERSIONS.md).
 
-Direct PumpSwap builders match explicit input/output mints, including custom
-Token-2022 quote tokens. Cache preparation supports independent buy/sell routes,
-bounded best-protected path selection, quote freshness checks and offline V0/V1
-signing with explicit nonce/tip/ALT policies. Every hop spends protected credit;
-preparation and signing require no RPC.
+- [SDK Versions and Related SDKs](#sdk-versions-and-related-sdks)
+- [Installation](#installation)
+- [What This SDK Is For](#what-this-sdk-is-for)
+- [Features](#features)
+- [Usage Examples](#usage-examples)
+- [Documentation](#documentation)
+- [PumpSwap cached routes](#pumpswap-custom-quote-tokens-and-cached-routes)
 
-Run `go run ./examples/pumpswap_cached_prepare` and
-`go test ./examples/pumpswap_cached_prepare -count=2` for historical TTWO replay.
-See [the API, limits and native tests](docs/PUMPSWAP_QUOTE_ROUTING.md).
-
-Run `go run ./examples/hotpath_latency` from the repository root to measure
-cached three-hop buy/sell search and preparation, V0+ALT build/sign and V1
-build/sign. Edit `examples/hotpath_latency/config.json` for warmup, samples and
-batch size; an alternate config path is optional. The native benchmark uses a
-public deterministic test key and frozen accounts, reports p50/p95/p99
-nanoseconds and allocations, and makes no RPC calls or submissions. Keep real
-wallets out of this example. Local CPU results do not measure network landing.
-
-## 📋 Table of Contents
-
-- [✨ Features](#-features)
-- [📦 Installation](#-installation)
-- [🛠️ Usage Examples](#️-usage-examples)
-  - [📋 Example Usage](#-example-usage)
-  - [⚡ Trading Parameters](#-trading-parameters)
-  - [📊 Usage Examples Summary Table](#-usage-examples-summary-table)
-  - [⚙️ SWQoS Service Configuration](#️-swqos-service-configuration)
-  - [🔧 Middleware System](#-middleware-system)
-  - [🔍 Address Lookup Tables](#-address-lookup-tables)
-  - [🔍 Nonce Cache](#-durable-nonce)
-- [💰 Cashback Support (PumpFun / PumpSwap)](#-cashback-support-pumpfun--pumpswap)
-- [🛡️ MEV Protection Services](#️-mev-protection-services)
-- [📁 Project Structure](#-project-structure)
-- [📄 License](#-license)
-- [💬 Contact](#-contact)
-- [⚠️ Important Notes](#️-important-notes)
-
----
+<a id="sdk-versions-and-related-sdks"></a>
 
 ## 📦 SDK Versions and Related SDKs
 
-Trading SDK language versions and related Rust SDKs:
+Repositories are versioned independently; follow each SDK’s installation guide for compatible dependencies.
 
-| Language | Repository | Description | Version |
+| Language | Repository | Purpose | Version |
 |----------|------------|-------------|---------|
-| **Rust** | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | Ultra-low latency with zero-copy optimization | `v8.0.0` |
-| **Node.js** | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | TypeScript/JavaScript for Node.js | `v0.2.0` |
-| **Python** | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | Async/await native support | `v0.2.0` |
-| **Go** | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | Concurrent-safe with goroutine support | `v0.2.0` |
-| **Rust** | [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk) | Solana DEX transaction and account event parsing | `v0.8.0` |
-| **Rust** | [sol-shred-sdk](https://github.com/0xfnzero/sol-shred-sdk) | Raw Solana shred decoding and ShredStream DEX event parsing | `v5.0.0` |
+| Rust | [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk) | DEX transaction and account event parsing | `v0.9.0` |
+| Node.js | [sol-parser-sdk-nodejs](https://github.com/0xfnzero/sol-parser-sdk-nodejs) | DEX transaction and account event parsing | `v0.9.0` |
+| Python | [sol-parser-sdk-python](https://github.com/0xfnzero/sol-parser-sdk-python) | DEX transaction and account event parsing | `v0.9.0` |
+| Go | [sol-parser-sdk-golang](https://github.com/0xfnzero/sol-parser-sdk-golang) | DEX transaction and account event parsing | `v0.9.0` |
+| Rust | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | Transaction building, signing and multi-channel submission | `v9.0.0` |
+| Node.js | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | Transaction building, signing and multi-channel submission | `v9.0.0` |
+| Python | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | Transaction building, signing and multi-channel submission | `v9.0.0` |
+| Go | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | Transaction building, signing and multi-channel submission | `v9.0.0` |
+| Rust | [sol-shred-sdk](https://github.com/0xfnzero/sol-shred-sdk) | Raw shred decoding and ShredStream instruction events | `v6.0.0` |
+| Rust | [solana-streamer](https://github.com/0xfnzero/solana-streamer) | gRPC / ShredStream subscriptions and event streaming | `v5.0.0` |
+| Rust | [sol-trade-router-sdk](https://github.com/0xfnzero/sol-trade-router-sdk) | On-chain multi-hop router and client SDK | `v0.3.0` |
 
-## v0.1.11 — PumpSwap custom quotes and creator account fixes
+<a id="installation"></a>
 
-Builds PumpSwap buys and sells with the actual quote mint/token program, validates creator vault identities, honors explicit fee recipients in mayhem mode, and removes an unnecessary global volume write lock. Adds cached quotes, conversion-route selection and complete offline signing preparation, with TTWO pool and SOL→USDC→TTWO→target buy/sell regressions.
+## Installation
 
-Four language implementations share a real 3007 failure fixture and compare instruction data and account privileges. Native local bank regressions use captured public programs/accounts and synthetic wallets. See [PumpSwap fixes and validation](docs/PUMPSWAP_REPORTED_FAILURE.md).
+```sh
+go get github.com/0xfnzero/sol-trade-sdk-golang/v9@v9.0.0
+```
 
-## v0.1.10 — Pump depth-2 and SpeedLanding regional updates
+To run repository examples or contribute, clone the source:
 
-Adds Pump depth-2 create_v2 account chains, including curve and migrated-pool combinations. Preserves stored-depth chains when an ancestor is later whitelisted. Synchronizes SpeedLanding regional endpoints, including London and the New York domain, and compatible client routing. Account construction adds no RPC calls.
+```sh
+git clone https://github.com/0xfnzero/sol-trade-sdk-golang
+cd sol-trade-sdk-golang
+go mod download
+```
 
-Validation includes official Pump SDK 4.1.0 instruction comparisons, signed local LiteSVM simulations and SDK regressions. Local simulation state/config is synthetic; no funded transactions were broadcast and production latency was not measured.
+See [the example index](examples/README.md) for configuration and offline versus live workflows.
 
-## v0.1.9 — Signed transaction and hot-path hardening
-
-Fixes SPL CloseAccount opcode and Token/Token-2022/WSOL execution boundaries. Hardens cached preparation, nonce lifecycle, bounded executor queues and transfer-fee rounding. Adds signed transaction parsing and offline bank regressions. Caller-signed SWQoS submission does not automatically filter provider-owned minimum-tip lanes.
-
-Validation includes local CPU benchmarks and offline signed-bank scenarios. Measured hot paths use cached inputs without RPC. Benchmarks do not establish production network or transaction-landing latency. No funded mainnet transactions were broadcast.
+<a id="what-this-sdk-is-for"></a>
 
 ## What This SDK Is For
 
@@ -117,31 +80,7 @@ Validation includes local CPU benchmarks and offline signed-bank scenarios. Meas
 | Trading workflows | `BuySimple` / `SellSimple`, legacy buy/sell params, copy trading, sniper trading, address lookup tables, durable nonce, middleware, prebuilt transaction execution |
 | Runtime | Go 1.25+, backend services, workers, and latency-sensitive bot infrastructure |
 
-## 🔖 Current Release
-
-**Go module tag:** `github.com/0xfnzero/sol-trade-sdk-golang@v0.2.0`
-
-This release includes PumpSwap custom quotes, creator account validation, cached routes and offline signing preparation. Execution uses caller-supplied blockhash/nonce and validated account snapshots.
-
-## v0.1.8 — Token-program and RPC fixes
-
-PumpFun legacy/V2 buy and sell builders now honor the explicit `TokenProgram` from a parser event or mint-owner RPC lookup, regardless of the mint suffix. ATA creation and swap account derivation use that program consistently. Omitting it retains the Token-2022 default; supply the mint owner explicitly for SPL Token mints.
-
-`TransferSOL` and `CloseTokenAccount` now use `getLatestBlockhash`. Regression tests cover mint suffixes, both token programs, legacy/V2 buys and sells, ATA derivation, and signed transactions against a local mock RPC. `go test ./...` and `go vet ./...` passed.
-
-## v0.1.7 — CPMM creator-fee parity
-
-Aligns the CPMM creator-fee collection surface with Rust 5.0.7: creator-signed (15 accounts) and permissionless (16 accounts) builders, mandatory share PDA, 236-byte AmmConfig and 145-byte CreatorFeeShare decoders, same-bank cold RPC rate reads, exact integer payout splitting, and RPC-free cached preparation with version/freshness/continuity revalidation. Uses shared mainnet simulation fixtures for direct account/byte/payout comparisons, including Token-2022 and a zero-rate override. PoolState and swap/LP behavior are unchanged. Estimates exclude Token-2022 transfer taxes; rates are read by the program at collection time.
-
-See [CPMM example](examples/cpmm_creator_fee_replay/main.go) and [migration guide](docs/USAGE.md#api-compatibility).
-
-## v0.1.6
-
-Adds cache-backed trade/route preparation, CLMM/Whirlpool/DLMM integer quotes, PumpFun native settlement and multihop support, StonkFun routes, V1 serialization, token mint validation and simulation examples. Includes native alignment evidence and regression fixtures. The new Rust CPMM creator-fee collection API is not yet included in this language release; do not assume full Rust 5.0.7 API parity.
-
-## Rust v5.0.2 Parity
-
-This SDK now tracks the Rust SDK `v5.0.2` public behavior for high-level trade intent APIs and SWQoS provider coverage. Also aligned: `TradeRiskGate` / `WithRiskGate` (buy paths only), Meteora DAMM v2 `swapMode` / rate-limiter sysvar / referral, and Bonk slippage clamp at 9999 bps. New code can use `BuySimple` / `SellSimple` with `AccountPolicy`, `BuyAmount`, and `SellAmount`; these convert to the existing `Buy` / `Sell` params without removing the legacy API. The root `TradingClient` still documents its execution boundary and does not claim to build or submit trades by itself. SWQoS coverage includes LunarLander, Glaive, and Solami alongside the existing provider set. Explicit SWQoS routes still keep the default RPC lane appended. NextBlock is still filtered by the Rust parity blacklist unless Rust changes that behavior. Legacy extended provider classes such as `Triton`, `QuickNode`, `Syndica`, `Figment`, and `Alchemy` are kept only for source compatibility and are not part of Rust `v5.0.2` trading provider parity.
+<a id="features"></a>
 
 ## ✨ Features
 
@@ -158,41 +97,11 @@ This SDK now tracks the Rust SDK `v5.0.2` public behavior for high-level trade i
 11. **Reusable Execution Components**: Build and submit prebuilt transactions through `pkg/trading`, `pkg/trading/core`, or `pkg/hotpath`
 12. **Hot-Path RPC Boundary**: Trade execution uses caller-supplied blockhash or durable nonce and never queries RPC for blockhash, account, or balance data
 
-## 📦 Installation
-
-### Direct Clone (Recommended)
-
-Clone this project to your project directory:
-
-```bash
-cd your_project_root_directory
-git clone https://github.com/0xfnzero/sol-trade-sdk-golang
-```
-
-Add the dependency to your `go.mod`:
-
-```go
-// Add to your go.mod
-require github.com/0xfnzero/sol-trade-sdk-golang v0.2.0
-
-replace github.com/0xfnzero/sol-trade-sdk-golang => ./sol-trade-sdk-golang
-```
-
-Then run:
-
-```bash
-go mod tidy
-```
-
-### Use Go Modules
-
-```bash
-go get github.com/0xfnzero/sol-trade-sdk-golang@v0.2.0
-```
+<a id="usage-examples"></a>
 
 ## 🛠️ Usage Examples
 
-### 📋 Example Usage
+### 📋 Trading workflow
 
 For the high-level intent API, see [Simple Trading](examples/simple_trading/main.go). It shows `AccountPolicyAuto`, `BuyWithMaxInput`, and the conversion to legacy `TradeBuyParams`.
 
@@ -209,7 +118,7 @@ import (
     "fmt"
     "log"
 
-    soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
+    soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
     "github.com/gagliardetto/solana-go"
 )
 
@@ -306,28 +215,9 @@ For comprehensive information about all trading parameters including `TradeBuyPa
 When using shred to subscribe to events, due to the nature of shreds, you cannot get complete information about transaction events.
 Please ensure that the parameters your trading logic depends on are available in shreds when using them.
 
-### 📊 Usage Examples Summary Table
+### Example index
 
-| Description | Run Command | Source Code |
-|-------------|-------------|-------------|
-| Create and configure TradingClient instance | `go run ./examples/trading_client` | [examples/trading_client](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/trading_client/main.go) | `v0.2.0` |
-| Share infrastructure across multiple wallets | `go run ./examples/shared_infrastructure` | [examples/shared_infrastructure](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/shared_infrastructure/main.go) | `v0.2.0` |
-| PumpFun token sniping trading | `go run ./examples/pumpfun_sniper_trading` | [examples/pumpfun_sniper_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpfun_sniper_trading/main.go) | `v0.2.0` |
-| PumpFun token copy trading | `go run ./examples/pumpfun_copy_trading` | [examples/pumpfun_copy_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpfun_copy_trading/main.go) | `v0.2.0` |
-| PumpSwap trading operations | `go run ./examples/pumpswap_trading` | [examples/pumpswap_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpswap_trading/main.go) | `v0.2.0` |
-| PumpSwap direct trading (via RPC) | `go run ./examples/pumpswap_direct_trading` | [examples/pumpswap_direct_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/pumpswap_direct_trading/main.go) | `v0.2.0` |
-| Raydium CPMM trading operations | `go run ./examples/raydium_cpmm_trading` | [examples/raydium_cpmm_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/raydium_cpmm_trading/main.go) | `v0.2.0` |
-| Raydium AMM V4 trading operations | `go run ./examples/raydium_amm_v4_trading` | [examples/raydium_amm_v4_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/raydium_amm_v4_trading/main.go) | `v0.2.0` |
-| Meteora DAMM V2 trading operations | `go run ./examples/meteora_damm_v2_trading` | [examples/meteora_damm_v2_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/meteora_damm_v2_trading/main.go) | `v0.2.0` |
-| Bonk token sniping trading | `go run ./examples/bonk_sniper_trading` | [examples/bonk_sniper_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/bonk_sniper_trading/main.go) | `v0.2.0` |
-| Bonk token copy trading | `go run ./examples/bonk_copy_trading` | [examples/bonk_copy_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/bonk_copy_trading/main.go) | `v0.2.0` |
-| Custom instruction middleware example | `go run ./examples/middleware_system` | [examples/middleware_system](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/middleware_system/main.go) | `v0.2.0` |
-| Address lookup table example | `go run ./examples/address_lookup` | [examples/address_lookup](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/address_lookup/main.go) | `v0.2.0` |
-| Nonce cache (durable nonce) example | `go run ./examples/nonce_cache` | [examples/nonce_cache](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/nonce_cache/main.go) | `v0.2.0` |
-| Wrap/unwrap SOL to/from WSOL example | `go run ./examples/wsol_wrapper` | [examples/wsol_wrapper](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/wsol_wrapper/main.go) | `v0.2.0` |
-| Seed trading example | `go run ./examples/seed_trading` | [examples/seed_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/seed_trading/main.go) | `v0.2.0` |
-| Gas fee strategy example | `go run ./examples/gas_fee_strategy` | [examples/gas_fee_strategy](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/gas_fee_strategy/main.go) | `v0.2.0` |
-| Hot path trading (zero-RPC) | `go run ./examples/hot_path_trading` | [examples/hot_path_trading](https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/examples/hot_path_trading/main.go) | `v0.2.0` |
+See the [example index](examples/README.md) for workflows, commands and configuration requirements.
 
 ### ⚙️ SWQoS Service Configuration
 
@@ -371,7 +261,7 @@ When using multiple MEV services, you need to use `Durable Nonce`. You need to u
 The SDK provides a powerful middleware system that allows you to modify, add, or remove instructions before transaction execution. Middleware executes in the order they are added:
 
 ```go
-import "github.com/0xfnzero/sol-trade-sdk-golang/pkg/middleware"
+import "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/middleware"
 
 manager := middleware.NewManager()
 manager.Add(FirstMiddleware{})   // Executes first
@@ -384,7 +274,7 @@ manager.Add(ThirdMiddleware{})   // Executes last
 Address Lookup Tables (ALT) allow you to optimize transaction size and reduce fees by storing frequently used addresses in a compact table format.
 
 ```go
-import "github.com/0xfnzero/sol-trade-sdk-golang/pkg/addresslookup"
+import "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/addresslookup"
 
 // Fetch ALT from chain
 alt, err := addresslookup.FetchAddressLookupTableAccount(ctx, rpcClient, altAddress)
@@ -399,7 +289,7 @@ fmt.Printf("ALT contains %d addresses\n", len(alt.Addresses))
 Use Durable Nonce to implement transaction replay protection and optimize transaction processing.
 
 ```go
-import "github.com/0xfnzero/sol-trade-sdk-golang/pkg/nonce"
+import "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/nonce"
 
 // Fetch nonce info
 nonceInfo, err := nonce.FetchNonceInfo(ctx, rpcClient, nonceAccount)
@@ -407,6 +297,30 @@ if err != nil {
     log.Fatal(err)
 }
 ```
+
+<a id="pumpswap-custom-quote-tokens-and-cached-routes"></a>
+
+## PumpSwap custom quote tokens and cached routes
+
+Direct PumpSwap builders match explicit input/output mints, including custom
+Token-2022 quote tokens. Cache preparation supports independent buy/sell routes,
+bounded best-protected path selection, quote freshness checks and offline V0/V1
+signing with explicit nonce/tip/ALT policies. Every hop spends protected credit;
+preparation and signing require no RPC.
+
+Run `go run ./examples/pumpswap_cached_prepare` and
+`go test ./examples/pumpswap_cached_prepare -count=2` for historical TTWO replay.
+See [the API, limits and native tests](docs/PUMPSWAP_QUOTE_ROUTING.md).
+
+Run `go run ./examples/hotpath_latency` from the repository root to measure
+cached three-hop buy/sell search and preparation, V0+ALT build/sign and V1
+build/sign. Edit `examples/hotpath_latency/config.json` for warmup, samples and
+batch size; an alternate config path is optional. The native benchmark uses a
+public deterministic test key and frozen accounts, reports p50/p95/p99
+nanoseconds and allocations, and makes no RPC calls or submissions. Keep real
+wallets out of this example. Local CPU results do not measure network landing.
+
+<a id="cashback-support-pumpfun-pumpswap"></a>
 
 ## 💰 Cashback Support (PumpFun / PumpSwap)
 
@@ -416,6 +330,8 @@ PumpFun and PumpSwap support **cashback** for eligible tokens: part of the tradi
 - **When params come from decoded events**: If you build params from already-decoded trade events (for example from a parser service), you **must** pass the cashback flag into the SDK:
   - **PumpFun**: Set `IsCashbackCoin` when building params from decoded events.
   - **PumpSwap**: Set `IsCashbackCoin` field when constructing params manually.
+
+<a id="mev-protection-services"></a>
 
 ## 🛡️ MEV Protection Services
 
@@ -429,6 +345,8 @@ You can apply for a key through the official website: [Community Website](https:
 - **BlockRazor**: High-speed transaction execution with API key authentication
 - **Node1**: High-speed transaction execution with API key authentication
 - **Astralane**: Blockchain network acceleration
+
+<a id="project-structure"></a>
 
 ## 📁 Project Structure
 
@@ -451,16 +369,7 @@ pkg/
 └── trading/          # High-performance trade executor
 ```
 
-## 📄 License
-
-MIT License
-
-## 💬 Contact
-
-- Official Website: https://fnzero.dev/
-- Project Repository: https://github.com/0xfnzero/sol-trade-sdk-golang
-- Telegram Group: https://t.me/fnzero_group
-- Discord: https://discord.gg/vuazbGkqQE
+<a id="important-notes"></a>
 
 ## ⚠️ Important Notes
 
@@ -470,15 +379,17 @@ MIT License
 4. Monitor balances and transaction fees
 5. Comply with relevant laws and regulations
 
+<a id="api-compatibility"></a>
+
 ## API compatibility
 
 Full cross-language API parity is still in progress. See the [API migration guide](docs/USAGE.md#api-compatibility) for public behavior and support boundaries, and the examples directory for usage.
 
 
-实时 parser → trade 接入使用 Yellowstone **gRPC**；见 [gRPC 缓存接入与三语言示例](docs/USAGE.md#grpc-cache)。此路径不使用 WebSocket，报价和构建热路径不调用 RPC。
+Live parser-to-trade integration uses Yellowstone **gRPC**. See [gRPC cache integration and language examples](docs/USAGE.md#grpc-cache). Quoting and construction read cached state without hot-path RPC.
 
 
-DAMM v2 单跳缓存准备与显式模拟见 [cached_damm_v2](examples/cached_damm_v2/main.go)。当前要求调用方显式最低输出，预计到账未知；SOL 与已有 WSOL 使用不同账户结算。PumpFun 当前配置读取尚不代表完整费用报价或 cached factory。
+See [cached_damm_v2](examples/cached_damm_v2/main.go) for single-hop DAMM v2 cached preparation and explicit simulation. Callers supply a minimum output; expected net receipts remain unknown. Native SOL and existing WSOL settle through different accounts. Reading PumpFun configuration alone does not provide complete fee quotes or a cached factory.
 
 ### Offline deployed-program validation
 
@@ -490,3 +401,31 @@ Local preparation/signing benchmarks:
 `go test ./examples/pumpswap_cached_prepare -run '^$' -bench BenchmarkPumpSwapCached -benchmem`.
 Replay and construction make no RPC calls. Mixed historical captures and synthetic
 local funding are documented; these checks do not measure production latency.
+
+<a id="documentation"></a>
+
+## Documentation
+
+- [Release and migration](RELEASE_NOTES.md)
+- [Usage guide](docs/USAGE.md)
+- [Examples](examples/README.md)
+- [Cross-language support and boundaries](docs/cross-language-sync.md)
+
+
+<a id="license"></a>
+
+## 📄 License
+
+MIT License
+
+<a id="contact"></a>
+
+## 💬 Contact
+
+- Official Website: https://fnzero.dev/
+- Project Repository: https://github.com/0xfnzero/sol-trade-sdk-golang
+- Telegram Group: https://t.me/fnzero_group
+- Discord: https://discord.gg/vuazbGkqQE
+
+
+Shared stock bridges: 34 official stock/ETF mints and 63 pools. See [eleven-SDK catalog and routing alignment](docs/STOCK_BRIDGE_SYNC.md) for configuration, USDC routing and cache-only boundaries.

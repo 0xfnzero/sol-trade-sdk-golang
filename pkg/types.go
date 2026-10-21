@@ -2,6 +2,7 @@ package soltradesdk
 
 import (
 	"context"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
 	"runtime"
 
 	"github.com/gagliardetto/solana-go"
@@ -184,8 +185,17 @@ func (g *GasFeeStrategy) SetGlobalFeeStrategy(buyPriority, sellPriority, buyCU, 
 	g.SellTipLamports = sellTip
 }
 
+type PumpFunVersion = constants.PumpFunVersion
+
+const (
+	PumpFunLegacy = constants.PumpFunLegacy
+	PumpFunV2     = constants.PumpFunV2
+	PumpFunV3     = constants.PumpFunV3
+)
+
 // TradeConfig represents trading configuration
 type TradeConfig struct {
+	PumpFunVersion            PumpFunVersion
 	RPCUrl                    string
 	SwqosConfigs              []SwqosConfig
 	LogEnabled                bool
@@ -201,6 +211,7 @@ type TradeConfig struct {
 func NewTradeConfig(rpcUrl string, swqosConfigs []SwqosConfig) *TradeConfig {
 	return &TradeConfig{
 		RPCUrl:                 rpcUrl,
+		PumpFunVersion:         PumpFunV3,
 		SwqosConfigs:           NormalizeSwqosConfigs(rpcUrl, swqosConfigs),
 		LogEnabled:             true,
 		UseSeedOptimize:        true,
@@ -238,6 +249,7 @@ func NormalizeSwqosConfigs(rpcUrl string, configs []SwqosConfig) []SwqosConfig {
 //	    // MEVProtection(true). // Enable MEV protection (BlockRazor: sandwichMitigation, Astralane: port 9000)
 //	    Build()
 type TradeConfigBuilder struct {
+	pumpFunVersion            PumpFunVersion
 	rpcUrl                    string
 	swqosConfigs              []SwqosConfig
 	logEnabled                bool
@@ -253,6 +265,7 @@ type TradeConfigBuilder struct {
 func NewTradeConfigBuilder(rpcUrl string) *TradeConfigBuilder {
 	return &TradeConfigBuilder{
 		rpcUrl:                 rpcUrl,
+		pumpFunVersion:         PumpFunV3,
 		swqosConfigs:           []SwqosConfig{},
 		logEnabled:             true,
 		mevProtection:          false,
@@ -308,10 +321,16 @@ func (b *TradeConfigBuilder) MaxSwqosSubmitConcurrency(limit int) *TradeConfigBu
 	return b
 }
 
+func (b *TradeConfigBuilder) PumpFunVersion(version PumpFunVersion) *TradeConfigBuilder {
+	b.pumpFunVersion = version
+	return b
+}
+
 // Build creates the TradeConfig
 func (b *TradeConfigBuilder) Build() *TradeConfig {
 	return &TradeConfig{
 		RPCUrl:                    b.rpcUrl,
+		PumpFunVersion:            b.pumpFunVersion,
 		SwqosConfigs:              NormalizeSwqosConfigs(b.rpcUrl, b.swqosConfigs),
 		LogEnabled:                b.logEnabled,
 		MEVProtection:             b.mevProtection,

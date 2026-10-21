@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
-	dexparams "github.com/0xfnzero/sol-trade-sdk-golang/pkg/params"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
+	dexparams "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/params"
 	"github.com/gagliardetto/solana-go"
 )
 

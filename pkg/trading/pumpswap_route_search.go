@@ -5,21 +5,22 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/subscription"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/subscription"
 	"github.com/gagliardetto/solana-go"
 	"sort"
 )
 
 type PumpSwapRouteSearch struct {
-	Pool, TokenMint, AssetMint                solana.PublicKey
-	ConversionPools                           []subscription.PoolTradeHint
-	MaximumConversionHops, MaximumSearchNodes int
+	Pool, TokenMint, AssetMint                     solana.PublicKey
+	ConversionPools                                []subscription.PoolTradeHint
+	MaximumConversionHops, MaximumSearchNodes      int
+	BridgeSlippageBps, MaximumBridgePriceImpactBps uint16
 }
 
 func NewPumpSwapRouteSearch(pool, token, asset solana.PublicKey, hints []subscription.PoolTradeHint) PumpSwapRouteSearch {
-	return PumpSwapRouteSearch{pool, token, asset, append([]subscription.PoolTradeHint(nil), hints...), 2, 128}
+	return PumpSwapRouteSearch{pool, token, asset, append([]subscription.PoolTradeHint(nil), hints...), 2, 512, 100, 100}
 }
 
 type PumpSwapRouteRejection struct {
@@ -35,29 +36,23 @@ type PumpSwapRouteSelection struct {
 // pumpConversionPaths counts every partial path and dead end, and refuses an
 // incomplete search even after a valid path was found.
 func pumpConversionPaths(search PumpSwapRouteSearch, from, to, excluded solana.PublicKey) ([][]subscription.PoolTradeHint, error) {
-	if len(search.ConversionPools) > 32 || search.MaximumConversionHops < 0 || search.MaximumConversionHops > 3 || search.MaximumSearchNodes < 1 || search.MaximumSearchNodes > 4096 {
+	return pumpConversionPathsWithTopology(search, from, to, excluded, nil)
+}
+
+func pumpConversionPathsWithTopology(search PumpSwapRouteSearch, from, to, excluded solana.PublicKey, graph *pumpTopology) ([][]subscription.PoolTradeHint, error) {
+	if len(search.ConversionPools) > 128 || search.MaximumConversionHops < 0 || search.MaximumConversionHops > 3 || search.MaximumSearchNodes < 1 || search.MaximumSearchNodes > 4096 {
 		return nil, errors.New("invalid PumpSwap search limits")
 	}
-	pools := map[solana.PublicKey]subscription.PoolTradeHint{}
-	for _, h := range search.ConversionPools {
-		h.InputMint = canonicalPumpMint(h.InputMint)
-		h.OutputMint = canonicalPumpMint(h.OutputMint)
-		if h.Pool.IsZero() || h.Pool == search.Pool || h.InputMint.IsZero() || h.OutputMint.IsZero() || h.InputMint == h.OutputMint {
-			return nil, errors.New("invalid conversion pool identity or selected pool reuse")
+	if graph == nil {
+		var err error
+		graph, err = buildPumpTopology(search.ConversionPools)
+		if err != nil {
+			return nil, err
 		}
-		if bytes.Compare(h.InputMint[:], h.OutputMint[:]) > 0 {
-			h.InputMint, h.OutputMint = h.OutputMint, h.InputMint
-		}
-		if old, ok := pools[h.Pool]; ok && old != h {
-			return nil, errors.New("conflicting conversion pool mint pairs")
-		}
-		pools[h.Pool] = h
 	}
-	ordered := make([]subscription.PoolTradeHint, 0, len(pools))
-	for _, h := range pools {
-		ordered = append(ordered, h)
+	if _, ok := graph.pools[search.Pool]; ok {
+		return nil, errors.New("conversion route reuses anchor")
 	}
-	sort.Slice(ordered, func(i, j int) bool { return bytes.Compare(ordered[i].Pool[:], ordered[j].Pool[:]) < 0 })
 	remaining := search.MaximumSearchNodes
 	paths := [][]subscription.PoolTradeHint{}
 	seen := map[solana.PublicKey]bool{from: true}
@@ -74,7 +69,7 @@ func pumpConversionPaths(search PumpSwapRouteSearch, from, to, excluded solana.P
 		if len(path) == search.MaximumConversionHops {
 			return nil
 		}
-		for _, h := range ordered {
+		for _, h := range graph.adjacency[mint] {
 			var output solana.PublicKey
 			if mint == h.InputMint {
 				output = h.OutputMint
@@ -113,7 +108,14 @@ func pumpConversionPaths(search PumpSwapRouteSearch, from, to, excluded solana.P
 // PrepareBestPumpSwapTrade ranks every complete simple path by protected output,
 // then fewer hops and raw pool pubkey bytes. Hints never copy observed amounts.
 func PrepareBestPumpSwapTrade(search PumpSwapRouteSearch, r CachedTradeRequest) (PumpSwapRouteSelection, error) {
+	return prepareBestPumpSwapTradeWithTopology(search, r, nil)
+}
+
+func prepareBestPumpSwapTradeWithTopology(search PumpSwapRouteSearch, r CachedTradeRequest, topology *pumpTopology) (PumpSwapRouteSelection, error) {
 	var result PumpSwapRouteSelection
+	if search.BridgeSlippageBps >= 10000 || search.MaximumBridgePriceImpactBps >= 10000 {
+		return result, errors.New("invalid bridge limits")
+	}
 	if r.Snapshot == nil || r.Amount == 0 || (r.TradeType != soltradesdk.TradeTypeBuy && r.TradeType != soltradesdk.TradeTypeSell) {
 		return result, errors.New("invalid PumpSwap search request")
 	}
@@ -145,7 +147,7 @@ func PrepareBestPumpSwapTrade(search PumpSwapRouteSearch, r CachedTradeRequest) 
 	if _, err = r.Snapshot.PumpSwap(pump, r.Context); err != nil {
 		return result, err
 	}
-	paths, err := pumpConversionPaths(search, from, to, token)
+	paths, err := pumpConversionPathsWithTopology(search, from, to, token, topology)
 	if err != nil {
 		return result, err
 	}
@@ -159,7 +161,7 @@ func PrepareBestPumpSwapTrade(search PumpSwapRouteSearch, r CachedTradeRequest) 
 			r.InputMint, r.OutputMint = search.TokenMint, search.AssetMint
 		}
 		r.Hints = path
-		trade, e := PreparePumpSwapTrade(r)
+		trade, e := preparePumpSwapTradeWithLimits(r, &subscription.BridgeLimits{AnchorPool: search.Pool, SlippageBps: search.BridgeSlippageBps, MaximumPriceImpactBps: search.MaximumBridgePriceImpactBps})
 		if e != nil {
 			rejected := PumpSwapRouteRejection{Reason: e.Error()}
 			for _, h := range path {
@@ -192,4 +194,39 @@ func pumpRouteLess(a, b []PumpSwapQuotedStep) bool {
 		}
 	}
 	return false
+}
+
+type pumpTopology struct {
+	pools     map[solana.PublicKey]subscription.PoolTradeHint
+	adjacency map[solana.PublicKey][]subscription.PoolTradeHint
+}
+
+func buildPumpTopology(hints []subscription.PoolTradeHint) (*pumpTopology, error) {
+	pools := map[solana.PublicKey]subscription.PoolTradeHint{}
+	for _, h := range hints {
+		h.InputMint = canonicalPumpMint(h.InputMint)
+		h.OutputMint = canonicalPumpMint(h.OutputMint)
+		if h.Pool.IsZero() || h.InputMint.IsZero() || h.OutputMint.IsZero() || h.InputMint == h.OutputMint {
+			return nil, errors.New("invalid conversion pool identity or selected pool reuse")
+		}
+		if bytes.Compare(h.InputMint[:], h.OutputMint[:]) > 0 {
+			h.InputMint, h.OutputMint = h.OutputMint, h.InputMint
+		}
+		if old, ok := pools[h.Pool]; ok && old != h {
+			return nil, errors.New("conflicting conversion pool mint pairs")
+		}
+		pools[h.Pool] = h
+	}
+	ordered := make([]subscription.PoolTradeHint, 0, len(pools))
+	for _, h := range pools {
+		ordered = append(ordered, h)
+	}
+	sort.Slice(ordered, func(i, j int) bool { return bytes.Compare(ordered[i].Pool[:], ordered[j].Pool[:]) < 0 })
+	adjacency := map[solana.PublicKey][]subscription.PoolTradeHint{}
+	for _, h := range ordered {
+		for _, mint := range []solana.PublicKey{h.InputMint, h.OutputMint} {
+			adjacency[mint] = append(adjacency[mint], h)
+		}
+	}
+	return &pumpTopology{pools, adjacency}, nil
 }

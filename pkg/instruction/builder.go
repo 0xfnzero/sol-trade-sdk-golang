@@ -3,8 +3,8 @@ package instruction
 import (
 	"fmt"
 
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/params"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/params"
 	"github.com/gagliardetto/solana-go"
 )
 
@@ -51,10 +51,14 @@ func CreateInstructionBuilder(dexType soltradesdk.DexType) (InstructionBuilder, 
 	}
 }
 
-type PumpFunInstructionBuilder struct{}
+type PumpFunInstructionBuilder struct{ Version soltradesdk.PumpFunVersion }
 
-func NewPumpFunInstructionBuilder() *PumpFunInstructionBuilder {
-	return &PumpFunInstructionBuilder{}
+func NewPumpFunInstructionBuilder(config ...*soltradesdk.TradeConfig) *PumpFunInstructionBuilder {
+	version := soltradesdk.PumpFunV3
+	if len(config) > 0 && config[0] != nil && config[0].PumpFunVersion != "" {
+		version = config[0].PumpFunVersion
+	}
+	return &PumpFunInstructionBuilder{Version: version}
 }
 
 func (b *PumpFunInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([]solana.Instruction, error) {
@@ -72,7 +76,7 @@ func (b *PumpFunInstructionBuilder) BuildBuyInstructions(bp *BuildParams) ([]sol
 		OutputMint:          bp.OutputMint,
 		InputAmount:         bp.InputAmount,
 		SlippageBasisPoints: bp.SlippageBasisPoints,
-		ProtocolParams:      toPumpFunParams(protocolParams),
+		ProtocolParams:      b.resolveVersion(protocolParams),
 		CreateOutputMintAta: bp.CreateOutputATA,
 		CreateInputMintAta:  bp.CreateInputATA,
 		CloseInputMintAta:   bp.CloseInputATA,
@@ -92,7 +96,7 @@ func (b *PumpFunInstructionBuilder) BuildSellInstructions(bp *BuildParams) ([]so
 		OutputMint:          bp.OutputMint,
 		InputAmount:         bp.InputAmount,
 		SlippageBasisPoints: bp.SlippageBasisPoints,
-		ProtocolParams:      toPumpFunParams(protocolParams),
+		ProtocolParams:      b.resolveVersion(protocolParams),
 		CreateOutputMintAta: bp.CreateOutputATA,
 		CloseInputMintAta:   bp.CloseInputATA,
 		FixedOutputAmount:   bp.FixedOutputAmount,
@@ -318,11 +322,23 @@ func (b *MeteoraDammV2InstructionBuilder) BuildSellInstructions(bp *BuildParams)
 	})
 }
 
+func (b *PumpFunInstructionBuilder) resolveVersion(p *params.PumpFunParams) *PumpFunParams {
+	result := toPumpFunParams(p)
+	if result.Version == "" {
+		result.Version = b.Version
+	}
+	if result.Version == "" {
+		result.Version = soltradesdk.PumpFunV3
+	}
+	return result
+}
+
 func toPumpFunParams(p *params.PumpFunParams) *PumpFunParams {
 	var bondingCurve *BondingCurve
 	if p.BondingCurve != nil {
 		bondingCurve = &BondingCurve{
 			Account:              p.BondingCurve.Account,
+			Complete:             p.BondingCurve.Complete,
 			VirtualTokenReserves: p.BondingCurve.VirtualTokenReserves,
 			VirtualSolReserves:   p.BondingCurve.VirtualSolReserves,
 			RealTokenReserves:    p.BondingCurve.RealTokenReserves,
@@ -333,7 +349,9 @@ func toPumpFunParams(p *params.PumpFunParams) *PumpFunParams {
 		}
 	}
 	return &PumpFunParams{
-		BondingCurve:              bondingCurve,
+		BondingCurve: bondingCurve,
+		Version:      p.Version, QuoteTokenProgram: p.QuoteTokenProgram, MinimumOutputAmount: p.MinimumOutputAmount,
+		BaseTransferFeeBps: p.BaseTransferFeeBps, QuoteTransferFeeBps: p.QuoteTransferFeeBps, BuybackRecipient: p.BuybackRecipient,
 		CreatorVault:              p.CreatorVault,
 		AssociatedBondingCurve:    p.AssociatedBondingCurve,
 		TokenProgram:              p.TokenProgram,

@@ -1,18 +1,15 @@
-# Cross-language synchronization (v0.2.0)
+# Cross-language synchronization (v9.0.0)
 
 The SDK and examples use their own language. All replays below run offline; no parser, price tracker, or cached quote hot path requests RPC.
 
 ## Trade evidence and wrappers
 
-RPC/gRPC uses supplied execution metadata and CPI instructions. Supported trade events expose `parse_status` and optional `third_program`. `ExecutionConfirmed` means a successful transaction supplied execution context; it does not guarantee every amount is known. Instruction budgets and minimum outputs are not fills. `InstructionDecoded` denotes decoded instructions without execution confirmation.
-
-For unknown Shred wrappers whose own account list references Pump.fun, the default callback is `PumpFunTrade` with `Unresolved`. Only a candidate is known: direction, method, mint, pool and amounts remain defaults. A Pump.fun account reference does not prove a CPI occurred. Count candidates separately from confirmed trades. A missing ALT address remains null and cannot establish a Pump.fun reference.
-
-`third_program` contains the outer `program_id`, `instruction_index`, ordered `accounts` (including duplicates/nulls), original `account_indices`, and byte-array `instruction_data`. Event metadata retains transaction position and receive time. Entries positions are local to a message, not slot-wide execution ordering.
-
-Direction-only subscriptions do not receive unresolved candidates. Excluding `RawInstruction` does not exclude Pump.fun callbacks. Explicit `RawInstruction` subscription remains a compatibility API for all outer instructions. An unknown non-Pump router is not turned into a confirmed swap solely from account references. RPC/gRPC can decode supported native CPI swaps under those routers normally.
-
-Optional wrapper rules remain explicit, offline-reviewed helpers. Their restored input fields carry `InstructionDecoded`; they do not establish fills. Rules are never installed automatically and are never applied to gRPC execution events.
+Use confirmed execution data and coherent current pool snapshots for trading.
+Unresolved Shred candidates are not executable quotes: third_program preserves
+opaque wrapper input, not inferred direction or amounts. RawInstruction and
+PumpRouteIntent callbacks and wrapper-rule decoders have been removed.
+See the matching [parser callback contract](https://github.com/0xfnzero/sol-parser-sdk-golang/blob/main/docs/wrapped-pumpfun.md)
+for filtering, provenance and metadata details.
 
 ## Stock catalog and prices
 

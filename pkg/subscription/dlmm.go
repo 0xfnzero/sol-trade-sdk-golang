@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 	"math"
 )
@@ -42,7 +42,7 @@ func DecodeDlmmBins(d []byte, pool solana.PublicKey, index int64) ([]calc.DlmmBi
 	}
 	return bins, nil
 }
-func (s *AccountCacheSnapshot) PrepareDlmm(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int) (instruction.MeteoraDlmmSwap2Accounts, CachedDlmmQuote, solana.Instruction, error) {
+func (s *AccountCacheSnapshot) calculateDlmm(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int, quoteOnly bool) (instruction.MeteoraDlmmSwap2Accounts, CachedDlmmQuote, solana.Instruction, error) {
 	fail := func(e error) (instruction.MeteoraDlmmSwap2Accounts, CachedDlmmQuote, solana.Instruction, error) {
 		return instruction.MeteoraDlmmSwap2Accounts{}, CachedDlmmQuote{}, nil, e
 	}
@@ -191,6 +191,10 @@ func (s *AccountCacheSnapshot) PrepareDlmm(h PoolTradeHint, ctx CacheReadContext
 			if minimum == 0 {
 				return fail(errors.New("zero protected DLMM output"))
 			}
+			q := CachedDlmmQuote{amount, net, minimum, minimum, ctx.Slot, ctx.Epoch, r.BinsCrossed}
+			if quoteOnly {
+				return instruction.MeteoraDlmmSwap2Accounts{}, q, nil, nil
+			}
 			in, _, err := solana.FindProgramAddress([][]byte{payer[:], pi[:], h.InputMint[:]}, solana.SPLAssociatedTokenAccountProgramID)
 			if err != nil {
 				return fail(err)
@@ -200,7 +204,6 @@ func (s *AccountCacheSnapshot) PrepareDlmm(h PoolTradeHint, ctx CacheReadContext
 				return fail(err)
 			}
 			a := instruction.MeteoraDlmmSwap2Accounts{LbPair: h.Pool, ReserveX: key(152), ReserveY: key(184), UserTokenIn: in, UserTokenOut: out, TokenXMint: key(88), TokenYMint: key(120), Oracle: key(552), User: payer, TokenXProgram: mx.Owner, TokenYProgram: my.Owner, BitmapExtension: bitmap, BinArrays: arrays}
-			q := CachedDlmmQuote{amount, net, minimum, minimum, ctx.Slot, ctx.Epoch, r.BinsCrossed}
 			ix, err := instruction.BuildMeteoraDlmmSwap2(a, amount, minimum)
 			return a, q, ix, err
 		}
@@ -209,4 +212,13 @@ func (s *AccountCacheSnapshot) PrepareDlmm(h PoolTradeHint, ctx CacheReadContext
 		}
 	}
 	return fail(errors.New("insufficient DLMM liquidity in supplied snapshot"))
+}
+
+func (s *AccountCacheSnapshot) PrepareDlmm(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int) (instruction.MeteoraDlmmSwap2Accounts, CachedDlmmQuote, solana.Instruction, error) {
+	return s.calculateDlmm(h, ctx, unixTimestamp, payer, amount, slippageBps, maximumArrays, false)
+}
+
+func (s *AccountCacheSnapshot) QuoteDlmm(h PoolTradeHint, ctx CacheReadContext, unixTimestamp uint64, payer solana.PublicKey, amount uint64, slippageBps uint16, maximumArrays int) (CachedDlmmQuote, error) {
+	_, q, _, err := s.calculateDlmm(h, ctx, unixTimestamp, payer, amount, slippageBps, maximumArrays, true)
+	return q, err
 }

@@ -3,7 +3,7 @@ package instruction
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
 	"github.com/gagliardetto/solana-go"
 )
 

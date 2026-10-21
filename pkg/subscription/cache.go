@@ -7,8 +7,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 	"sync"
 )
@@ -169,9 +170,17 @@ func (c *SubscriptionAccountCache) UpdateRaw(key, owner solana.PublicKey, data [
 }
 
 type AccountCacheSnapshot struct {
+	pumpFunVersion  constants.PumpFunVersion
 	observedThrough *uint64
 	continuityGuard func() error
 	accounts        map[solana.PublicKey]CachedAccount
+}
+
+// WithPumpFunVersion shares immutable account state without mutating the caller's snapshot.
+func (s *AccountCacheSnapshot) WithPumpFunVersion(version constants.PumpFunVersion) *AccountCacheSnapshot {
+	copy := *s
+	copy.pumpFunVersion = version
+	return &copy
 }
 
 func (c *SubscriptionAccountCache) Snapshot() *AccountCacheSnapshot {

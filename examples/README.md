@@ -1,5 +1,7 @@
 # Sol Trade SDK Go Examples
 
+Pump.fun defaults to V3 with per-request V1/V2/V3 overrides. See [version configuration, multi-hop examples and simulation limits](../docs/PUMPFUN_VERSIONS.md).
+
 Examples are updated for the current Go SDK API. Basic protocol demonstrations use synthetic accounts and do not submit transactions. Cached simulation examples use explicit bank simulation; see ../docs/USAGE.md#simulation-matrix.
 
 ## Run

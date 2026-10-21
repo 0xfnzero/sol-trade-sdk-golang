@@ -4,11 +4,11 @@ package trading
 // snapshot. No account discovery, RPC, simulation or submission occurs here.
 import (
 	"errors"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/constants"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/serialization"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/subscription"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/serialization"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/subscription"
 	"github.com/gagliardetto/solana-go"
 	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/programs/system"
@@ -52,9 +52,13 @@ func canonicalPumpMint(m solana.PublicKey) solana.PublicKey {
 // PreparePumpSwapTrade quotes explicit ordered hints using preceding protected
 // credits. Amounts are raw token units; slippage is applied separately per hop.
 func PreparePumpSwapTrade(r CachedTradeRequest) (*PreparedPumpSwapTrade, error) {
+	return preparePumpSwapTradeWithLimits(r, nil)
+}
+func preparePumpSwapTradeWithLimits(r CachedTradeRequest, limits *subscription.BridgeLimits) (*PreparedPumpSwapTrade, error) {
 	if r.Snapshot == nil || r.Payer.IsZero() || r.Amount == 0 || len(r.Hints) == 0 || r.FixedOutputAmount != nil || (r.TradeType != soltradesdk.TradeTypeBuy && r.TradeType != soltradesdk.TradeTypeSell) {
 		return nil, errors.New("invalid exact-input PumpSwap preparation request")
 	}
+	r = r.withResolvedPumpFunVersion()
 	r.Hints = append([]subscription.PoolTradeHint(nil), r.Hints...)
 	for i := range r.Hints {
 		r.Hints[i].InputMint = canonicalPumpMint(r.Hints[i].InputMint)
@@ -81,7 +85,7 @@ func PreparePumpSwapTrade(r CachedTradeRequest) (*PreparedPumpSwapTrade, error) 
 	if arrays == 0 {
 		arrays = 8
 	}
-	route, err := r.Snapshot.PrepareRoute(r.Hints, r.Context, r.UnixTimestamp, r.Payer, r.Amount, slip, arrays)
+	route, err := r.Snapshot.PrepareRouteWithBridgeLimits(r.Hints, r.Context, r.UnixTimestamp, r.Payer, r.Amount, slip, arrays, limits)
 	if err != nil {
 		return nil, err
 	}

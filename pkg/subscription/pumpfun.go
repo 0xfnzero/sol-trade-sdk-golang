@@ -5,8 +5,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 	"math/big"
 )
@@ -301,9 +302,6 @@ func (s *AccountCacheSnapshot) preparePumpFunRouteLeg(h PoolTradeHint, ctx Cache
 	}
 	token := solana.MustPublicKeyFromBase58("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
 	token2022 := solana.MustPublicKeyFromBase58("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
-	if state.QuoteTokenProgram != token {
-		return empty, errors.New("PumpFun V2 quote token program is unsupported")
-	}
 	mintString := state.Mint.String()
 	if len(mintString) >= 4 && mintString[len(mintString)-4:] == "pump" && state.TokenProgram != token2022 {
 		return empty, errors.New("PumpFun mint suffix and token program mismatch")
@@ -365,6 +363,62 @@ func (s *AccountCacheSnapshot) preparePumpFunRouteLeg(h PoolTradeHint, ctx Cache
 		pp.FeeSharingCreatorVault = *active
 	}
 	var swaps []solana.Instruction
+	version := s.pumpFunVersion
+	if version == "" {
+		version = constants.PumpFunV3
+	}
+	if version == constants.PumpFunV3 {
+		zeroFee := uint16(0)
+		pp.QuoteTokenProgram = state.QuoteTokenProgram
+		pp.MinimumOutputAmount = &quote.MinimumNetAmountOut
+		pp.BaseTransferFeeBps = &zeroFee
+		pp.QuoteTransferFeeBps = &zeroFee
+		pp.BuybackRecipient = buyback
+		// The route core handles wrapping/unwrapping; native curves settle wallet SOL.
+		settlement := state.Quote
+		if settlement == pumpWSOL {
+			settlement = constants.SOL_TOKEN_ACCOUNT
+		}
+		swaps, err = instruction.BuildPumpFunV3Instructions(payer, state.Mint, settlement, amount, uint64(slippage), pp, buy, nil, false, false, false)
+		if err != nil {
+			return empty, err
+		}
+		if err = s.AssertUsable(); err != nil {
+			return empty, err
+		}
+		return PreparedPumpFun{state, quote, swaps[0]}, nil
+	}
+	if version == constants.PumpFunLegacy {
+		if state.Quote != pumpWSOL {
+			return empty, errors.New("PumpFun V1 requires native SOL")
+		}
+		pp.Version = version
+		if buy {
+			swaps, err = instruction.PumpFunBuildBuyInstructions(&instruction.PumpFunBuildBuyParams{Payer: payer, OutputMint: state.Mint, InputAmount: amount, ProtocolParams: pp, UseExactSolAmount: true})
+		} else {
+			swaps, err = instruction.PumpFunBuildSellInstructions(&instruction.PumpFunBuildSellParams{Payer: payer, InputMint: state.Mint, InputAmount: amount, ProtocolParams: pp})
+		}
+		if err != nil {
+			return empty, err
+		}
+		data, e := swaps[0].Data()
+		if e != nil {
+			return empty, e
+		}
+		data = bytes.Clone(data)
+		binary.LittleEndian.PutUint64(data[8:], amount)
+		binary.LittleEndian.PutUint64(data[16:], quote.MinimumNetAmountOut)
+		if e = s.AssertUsable(); e != nil {
+			return empty, e
+		}
+		return PreparedPumpFun{state, quote, solana.NewInstruction(instruction.PUMPFUN_PROGRAM, swaps[0].Accounts(), data)}, nil
+	}
+	if version != constants.PumpFunV2 {
+		return empty, errors.New("unknown PumpFun version")
+	}
+	if state.QuoteTokenProgram != token {
+		return empty, errors.New("PumpFun V2 quote token program is unsupported")
+	}
 	if buy {
 		swaps, err = instruction.PumpFunBuildBuyV2Instructions(&instruction.PumpFunBuildBuyParams{Payer: payer, InputMint: state.Quote, OutputMint: state.Mint, InputAmount: amount, ProtocolParams: pp, UseExactSolAmount: true})
 	} else {

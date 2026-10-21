@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
-	"github.com/0xfnzero/sol-trade-sdk-golang/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 	"unicode/utf8"
 )
@@ -58,6 +58,26 @@ func validatePumpFunNativeAnchor(leg CachedRouteLeg, payer solana.PublicKey, buy
 		return err
 	}
 	keys := leg.Instruction.Accounts()
+	legacy, legacySize, legacyMint := []byte{51, 230, 133, 164, 1, 127, 131, 173}, 24, leg.Hint.InputMint
+	if buy {
+		legacy, legacySize, legacyMint = []byte{56, 252, 116, 8, 158, 223, 205, 95}, 25, leg.Hint.OutputMint
+	}
+	if len(data) >= 8 && bytes.Equal(data[:8], legacy) {
+		if len(data) != legacySize || (buy && data[24] > 1) || len(keys) < 16 || binary.LittleEndian.Uint64(data[8:]) != leg.AmountIn || binary.LittleEndian.Uint64(data[16:]) != leg.MinimumNetAmountOut || keys[6].PublicKey != payer || !keys[6].IsSigner || !keys[6].IsWritable || keys[3].PublicKey != leg.Hint.Pool || keys[2].PublicKey != legacyMint {
+			return errors.New("PumpFun V1 settlement does not match quote")
+		}
+		return nil
+	}
+	v3, size, baseMint := []byte{28, 146, 222, 119, 38, 196, 105, 213}, 24, leg.Hint.InputMint
+	if buy {
+		v3, size, baseMint = []byte{225, 247, 80, 30, 213, 179, 132, 136}, 25, leg.Hint.OutputMint
+	}
+	if len(data) >= 8 && bytes.Equal(data[:8], v3) {
+		if len(data) != size || (buy && data[24] != 0) || len(keys) != 17 || binary.LittleEndian.Uint64(data[8:]) != leg.AmountIn || binary.LittleEndian.Uint64(data[16:]) != leg.MinimumNetAmountOut || keys[8].PublicKey != payer || !keys[8].IsSigner || !keys[8].IsWritable || keys[5].PublicKey != leg.Hint.Pool || keys[2].PublicKey != pumpWSOL || keys[1].PublicKey != baseMint {
+			return errors.New("PumpFun V3 settlement does not match quote")
+		}
+		return nil
+	}
 	disc, count, mint := []byte{93, 246, 130, 60, 231, 233, 64, 178}, 26, leg.Hint.InputMint
 	if buy {
 		disc, count, mint = []byte{194, 171, 28, 70, 104, 77, 91, 47}, 27, leg.Hint.OutputMint
