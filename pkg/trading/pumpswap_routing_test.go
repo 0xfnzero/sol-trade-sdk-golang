@@ -198,7 +198,7 @@ func TestPumpSwapClientAppliesVersionToPumpFunBridge(t *testing.T) {
 func TestGlobalBridgeRegistryAndUSDCPaths(t *testing.T) {
 	c := DefaultPumpSwapRoutingConfig()
 	hints := c.ConversionPools()
-	if len(hints) != 64 {
+	if len(hints) != 59 {
 		t.Fatal(len(hints))
 	}
 	reversed := make([]subscription.PoolTradeHint, len(hints))
@@ -206,17 +206,17 @@ func TestGlobalBridgeRegistryAndUSDCPaths(t *testing.T) {
 		h.InputMint, h.OutputMint = h.OutputMint, h.InputMint
 		reversed[i] = h
 	}
-	if e := c.ExtendPools(reversed); e != nil || len(c.pools) != 64 {
+	if e := c.ExtendPools(reversed); e != nil || len(c.pools) != 59 {
 		t.Fatal(e)
 	}
 	extra := hints[0]
 	extra.Pool = solana.NewWallet().PublicKey()
 	bad := hints[0]
 	bad.OutputMint = extra.Pool
-	if e := c.ExtendPools([]subscription.PoolTradeHint{extra, bad}); e == nil || len(c.pools) != 64 {
+	if e := c.ExtendPools([]subscription.PoolTradeHint{extra, bad}); e == nil || len(c.pools) != 59 {
 		t.Fatal("non-atomic merge")
 	}
-	if e := c.ExtendPools([]subscription.PoolTradeHint{extra}); e != nil || len(c.pools) != 65 {
+	if e := c.ExtendPools([]subscription.PoolTradeHint{extra}); e != nil || len(c.pools) != 60 {
 		t.Fatal(e)
 	}
 	// Every USDC path starts at the payer's asset and never revisits it.

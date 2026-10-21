@@ -101,9 +101,8 @@
           }
         ]
       },
-      "expected_pools": [
-        "Bu2A9LUZaMRnf7ZyC1nzREn6dVGVVuPwxz5aFBFkJLTa"
-      ]
+      "expected_pools": [],
+      "catalog_exclusion_note": "ABNB.US/WSOL Meteora pool removed from defaults on 2026-10-22: liquid-side reserve below $500. Captured raw legs remain unchanged."
     },
     {
       "name": "pumpswap_raydium",

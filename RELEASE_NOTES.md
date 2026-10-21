@@ -1,6 +1,14 @@
-# sol-trade-sdk-golang v9.0.0
+# sol-trade-sdk-golang v9.0.1
 
-Released 2026-10-22. Rust, Node.js, Python and Go trade packages share family version 9.0.0; parser packages share 0.9.0.
+Released 2026-10-22. Rust, Node.js, Python and Go trade packages share family version 9.0.1; parser packages share 0.9.0.
+
+## Default stock pools / 默认股票代币池子
+
+Remove five pools from the default catalog: two have captured single-transaction withdrawals reducing both vault balances by at least 50%; four have less than $500 in USDC/WSOL-side reserves at the 2026-10-22 04:25 UTC+8 snapshot (one meets both criteria). Defaults now contain 58 stock pools across 33 mints; trading adds the SOL/USDC conversion pool for 59 pools total. COPX.US is no longer a default mint. See [the synchronized catalog notes](docs/STOCK_BRIDGE_SYNC.md) for addresses and evidence.
+
+This is a static catalog refresh, not continuous liquidity monitoring, certified executable depth, or an LP-lock guarantee. Explicit custom catalogs remain supported. No RPC or history scanning was added to parsing or trading hot paths.
+
+中文：默认目录剔除 5 个池子，涵盖整池双边储备单笔下降至少 50% 的历史记录，以及快照中 USDC/WSOL 一侧储备不足 500 美元的池子。保留 58 个股票池、33 个 mint；交易侧加 SOL/USDC 共 59 个池子。该目录为静态快照，不保证实时深度或流动性锁定。
 
 ## Changes / 更新
 
@@ -19,7 +27,7 @@ Update public struct/configuration literals for new fields and prefer constructo
 
 ### Go module migration
 
-Run `go get github.com/0xfnzero/sol-trade-sdk-golang/v9@v9.0.0` and change every SDK import from `github.com/0xfnzero/sol-trade-sdk-golang/...` to `github.com/0xfnzero/sol-trade-sdk-golang/v9/...`. The repository URL is unchanged. v0 users can keep their previously pinned versions.
+Run `go get github.com/0xfnzero/sol-trade-sdk-golang/v9@v9.0.1` and change every SDK import from `github.com/0xfnzero/sol-trade-sdk-golang/...` to `github.com/0xfnzero/sol-trade-sdk-golang/v9/...`. The repository URL is unchanged. v0 users can keep their previously pinned versions.
 
 CachedTradeExecutor and UnifiedTradeExecutor now carry private configuration. Replace external positional struct literals with named fields or factory constructors. See docs/PUMPFUN_VERSIONS.md.
 
