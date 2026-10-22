@@ -1,19 +1,34 @@
 <div align="center">
-    <h1>Sol Trade SDK — Go</h1>
-    <p>面向 Solana DEX 的 Go 交易 SDK</p>
-    <a href="https://pkg.go.dev/github.com/0xfnzero/sol-trade-sdk-golang/v9"><img src="https://pkg.go.dev/badge/github.com/0xfnzero/sol-trade-sdk-golang/v9.svg" alt="sol-trade-sdk-golang"></a>
-    <a href="#许可证"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+    <h1>🚀 Sol Trade SDK for Go</h1>
+    <h3><em>全面的 Go SDK，用于无缝 Solana DEX 交易</em></h3>
 </div>
 
 <p align="center">
-    <a href="README.md">English</a> · <a href="README_CN.md">中文</a> ·
-    <a href="examples/README.md">示例</a> ·
-    <a href="docs/USAGE.md">文档</a> ·
-    <a href="RELEASE_NOTES.md">发布与迁移</a> ·
-    <a href="#sdk-版本与相关项目">相关 SDK</a>
+    <strong>一个面向低延迟 Solana DEX 交易机器人的高性能 Go SDK。该 SDK 以速度和效率为核心设计，支持与 PumpFun、Pump AMM（PumpSwap）、Bonk、Meteora DAMM v2、Raydium AMM v4 以及 Raydium CPMM 进行无缝、高吞吐量的交互，适用于对延迟高度敏感的交易策略。</strong>
 </p>
 
-提供交易构建、签名、多通道提交与缓存路由，支持 PumpFun、PumpSwap、Raydium 和 Meteora 等 DEX。各语言接口与支持边界见使用指南。
+<p align="center">
+    <a href="https://pkg.go.dev/github.com/0xfnzero/sol-trade-sdk-golang/v9">
+        <img src="https://pkg.go.dev/badge/github.com/0xfnzero/sol-trade-sdk-golang/v9.svg" alt="Go Reference">
+    </a>
+    <a href="#许可证">
+        <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
+    </a>
+</p>
+
+<p align="center">
+    <img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white" alt="Go">
+    <img src="https://img.shields.io/badge/Solana-9945FF?style=for-the-badge&logo=solana&logoColor=white" alt="Solana">
+    <img src="https://img.shields.io/badge/DEX-4B8BBE?style=for-the-badge&logo=bitcoin&logoColor=white" alt="DEX Trading">
+</p>
+
+<p align="center">
+    <a href="https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/README_CN.md">中文</a> |
+    <a href="https://github.com/0xfnzero/sol-trade-sdk-golang/blob/main/README.md">English</a> |
+    <a href="https://fnzero.dev/">Website</a> |
+    <a href="https://t.me/fnzero_group">Telegram</a> |
+    <a href="https://discord.gg/vuazbGkqQE">Discord</a>
+</p>
 
 当前版本：**9.0.1**。升级前请阅读 [迁移说明](RELEASE_NOTES.md)；历史变更见 [版本记录](CHANGELOG_CN.md)。
 
