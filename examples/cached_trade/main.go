@@ -6,12 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/examples/internal/exampleutil"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/subscription"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/trading"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/examples/internal/exampleutil"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/subscription"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"os"
 	"strconv"
@@ -29,6 +29,12 @@ type routeHintInput struct {
 }
 
 type input struct {
+	PumpRoute *struct {
+		Execution           instruction.PumpRouteExecution `json:"execution"`
+		MinimumOutputAmount *string                        `json:"minimum_output_amount"`
+		BuybackRecipient    *string                        `json:"buyback_recipient"`
+	} `json:"pump_route"`
+
 	PumpFunVersion    soltradesdk.PumpFunVersion `json:"pumpfun_version"`
 	FixedOutputAmount *string                    `json:"fixed_output_amount"`
 	DexType           string                     `json:"dex_type"`
@@ -177,7 +183,19 @@ func main() {
 		value := number(*in.FixedOutputAmount)
 		minimum = &value
 	}
-	prepared, err := executor.Prepare(trading.CachedTradeRequest{PumpFunVersion: in.PumpFunVersion, DexType: dex, TradeType: direction, Snapshot: cache.Snapshot(), Hints: hints, Candidates: candidates, InputMint: inputMint, OutputMint: outputMint, Context: ctx, UnixTimestamp: number(in.UnixTimestamp), Payer: payer, Amount: number(in.Amount), FixedOutputAmount: minimum, RecentBlockhash: solana.MustHashFromBase58(in.RecentBlockhash), SlippageBps: &in.SlippageBps, MaximumArrays: arrays, NativeInput: in.NativeInput, NativeOutput: in.NativeOutput, TemporaryWsolSeed: in.TemporaryWsolSeed, RentLamports: rent, TipAccount: tipAccount, TipLamports: tipLamports})
+	pumpRoute := instruction.PumpRouteOptions{}
+	if in.PumpRoute != nil {
+		pumpRoute.Execution = in.PumpRoute.Execution
+		if in.PumpRoute.MinimumOutputAmount != nil {
+			n := number(*in.PumpRoute.MinimumOutputAmount)
+			pumpRoute.MinimumOutputAmount = &n
+		}
+		if in.PumpRoute.BuybackRecipient != nil {
+			k := solana.MustPublicKeyFromBase58(*in.PumpRoute.BuybackRecipient)
+			pumpRoute.BuybackRecipient = &k
+		}
+	}
+	prepared, err := executor.Prepare(trading.CachedTradeRequest{PumpRoute: pumpRoute, PumpFunVersion: in.PumpFunVersion, DexType: dex, TradeType: direction, Snapshot: cache.Snapshot(), Hints: hints, Candidates: candidates, InputMint: inputMint, OutputMint: outputMint, Context: ctx, UnixTimestamp: number(in.UnixTimestamp), Payer: payer, Amount: number(in.Amount), FixedOutputAmount: minimum, RecentBlockhash: solana.MustHashFromBase58(in.RecentBlockhash), SlippageBps: &in.SlippageBps, MaximumArrays: arrays, NativeInput: in.NativeInput, NativeOutput: in.NativeOutput, TemporaryWsolSeed: in.TemporaryWsolSeed, RentLamports: rent, TipAccount: tipAccount, TipLamports: tipLamports})
 	if err != nil {
 		panic(err)
 	}
@@ -196,7 +214,11 @@ func main() {
 	for _, r := range route.EstimatedIntermediateResiduals {
 		residuals = append(residuals, map[string]string{"mint": r.Mint.String(), "amount": strconv.FormatUint(r.Amount, 10)})
 	}
-	out, _ := json.Marshal(map[string]any{"minimum_amount_out": strconv.FormatUint(route.MinimumNetAmountOut, 10), "legs": legs, "intermediate_residuals": residuals, "estimated_native_residual_lamports": strconv.FormatUint(prepared.EstimatedNativeResidualLamports, 10), "wire_bytes": len(raw), "transaction": encoded})
+	execution := route.Execution
+	if execution == "" {
+		execution = instruction.PumpRouteSequential
+	}
+	out, _ := json.Marshal(map[string]any{"execution": execution, "minimum_amount_out": strconv.FormatUint(route.MinimumNetAmountOut, 10), "legs": legs, "intermediate_residuals": residuals, "estimated_native_residual_lamports": strconv.FormatUint(prepared.EstimatedNativeResidualLamports, 10), "wire_bytes": len(raw), "transaction": encoded})
 	fmt.Println(string(out))
 	if e := exampleutil.SimulateIfRequested(simulationArgs, raw, number(in.ReadSlot)); e != nil {
 		panic(e)

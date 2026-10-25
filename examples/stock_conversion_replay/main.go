@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/stockcatalog"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/stockcatalog"
 	"os"
 )
 

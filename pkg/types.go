@@ -2,7 +2,7 @@ package soltradesdk
 
 import (
 	"context"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/constants"
 	"runtime"
 
 	"github.com/gagliardetto/solana-go"

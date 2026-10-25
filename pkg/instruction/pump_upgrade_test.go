@@ -62,6 +62,42 @@ func TestNestedCurveRoute(t *testing.T) {
 		return PumpMultiHop{Venue: "curve", BaseMint: base, QuoteMint: quote, Address: p["bonding_curve"], BaseVault: p["associated_base_bonding_curve"], QuoteVault: p["associated_quote_bonding_curve"], BaseTokenProgram: token, QuoteTokenProgram: token}
 	}
 	hops := []PumpMultiHop{hop(a, compactWSOL), hop(b, a)}
+	minimum := uint64(9)
+	options := PumpRouteOptions{MinimumOutputAmount: &minimum, BuybackRecipient: &user}
+	ix, err := SelectPumpRoute(options, user, compactWSOL, b, 7, hops)
+	if err != nil || ix == nil {
+		t.Fatal("official route not selected", err)
+	}
+	data, _ := ix.Data()
+	if len(data) != 24 || data[0] != 43 || data[8] != 7 || data[16] != 9 || len(ix.Accounts()) != 26 {
+		t.Fatal("incorrect official route encoding")
+	}
+	if v, e := SelectPumpRoute(PumpRouteOptions{}, user, compactWSOL, b, 7, hops); e != nil || v != nil {
+		t.Fatal("missing quote did not select sequential")
+	}
+	sequential := options
+	sequential.Execution = PumpRouteSequential
+	if v, e := SelectPumpRoute(sequential, user, compactWSOL, b, 7, hops); e != nil || v != nil {
+		t.Fatal("explicit sequential ignored")
+	}
+	if v, e := SelectPumpRoute(options, user, compactWSOL, b, 7, nil); e != nil || v != nil {
+		t.Fatal("unsupported route did not select sequential")
+	}
+	official := options
+	official.Execution = PumpRouteOfficial
+	if _, e := SelectPumpRoute(official, user, compactWSOL, b, 7, nil); e == nil {
+		t.Fatal("official route silently fell back")
+	}
+	zero := uint64(0)
+	invalid := options
+	invalid.MinimumOutputAmount = &zero
+	if _, e := SelectPumpRoute(invalid, user, compactWSOL, b, 7, hops); e == nil {
+		t.Fatal("zero minimum accepted")
+	}
+	if v, e := SelectPumpRoute(options, user, b, compactWSOL, 7, []PumpMultiHop{hops[1], hops[0]}); e != nil || v == nil {
+		t.Fatal("reverse sell failed", e)
+	}
+
 	accounts, remaining, e := DerivePumpMultiHopAccounts(user, compactWSOL, b, user, hops, false)
 	if e != nil || len(accounts) != 16 || len(remaining) != 10 {
 		t.Fatal(e)

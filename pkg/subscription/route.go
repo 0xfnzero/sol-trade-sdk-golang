@@ -5,9 +5,9 @@ package subscription
 import (
 	"errors"
 	"fmt"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 	"math/big"
 )
@@ -23,6 +23,7 @@ type RouteResidual struct {
 	Amount uint64
 }
 type PreparedCachedRoute struct {
+	Execution                           instruction.PumpRouteExecution
 	Legs                                []CachedRouteLeg
 	SetupInstructions, SwapInstructions []solana.Instruction
 	MinimumNetAmountOut                 uint64

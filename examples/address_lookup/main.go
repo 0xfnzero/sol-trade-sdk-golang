@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/examples/internal/exampleutil"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/addresslookup"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/examples/internal/exampleutil"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/addresslookup"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )

@@ -3,8 +3,8 @@ package instruction
 import (
 	"fmt"
 
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/params"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/params"
 	"github.com/gagliardetto/solana-go"
 )
 

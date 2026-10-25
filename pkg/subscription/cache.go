@@ -7,9 +7,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 	"sync"
 )

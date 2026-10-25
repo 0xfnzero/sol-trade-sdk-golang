@@ -9,9 +9,10 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/serialization"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/subscription"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/serialization"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/subscription"
 	"github.com/gagliardetto/solana-go"
 	"math"
 	"os"
@@ -110,6 +111,27 @@ func TestPumpFunInstructionVersionsPreserveProtectedHops(t *testing.T) {
 	}
 	for _, direction := range []string{"buy", "sell"} {
 		r := cachedFixture(t, direction, "pumpfun_whirlpool", solana.PublicKey{})
+		base, e := PrepareCachedTrade(r)
+		if e != nil {
+			t.Fatal(e)
+		}
+		floor := uint64(1)
+		auto := r
+		auto.PumpRoute = instruction.PumpRouteOptions{MinimumOutputAmount: &floor, BuybackRecipient: &r.Payer}
+		fallback, e := PrepareCachedTrade(auto)
+		if e != nil || !bytes.Equal(base.Compiled.Message, fallback.Compiled.Message) {
+			t.Fatal("cross-DEX automatic fallback changed wire", e)
+		}
+		required := auto
+		required.PumpRoute.Execution = instruction.PumpRouteOfficial
+		if _, e := PrepareCachedTrade(required); e == nil {
+			t.Fatal("official mode silently selected a cross-DEX route")
+		}
+		tooHigh := uint64(math.MaxUint64)
+		auto.PumpRoute.MinimumOutputAmount = &tooHigh
+		if _, e := PrepareCachedTrade(auto); e == nil {
+			t.Fatal("fallback weakened final minimum")
+		}
 		var minimum uint64
 		for _, version := range []soltradesdk.PumpFunVersion{soltradesdk.PumpFunLegacy, soltradesdk.PumpFunV2, soltradesdk.PumpFunV3} {
 			r.PumpFunVersion = version

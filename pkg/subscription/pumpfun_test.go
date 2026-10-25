@@ -3,7 +3,7 @@ package subscription
 import (
 	"encoding/binary"
 	"encoding/json"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 	"os"
 	"strconv"
@@ -248,5 +248,51 @@ func BenchmarkPumpFunRouteDecode(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+// A synthetic two-curve chain checks selection, not a mainnet quote.
+func TestOfficialPumpRouteFromFrozenCurves(t *testing.T) {
+	v := currentVectors(t)[0]
+	v.Quote = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+	v.Buy = true
+	v.Mayhem = false
+	s, first := currentStateFixture(v)
+	middle := first.OutputMint
+	target := solana.PublicKey{3}
+	pool := instruction.GetBondingCurvePDA(target)
+	c := owned(s.accounts[first.Pool])
+	copy(c.Data[83:115], middle[:])
+	s.accounts[pool] = c
+	s.accounts[target] = owned(s.accounts[middle])
+	second := PoolTradeHint{Pool: pool, InputMint: middle, OutputMint: target}
+	payer := solana.PublicKey{42}
+	minimum := uint64(7)
+	for _, buy := range []bool{true, false} {
+		hints := []PoolTradeHint{first, second}
+		if !buy {
+			hints = []PoolTradeHint{{Pool: second.Pool, InputMint: second.OutputMint, OutputMint: second.InputMint}, {Pool: first.Pool, InputMint: first.OutputMint, OutputMint: first.InputMint}}
+		}
+		var wire []byte
+		for _, execution := range []instruction.PumpRouteExecution{instruction.PumpRouteAuto, instruction.PumpRouteOfficial} {
+			p, err := s.PrepareOfficialPumpRoute(hints, configContext, payer, 1000, instruction.PumpRouteOptions{Execution: execution, MinimumOutputAmount: &minimum, BuybackRecipient: &payer}, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p == nil || p.Execution != instruction.PumpRouteOfficial || len(p.Legs) != 0 || len(p.SetupInstructions) != 3 || len(p.SwapInstructions) != 1 || p.MinimumNetAmountOut != minimum {
+				t.Fatal("missing official aggregate", p)
+			}
+			data, err := p.SwapInstructions[0].Data()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if binary.LittleEndian.Uint64(data[8:16]) != 1000 || binary.LittleEndian.Uint64(data[16:24]) != minimum || len(p.SwapInstructions[0].Accounts()) != 26 {
+				t.Fatal("invalid official instruction")
+			}
+			if wire != nil && string(wire) != string(data) {
+				t.Fatal("auto and official differ")
+			}
+			wire = data
+		}
 	}
 }

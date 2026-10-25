@@ -17,8 +17,8 @@ import (
 	"github.com/gagliardetto/solana-go/programs/token"
 	solanarpc "github.com/gagliardetto/solana-go/rpc"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/constants"
 )
 
 // ===== PumpSwap Program Constants from Rust: src/instruction/utils/pumpswap.rs =====
@@ -852,7 +852,10 @@ type PumpSwapFeeConfig struct {
 // DecodePool decodes a PumpSwap pool from account data
 // Returns nil if data is invalid or too short
 func DecodePool(data []byte) *PumpSwapPool {
-	if len(data) < PoolSize && len(data) != LegacyPoolSize {
+	if len(data) < 263 && len(data) != LegacyPoolSize && len(data) != PoolSize && len(data) != 262 {
+		return nil
+	}
+	if data[235] > 1 || data[236] > 1 || (len(data) >= 262 && data[261] > 1) || (len(data) >= 263 && data[262] > 1) {
 		return nil
 	}
 

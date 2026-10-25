@@ -7,7 +7,7 @@ import (
 
 	solana "github.com/gagliardetto/solana-go"
 
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
 )
 
 type rejectingGate struct{ calls int }

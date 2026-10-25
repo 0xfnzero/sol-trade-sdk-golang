@@ -8,8 +8,8 @@
 </p>
 
 <p align="center">
-    <a href="https://pkg.go.dev/github.com/0xfnzero/sol-trade-sdk-golang/v9">
-        <img src="https://pkg.go.dev/badge/github.com/0xfnzero/sol-trade-sdk-golang/v9.svg" alt="Go Reference">
+    <a href="https://pkg.go.dev/github.com/0xfnzero/sol-trade-sdk-golang/v10">
+        <img src="https://pkg.go.dev/badge/github.com/0xfnzero/sol-trade-sdk-golang/v10.svg" alt="Go Reference">
     </a>
     <a href="#license">
         <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
@@ -30,11 +30,15 @@
     <a href="https://discord.gg/vuazbGkqQE">Discord</a>
 </p>
 
-Current version: **9.0.1**. Read the [migration notes](RELEASE_NOTES.md) before upgrading; see the [changelog](CHANGELOG.md) for historical changes.
+Current version: **10.0.0**. Read the [migration notes](RELEASE_NOTES.md) before upgrading; see the [changelog](CHANGELOG.md) for historical changes.
 
 ## Contents
 
 Pump.fun defaults to V3 with per-request V1/V2/V3 overrides. See [version configuration, multi-hop examples and simulation limits](docs/PUMPFUN_VERSIONS.md).
+
+Official single-instruction multi-hop buys and sells for Pump.fun curves and PumpSwap pools: [`pump_multi_hop`](examples/pump_multi_hop/main.go). See [usage and simulation](docs/PUMPFUN_VERSIONS.md#official-multi-hop).
+
+Cached trade preparation supports Auto / Official / Sequential: official preference requires an independent final minimum and current buyback recipient; cross-DEX paths keep sequential execution. See execution selection above.
 
 - [SDK Versions and Related SDKs](#sdk-versions-and-related-sdks)
 - [Installation](#installation)
@@ -52,24 +56,24 @@ Repositories are versioned independently; follow each SDK’s installation guide
 
 | Language | Repository | Purpose | Version |
 |----------|------------|-------------|---------|
-| Rust | [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk) | DEX transaction and account event parsing | `v0.9.1` |
-| Node.js | [sol-parser-sdk-nodejs](https://github.com/0xfnzero/sol-parser-sdk-nodejs) | DEX transaction and account event parsing | `v0.9.1` |
-| Python | [sol-parser-sdk-python](https://github.com/0xfnzero/sol-parser-sdk-python) | DEX transaction and account event parsing | `v0.9.1` |
-| Go | [sol-parser-sdk-golang](https://github.com/0xfnzero/sol-parser-sdk-golang) | DEX transaction and account event parsing | `v0.9.1` |
-| Rust | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | Transaction building, signing and multi-channel submission | `v9.0.1` |
-| Node.js | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | Transaction building, signing and multi-channel submission | `v9.0.1` |
-| Python | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | Transaction building, signing and multi-channel submission | `v9.0.1` |
-| Go | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | Transaction building, signing and multi-channel submission | `v9.0.1` |
-| Rust | [sol-shred-sdk](https://github.com/0xfnzero/sol-shred-sdk) | Raw shred decoding and ShredStream instruction events | `v6.0.1` |
-| Rust | [solana-streamer](https://github.com/0xfnzero/solana-streamer) | gRPC / ShredStream subscriptions and event streaming | `v5.0.0` |
-| Rust | [sol-trade-router-sdk](https://github.com/0xfnzero/sol-trade-router-sdk) | On-chain multi-hop router and client SDK | `v0.3.0` |
+| Rust | [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk) | DEX transaction and account event parsing | `v0.10.0` |
+| Node.js | [sol-parser-sdk-nodejs](https://github.com/0xfnzero/sol-parser-sdk-nodejs) | DEX transaction and account event parsing | `v0.10.0` |
+| Python | [sol-parser-sdk-python](https://github.com/0xfnzero/sol-parser-sdk-python) | DEX transaction and account event parsing | `v0.10.0` |
+| Go | [sol-parser-sdk-golang](https://github.com/0xfnzero/sol-parser-sdk-golang) | DEX transaction and account event parsing | `v0.10.0` |
+| Rust | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | Transaction building, signing and multi-channel submission | `v10.0.0` |
+| Node.js | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | Transaction building, signing and multi-channel submission | `v10.0.0` |
+| Python | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | Transaction building, signing and multi-channel submission | `v10.0.0` |
+| Go | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | Transaction building, signing and multi-channel submission | `v10.0.0` |
+| Rust | [sol-shred-sdk](https://github.com/0xfnzero/sol-shred-sdk) | Raw shred decoding and ShredStream instruction events | `v6.0.2` |
+| Rust | [solana-streamer](https://github.com/0xfnzero/solana-streamer) | gRPC / ShredStream subscriptions and event streaming | `v5.0.1` |
+| Rust | [sol-trade-router-sdk](https://github.com/0xfnzero/sol-trade-router-sdk) | On-chain multi-hop router and client SDK | `v0.4.0` |
 
 <a id="installation"></a>
 
 ## Installation
 
 ```sh
-go get github.com/0xfnzero/sol-trade-sdk-golang/v9@v9.0.1
+go get github.com/0xfnzero/sol-trade-sdk-golang/v10@v10.0.0
 ```
 
 To run repository examples or contribute, clone the source:
@@ -133,7 +137,7 @@ import (
     "fmt"
     "log"
 
-    soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+    soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
     "github.com/gagliardetto/solana-go"
 )
 
@@ -276,7 +280,7 @@ When using multiple MEV services, you need to use `Durable Nonce`. You need to u
 The SDK provides a powerful middleware system that allows you to modify, add, or remove instructions before transaction execution. Middleware executes in the order they are added:
 
 ```go
-import "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/middleware"
+import "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/middleware"
 
 manager := middleware.NewManager()
 manager.Add(FirstMiddleware{})   // Executes first
@@ -289,7 +293,7 @@ manager.Add(ThirdMiddleware{})   // Executes last
 Address Lookup Tables (ALT) allow you to optimize transaction size and reduce fees by storing frequently used addresses in a compact table format.
 
 ```go
-import "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/addresslookup"
+import "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/addresslookup"
 
 // Fetch ALT from chain
 alt, err := addresslookup.FetchAddressLookupTableAccount(ctx, rpcClient, altAddress)
@@ -304,7 +308,7 @@ fmt.Printf("ALT contains %d addresses\n", len(alt.Addresses))
 Use Durable Nonce to implement transaction replay protection and optimize transaction processing.
 
 ```go
-import "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/nonce"
+import "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/nonce"
 
 // Fetch nonce info
 nonceInfo, err := nonce.FetchNonceInfo(ctx, rpcClient, nonceAccount)

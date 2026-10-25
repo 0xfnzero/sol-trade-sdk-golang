@@ -4,8 +4,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/examples/internal/pumpswapreplay"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/trading"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/examples/internal/pumpswapreplay"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/trading"
 	"github.com/gagliardetto/solana-go"
 	"os"
 )

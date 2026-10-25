@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/params"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/params"
 	"github.com/gagliardetto/solana-go"
 	"github.com/mr-tron/base58"
 )

@@ -4,11 +4,11 @@ package trading
 // snapshot. No account discovery, RPC, simulation or submission occurs here.
 import (
 	"errors"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/serialization"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/subscription"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/serialization"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/subscription"
 	"github.com/gagliardetto/solana-go"
 	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/programs/system"

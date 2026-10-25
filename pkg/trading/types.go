@@ -1,7 +1,7 @@
 package trading
 
 import (
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
 )
 
 // Re-exports from the main package for convenience

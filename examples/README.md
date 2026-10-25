@@ -4,6 +4,11 @@ Pump.fun defaults to V3 with per-request V1/V2/V3 overrides. See [version config
 
 Examples are updated for the current Go SDK API. Basic protocol demonstrations use synthetic accounts and do not submit transactions. Cached simulation examples use explicit bank simulation; see ../docs/USAGE.md#simulation-matrix.
 
+
+Official Pump.fun/PumpSwap multi-hop buy and sell: [`pump_multi_hop`](pump_multi_hop/main.go); `go run ./examples/pump_multi_hop --help`. [Four workflows and settlement](../docs/PUMPFUN_VERSIONS.md#official-multi-hop).
+
+`cached_trade` accepts optional `pump_route` JSON settings for Auto / Official / Sequential; see [execution selection](../docs/PUMPFUN_VERSIONS.md#execution-selection). It reports aggregate metadata when official execution is selected.
+
 ## Run
 
 ```bash

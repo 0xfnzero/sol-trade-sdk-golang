@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 )
 

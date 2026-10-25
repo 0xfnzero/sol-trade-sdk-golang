@@ -3,7 +3,7 @@ package trading
 import (
 	"context"
 	"crypto/ed25519"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"

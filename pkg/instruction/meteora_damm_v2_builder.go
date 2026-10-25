@@ -11,7 +11,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/constants"
 )
 
 // ===== Meteora DAMM V2 Program Constants from Rust: src/instruction/utils/meteora_damm_v2.rs =====

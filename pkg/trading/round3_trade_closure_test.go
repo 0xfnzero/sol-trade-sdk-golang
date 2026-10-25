@@ -3,7 +3,7 @@ package trading
 import (
 	"context"
 	"encoding/json"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
 	"github.com/gagliardetto/solana-go"
 	"net/http"
 	"net/http/httptest"

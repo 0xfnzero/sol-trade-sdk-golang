@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/calc"
 	"github.com/gagliardetto/solana-go"
 	"math/big"
 	"os"

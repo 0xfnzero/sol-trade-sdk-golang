@@ -4,16 +4,17 @@ package trading
 import (
 	"context"
 	"errors"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/serialization"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/subscription"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/serialization"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/subscription"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"math"
 )
 
 type CachedTradeRequest struct {
+	PumpRoute                 instruction.PumpRouteOptions
 	PumpFunVersion            soltradesdk.PumpFunVersion
 	TradeConfig               *soltradesdk.TradeConfig
 	Candidates                []subscription.PoolTradeHint
@@ -189,7 +190,22 @@ func prepareCachedTrade(r CachedTradeRequest, compileV1 bool) (PreparedCachedTra
 		arrays = 8
 	}
 	var route subscription.PreparedCachedRoute
-	if r.DexType == soltradesdk.DexTypeMeteoraDammV2 {
+	var official *subscription.PreparedCachedRoute
+	if r.DexType == soltradesdk.DexTypePumpFun || r.DexType == soltradesdk.DexTypePumpSwap {
+		official, e = r.Snapshot.PrepareOfficialPumpRoute(r.Hints, r.Context, r.Payer, r.Amount, r.PumpRoute, r.NativeInput || r.NativeOutput)
+		if e != nil {
+			return empty, e
+		}
+	}
+	if official == nil && r.PumpRoute.Execution == instruction.PumpRouteOfficial {
+		return empty, errors.New("requested route does not support official Pump execution")
+	}
+	if official != nil {
+		if r.FixedOutputAmount != nil {
+			return empty, errors.New("official Pump routes require exact-input sizing")
+		}
+		route, stateNative = *official, false
+	} else if r.DexType == soltradesdk.DexTypeMeteoraDammV2 {
 		route, e = r.Snapshot.PrepareExplicitDammV2Route(r.Hints, r.Context, r.UnixTimestamp, r.Payer, r.Amount, r.FixedOutputAmount, r.TradeType == soltradesdk.TradeTypeBuy)
 	} else {
 		if r.FixedOutputAmount != nil {
@@ -199,6 +215,9 @@ func prepareCachedTrade(r CachedTradeRequest, compileV1 bool) (PreparedCachedTra
 	}
 	if e != nil {
 		return empty, e
+	}
+	if r.PumpRoute.Execution != instruction.PumpRouteSequential && r.PumpRoute.MinimumOutputAmount != nil && route.MinimumNetAmountOut < *r.PumpRoute.MinimumOutputAmount {
+		return empty, errors.New("sequential route cannot guarantee the requested final output; refresh its quotes")
 	}
 	return finalizeCachedRoute(r, route, stateNative, compileV1)
 }

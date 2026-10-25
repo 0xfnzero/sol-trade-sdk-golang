@@ -1,6 +1,7 @@
 package instruction
 
 import (
+	"encoding/binary"
 	"math/big"
 	"testing"
 )
@@ -64,5 +65,29 @@ func TestDecodePoolAccountValidatesDiscriminator(t *testing.T) {
 	account[0] ^= 0xff
 	if DecodePoolAccount(account) != nil {
 		t.Fatal("accepted Pool account with wrong discriminator")
+	}
+}
+
+func TestDecodePoolCurrentFeesAndPartialLayouts(t *testing.T) {
+	body := make([]byte, 263)
+	copy(body[237:253], signedI128LE(big.NewInt(-500)))
+	binary.LittleEndian.PutUint64(body[253:261], 200)
+	body[261] = 1
+	body[262] = 1
+	pool := DecodePool(body)
+	if pool == nil || pool.VirtualQuoteReserves.Cmp(big.NewInt(-500)) != 0 || pool.CreatorFeeBps != 200 || !pool.CanEditCreatorFee || !pool.IsHolderReward {
+		t.Fatalf("invalid current fee fields %+v", pool)
+	}
+	if DecodePool(body[:262]).CreatorFeeBps != 200 || DecodePool(body[:253]).CreatorFeeBps != 0 {
+		t.Fatal("legacy extension compatibility")
+	}
+	for size := 254; size < 262; size++ {
+		if DecodePool(body[:size]) != nil {
+			t.Fatalf("partial fee body accepted %d", size)
+		}
+	}
+	body[261] = 2
+	if DecodePool(body) != nil {
+		t.Fatal("invalid Borsh bool accepted")
 	}
 }

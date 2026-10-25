@@ -3,7 +3,7 @@ package instruction
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/constants"
 	"github.com/gagliardetto/solana-go"
 	"os"
 	"testing"

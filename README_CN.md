@@ -8,8 +8,8 @@
 </p>
 
 <p align="center">
-    <a href="https://pkg.go.dev/github.com/0xfnzero/sol-trade-sdk-golang/v9">
-        <img src="https://pkg.go.dev/badge/github.com/0xfnzero/sol-trade-sdk-golang/v9.svg" alt="Go Reference">
+    <a href="https://pkg.go.dev/github.com/0xfnzero/sol-trade-sdk-golang/v10">
+        <img src="https://pkg.go.dev/badge/github.com/0xfnzero/sol-trade-sdk-golang/v10.svg" alt="Go Reference">
     </a>
     <a href="#许可证">
         <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
@@ -30,11 +30,15 @@
     <a href="https://discord.gg/vuazbGkqQE">Discord</a>
 </p>
 
-当前版本：**9.0.1**。升级前请阅读 [迁移说明](RELEASE_NOTES.md)；历史变更见 [版本记录](CHANGELOG_CN.md)。
+当前版本：**10.0.0**。升级前请阅读 [迁移说明](RELEASE_NOTES.md)；历史变更见 [版本记录](CHANGELOG_CN.md)。
 
 ## 目录
 
 Pump.fun 全局默认 V3，可按单笔交易切换 V1/V2/V3；[版本配置、多跳示例和模拟限制](docs/PUMPFUN_VERSIONS.md)。
+
+官方单指令多跳（Pump.fun 内盘 / PumpSwap 外盘，均支持买卖）：[`pump_multi_hop`](examples/pump_multi_hop/main.go)。运行方式与参数见[多跳说明](docs/PUMPFUN_VERSIONS.md#official-multi-hop)。
+
+缓存交易入口支持 Auto / Official / Sequential：官方优先需要独立的最终下限和当前回购收款人；跨 DEX 保留逐跳。详见上方执行选择说明。
 
 - [SDK 版本与相关项目](#sdk-版本与相关项目)
 - [安装](#安装)
@@ -52,24 +56,24 @@ Pump.fun 全局默认 V3，可按单笔交易切换 V1/V2/V3；[版本配置、�
 
 | 语言 | 仓库 | 用途 | 版本 |
 |----------|------------|-------------|---------|
-| Rust | [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk) | DEX 交易与账户事件解析 | `v0.9.1` |
-| Node.js | [sol-parser-sdk-nodejs](https://github.com/0xfnzero/sol-parser-sdk-nodejs) | DEX 交易与账户事件解析 | `v0.9.1` |
-| Python | [sol-parser-sdk-python](https://github.com/0xfnzero/sol-parser-sdk-python) | DEX 交易与账户事件解析 | `v0.9.1` |
-| Go | [sol-parser-sdk-golang](https://github.com/0xfnzero/sol-parser-sdk-golang) | DEX 交易与账户事件解析 | `v0.9.1` |
-| Rust | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | 交易构建、签名与多通道提交 | `v9.0.1` |
-| Node.js | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | 交易构建、签名与多通道提交 | `v9.0.1` |
-| Python | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | 交易构建、签名与多通道提交 | `v9.0.1` |
-| Go | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | 交易构建、签名与多通道提交 | `v9.0.1` |
-| Rust | [sol-shred-sdk](https://github.com/0xfnzero/sol-shred-sdk) | 原始 Shred 解码与 ShredStream 指令事件 | `v6.0.1` |
-| Rust | [solana-streamer](https://github.com/0xfnzero/solana-streamer) | gRPC / ShredStream 订阅与事件流封装 | `v5.0.0` |
-| Rust | [sol-trade-router-sdk](https://github.com/0xfnzero/sol-trade-router-sdk) | 链上多跳 Router 与客户端 SDK | `v0.3.0` |
+| Rust | [sol-parser-sdk](https://github.com/0xfnzero/sol-parser-sdk) | DEX 交易与账户事件解析 | `v0.10.0` |
+| Node.js | [sol-parser-sdk-nodejs](https://github.com/0xfnzero/sol-parser-sdk-nodejs) | DEX 交易与账户事件解析 | `v0.10.0` |
+| Python | [sol-parser-sdk-python](https://github.com/0xfnzero/sol-parser-sdk-python) | DEX 交易与账户事件解析 | `v0.10.0` |
+| Go | [sol-parser-sdk-golang](https://github.com/0xfnzero/sol-parser-sdk-golang) | DEX 交易与账户事件解析 | `v0.10.0` |
+| Rust | [sol-trade-sdk](https://github.com/0xfnzero/sol-trade-sdk) | 交易构建、签名与多通道提交 | `v10.0.0` |
+| Node.js | [sol-trade-sdk-nodejs](https://github.com/0xfnzero/sol-trade-sdk-nodejs) | 交易构建、签名与多通道提交 | `v10.0.0` |
+| Python | [sol-trade-sdk-python](https://github.com/0xfnzero/sol-trade-sdk-python) | 交易构建、签名与多通道提交 | `v10.0.0` |
+| Go | [sol-trade-sdk-golang](https://github.com/0xfnzero/sol-trade-sdk-golang) | 交易构建、签名与多通道提交 | `v10.0.0` |
+| Rust | [sol-shred-sdk](https://github.com/0xfnzero/sol-shred-sdk) | 原始 Shred 解码与 ShredStream 指令事件 | `v6.0.2` |
+| Rust | [solana-streamer](https://github.com/0xfnzero/solana-streamer) | gRPC / ShredStream 订阅与事件流封装 | `v5.0.1` |
+| Rust | [sol-trade-router-sdk](https://github.com/0xfnzero/sol-trade-router-sdk) | 链上多跳 Router 与客户端 SDK | `v0.4.0` |
 
 <a id="安装"></a>
 
 ## 安装
 
 ```sh
-go get github.com/0xfnzero/sol-trade-sdk-golang/v9@v9.0.1
+go get github.com/0xfnzero/sol-trade-sdk-golang/v10@v10.0.0
 ```
 
 运行仓库示例或参与开发时，再克隆源码：
@@ -133,7 +137,7 @@ import (
     "fmt"
     "log"
 
-    soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+    soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
     "github.com/gagliardetto/solana-go"
 )
 
@@ -274,7 +278,7 @@ bloxrouteConfig := soltradesdk.SwqosConfig{
 SDK 提供了强大的中间件系统，允许您在交易执行前修改、添加或移除指令。中间件按添加顺序执行：
 
 ```go
-import "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/middleware"
+import "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/middleware"
 
 manager := middleware.NewManager()
 manager.Add(FirstMiddleware{})   // 最先执行
@@ -287,7 +291,7 @@ manager.Add(ThirdMiddleware{})   // 最后执行
 地址查找表（ALT）允许您通过以紧凑的表格格式存储常用地址来优化交易大小并降低费用。
 
 ```go
-import "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/addresslookup"
+import "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/addresslookup"
 
 // 从链上获取 ALT
 alt, err := addresslookup.FetchAddressLookupTableAccount(ctx, rpcClient, altAddress)
@@ -302,7 +306,7 @@ fmt.Printf("ALT 包含 %d 个地址\n", len(alt.Addresses))
 使用持久 Nonce 实现交易重放保护并优化交易处理。
 
 ```go
-import "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/nonce"
+import "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/nonce"
 
 // 获取 nonce 信息
 nonceInfo, err := nonce.FetchNonceInfo(ctx, rpcClient, nonceAccount)

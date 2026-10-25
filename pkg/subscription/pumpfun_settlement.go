@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 	"unicode/utf8"
 )

@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v9/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
 	"github.com/gagliardetto/solana-go"
 	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/rpc"

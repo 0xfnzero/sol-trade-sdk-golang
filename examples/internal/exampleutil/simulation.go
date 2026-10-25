@@ -2,6 +2,7 @@ package exampleutil
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -59,26 +60,11 @@ func SimulateIfRequested(args []string, wire []byte, slot uint64) error {
 		endpoint = "https://api.mainnet-beta.solana.com"
 	}
 	encoded := base64.StdEncoding.EncodeToString(wire)
-	payload, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "simulateTransaction", "params": []any{encoded, map[string]any{"encoding": "base64", "sigVerify": false, "replaceRecentBlockhash": true, "innerInstructions": true, "commitment": "confirmed", "minContextSlot": slot}}})
+	body, err := SimulateRaw(context.Background(), endpoint, wire, slot)
 	if err != nil {
 		return err
 	}
-	client := http.Client{Timeout: 30 * time.Second}
-	response, err := client.Post(endpoint, "application/json", bytes.NewReader(payload))
-	if err != nil {
-		return errors.New("simulation transport failed")
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
-	if err != nil {
-		return errors.New("simulation response read failed")
-	}
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("simulation HTTP %d", response.StatusCode)
-	}
-	if !json.Valid(body) {
-		return errors.New("invalid simulation JSON")
-	}
+
 	if *output != "" {
 		evidence, err := json.MarshalIndent(map[string]any{"wire": encoded, "response": json.RawMessage(body)}, "", "  ")
 		if err != nil {
@@ -90,4 +76,36 @@ func SimulateIfRequested(args []string, wire []byte, slot uint64) error {
 	}
 	fmt.Println(string(body))
 	return ValidateSimulationResponse(body)
+}
+
+// SimulateRaw preserves V1 response fields instead of decoding them through legacy transaction structs.
+// Execution errors remain in the response so callers can save evidence before validation.
+func SimulateRaw(ctx context.Context, endpoint string, wire []byte, slot uint64) ([]byte, error) {
+	encoded := base64.StdEncoding.EncodeToString(wire)
+	payload, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "simulateTransaction", "params": []any{encoded, map[string]any{"encoding": "base64", "sigVerify": false, "replaceRecentBlockhash": true, "innerInstructions": true, "commitment": "confirmed", "minContextSlot": slot}}})
+	if err != nil {
+		return nil, err
+	}
+	client := http.Client{Timeout: 30 * time.Second}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, errors.New("invalid simulation endpoint")
+	}
+	request.Header.Set("Content-Type", "application/json")
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, errors.New("simulation transport failed")
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
+	if err != nil {
+		return nil, errors.New("simulation response read failed")
+	}
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("simulation HTTP %d", response.StatusCode)
+	}
+	if !json.Valid(body) {
+		return nil, errors.New("invalid simulation JSON")
+	}
+	return body, nil
 }
