@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/examples/internal/exampleutil"
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/examples/internal/exampleutil"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/common"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )

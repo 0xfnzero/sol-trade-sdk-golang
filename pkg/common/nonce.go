@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 )

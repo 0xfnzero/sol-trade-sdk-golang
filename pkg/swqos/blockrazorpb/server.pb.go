@@ -148,7 +148,7 @@ const file_server_proto_rawDesc = "" +
 	"\fSendResponse\x12\x1c\n" +
 	"\tsignature\x18\x01 \x01(\tR\tsignature2V\n" +
 	"\x06Server\x12L\n" +
-	"\x15SendBinaryTransaction\x12\x1b.serverpb.SendBinaryRequest\x1a\x16.serverpb.SendResponseBEZCgithub.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/swqos/blockrazorpbb\x06proto3"
+	"\x15SendBinaryTransaction\x12\x1b.serverpb.SendBinaryRequest\x1a\x16.serverpb.SendResponseBEZCgithub.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/swqos/blockrazorpbb\x06proto3"
 
 var (
 	file_server_proto_rawDescOnce sync.Once

@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/cache"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/pool"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/swqos"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/utils"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/cache"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/pool"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/swqos"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/utils"
 	"github.com/gagliardetto/solana-go"
 )
 

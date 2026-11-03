@@ -1,4 +1,4 @@
-module github.com/0xfnzero/sol-trade-sdk-golang/v10
+module github.com/0xfnzero/sol-trade-sdk-golang/v11
 
 go 1.25.0
 

@@ -5,9 +5,9 @@ package subscription
 import (
 	"errors"
 	"fmt"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/calc"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/instruction"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/calc"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/instruction"
 	"github.com/gagliardetto/solana-go"
 	"math/big"
 )

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/examples/internal/exampleutil"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/hotpath"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/examples/internal/exampleutil"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/hotpath"
 	"github.com/gagliardetto/solana-go/rpc"
 )
 

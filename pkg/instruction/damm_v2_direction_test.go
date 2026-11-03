@@ -1,7 +1,7 @@
 package instruction
 
 import (
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/constants"
 	"github.com/gagliardetto/solana-go"
 	"testing"
 )

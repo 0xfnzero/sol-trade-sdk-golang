@@ -2,8 +2,8 @@ package common
 
 import (
 	"fmt"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/constants"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/seed"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/constants"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/seed"
 	"github.com/gagliardetto/solana-go"
 )
 

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/common"
-	"github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg/trading"
+	soltradesdk "github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/common"
+	"github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg/trading"
 )
 
 func TestGasFeeStrategy_Create(t *testing.T) {

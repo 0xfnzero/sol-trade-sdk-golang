@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/0xfnzero/sol-trade-sdk-golang/v10/pkg"
+	sdk "github.com/0xfnzero/sol-trade-sdk-golang/v11/pkg"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/system"
 )
